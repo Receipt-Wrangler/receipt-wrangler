@@ -34,6 +34,7 @@ import { ReportTemplateTableService } from "./report-template-table.service";
 import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
 import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
 import { TableComponent } from "../../table/table/table.component";
+import { TableColumn } from "../../table/table-column.interface";
 import { MatIcon } from "@angular/material/icon";
 import { ButtonComponent } from "../../button/button/button.component";
 import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
@@ -144,7 +145,7 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
   }
 
   private setColumns(): void {
-    this.columns = [
+    const columns: TableColumn[] = [
       { columnHeader: "Name", matColumnDef: "name", template: this.nameCell(), sortable: true },
       { columnHeader: "Scope", matColumnDef: "scope", template: this.scopeCell(), sortable: false },
       { columnHeader: "Grouping", matColumnDef: "grouping", template: this.groupingCell(), sortable: false },
@@ -155,9 +156,10 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
     ];
     this.setInitialSortedColumn(
       this.baseTableService.getPagedRequestCommand() as PagedTableInterface,
-      this.columns,
+      columns,
     );
-    this.displayedColumns = ["name", "scope", "grouping", "detail", "formats", "updated_at", "actions"];
+    this.columns.set(columns);
+    this.displayedColumns.set(["name", "scope", "grouping", "detail", "formats", "updated_at", "actions"]);
   }
 
   // ---- Derived display strings (read from each template's stored configuration) ----

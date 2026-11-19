@@ -66,11 +66,11 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
 
   public originalGroup: Group | undefined = undefined;
 
-  public displayedColumns: string[] = [];
+  public displayedColumns = signal<string[]>([]);
 
-  public columns: TableColumn[] = [];
+  public columns = signal<TableColumn[]>([]);
 
-  public disableDeleteButton: boolean = false;
+  public disableDeleteButton = signal(false);
 
   public editLink: string = "";
 
@@ -148,7 +148,7 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
   }
 
   private setColumns(): void {
-    this.columns = [
+    const columns: TableColumn[] = [
       {
         columnHeader: "Name",
         matColumnDef: "name",
@@ -168,11 +168,14 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
         sortable: true,
       },
     ];
-    this.displayedColumns = ["name", "role"];
+    const displayedColumns = ["name", "role"];
 
     if (this.formConfig.mode !== FormMode.view) {
-      this.displayedColumns.push("actions");
+      displayedColumns.push("actions");
     }
+
+    this.columns.set(columns);
+    this.displayedColumns.set(displayedColumns);
   }
 
   private setDataSource(): void {
@@ -219,7 +222,7 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
         untilDestroyed(this),
         startWith(this.groupMembers.value),
         tap((v) => {
-          this.disableDeleteButton = v.length === 1;
+          this.disableDeleteButton.set(v.length === 1);
         })
       )
       .subscribe();

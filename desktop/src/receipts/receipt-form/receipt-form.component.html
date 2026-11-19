@@ -2,25 +2,25 @@
   <app-form-header
     [headerText]="formHeaderText() ?? ''"
     [headerButtonsTemplate]="formHeaderButtons"
-    [displayBackButton]="queueIndex === -1"
+    [displayBackButton]="queueIndex() === -1"
   ></app-form-header>
   <div class="row g-1">
     <div class="col g-4">
-      @if (queueIndex > -1) {
+      @if (queueIndex() > -1) {
         <app-form-section
           class="col"
           headerText="Queue Details"
           [indent]="false"
         >
           <div class="mb-2">
-            Receipt {{ queueIndex + 1 }} of {{ queueIds.length }}
+            Receipt {{ queueIndex() + 1 }} of {{ queueIds().length }}
           </div>
         </app-form-section>
       }
-      @if (mode !== formMode.add) {
+      @if (mode() !== formMode.add) {
         <app-audit-detail-section
-          [data]="originalReceipt"
-          [formMode]="mode"
+          [data]="originalReceipt()"
+          [formMode]="mode()"
           [indent]="false"
         ></app-audit-detail-section>
       }
@@ -37,7 +37,7 @@
               class="w-100"
               label="Name"
               [inputFormControl]="form | formGet : 'name'"
-              [readonly]="mode | inputReadonly"
+              [readonly]="mode() | inputReadonly"
             ></app-input>
             <div class="d-flex align-items-center w-100">
               <app-input
@@ -46,9 +46,9 @@
                 type="text"
                 [isCurrency]="true"
                 [inputFormControl]="form | formGet : 'amount'"
-                [readonly]="(mode | inputReadonly) || syncAmountWithItems"
+                [readonly]="(mode() | inputReadonly) || syncAmountWithItems"
               ></app-input>
-              @if (!(mode | inputReadonly)) {
+              @if (!(mode() | inputReadonly)) {
                 <app-checkbox
                   label="Sync with items"
                   [inputFormControl]="form | formGet : 'syncAmountWithItems'"
@@ -60,31 +60,31 @@
                 class="w-100"
                 data-testid="receipt-categories"
                 [inputFormControl]="form | formGet : 'categories'"
-                [categories]="categories"
+                [categories]="categories()"
                 [creatable]="canCreateCategories()"
-                [readonly]="mode | inputReadonly"
+                [readonly]="mode() | inputReadonly"
               ></app-category-autocomplete>
             }
             @if (!this.selectedGroup()?.groupReceiptSettings?.hideReceiptTags) {
               <app-tag-autocomplete
                 class="w-100"
                 [inputFormControl]="form | formGet : 'tags'"
-                [tags]="tags"
+                [tags]="tags()"
                 [creatable]="canCreateTags()"
-                [readonly]="mode | inputReadonly"
+                [readonly]="mode() | inputReadonly"
               ></app-tag-autocomplete>
             }
             <app-datepicker
               label="Date"
               class="w-100"
               [inputFormControl]="form | formGet : 'date'"
-              [readonly]="mode | inputReadonly"
+              [readonly]="mode() | inputReadonly"
             ></app-datepicker>
             <app-group-autocomplete
               class="w-100"
               data-testid="receipt-group"
               [inputFormControl]="form | formGet : 'groupId'"
-              [readonly]="mode | inputReadonly"
+              [readonly]="mode() | inputReadonly"
             >
             </app-group-autocomplete>
             <app-user-autocomplete
@@ -93,7 +93,7 @@
               label="Paid By"
               [inputFormControl]="form | formGet : 'paidByUserId'"
               [usersToOmit]="usersToOmit()"
-              [readonly]="mode | inputReadonly"
+              [readonly]="mode() | inputReadonly"
             ></app-user-autocomplete>
             <app-select
               class="w-100"
@@ -101,15 +101,15 @@
               optionValueKey="value"
               optionDisplayKey="displayValue"
               [inputFormControl]="form | formGet : 'status'"
-              [readonly]="mode | inputReadonly"
+              [readonly]="mode() | inputReadonly"
               [options]="receiptStatusOptions"
             ></app-select>
             @for (customField of customFieldsFormArray.controls; track customField.value["customFieldId"]) {
               <app-custom-field
                 class="w-100"
                 [formGroup]="$any(customField)"
-                [customFields]="customFields"
-                [readonly]="mode | inputReadonly"
+                [customFields]="customFields()"
+                [readonly]="mode() | inputReadonly"
               ></app-custom-field>
             }
           </div>
@@ -124,7 +124,7 @@
             <div class="w-100 h-100 rw-images-pane__content">
               <app-upload-image
                 class="w-100"
-                [receiptId]="originalReceipt?.id?.toString()"
+                [receiptId]="originalReceipt()?.id?.toString()"
                 (fileLoaded)="imageFileLoaded($event)"
                 (processingChange)="imagesProcessing.set($event)"
               >
@@ -160,11 +160,11 @@
                     class="rw-carousel--fill"
                     [images]="images()"
                     [imagePreviews]="filesToUpload()"
-                    [mode]="mode"
+                    [mode]="mode()"
                     [hideButtonControls]="true"
                     stageHeight="100%"
                     [disabled]="
-                    mode !== formMode.edit || (showProgressBar() ?? false)
+                    mode() !== formMode.edit || (showProgressBar() ?? false)
                   "
                   ></app-carousel>
                 </div>
@@ -180,10 +180,10 @@
       >
         <app-item-list
           [form]="form"
-          [categories]="categories"
-          [tags]="tags"
+          [categories]="categories()"
+          [tags]="tags()"
           [selectedGroup]="selectedGroup()"
-          [triggerAddMode]="triggerItemListAddMode"
+          [triggerAddMode]="triggerItemListAddMode()"
           (itemAdded)="onItemAdded($event)"
           (itemRemoved)="onItemRemoved($event)"
           (itemSplit)="onItemSplit($event)"
@@ -196,10 +196,10 @@
       >
         <app-share-list
           [form]="form"
-          [categories]="categories"
-          [tags]="tags"
+          [categories]="categories()"
+          [tags]="tags()"
           [selectedGroup]="selectedGroup()"
-          [triggerAddMode]="triggerShareListAddMode"
+          [triggerAddMode]="triggerShareListAddMode()"
           (itemAdded)="onItemAdded($event)"
           (itemRemoved)="onItemRemoved($event)"
           (allItemsResolved)="onAllItemsResolved($event)"
@@ -223,12 +223,12 @@
                  receipt, and the comments child only reads its inputs on init, so
                  without a fresh instance it would keep the previous receipt's
                  comments (and the required-comment check would count them). -->
-            @for (receipt of [originalReceipt]; track receipt?.id) {
+            @for (receipt of [originalReceipt()]; track receipt?.id) {
               <app-receipt-comments
                 [receiptId]="receipt?.id"
                 [groupId]="receipt?.groupId"
                 [comments]="receipt?.comments ?? []"
-                [mode]="mode"
+                [mode]="mode()"
                 [preventDeletingLastComment]="isCommentDeletionLimited()"
                 (commentsUpdated)="updateComments($event)"
               ></app-receipt-comments>
@@ -240,13 +240,13 @@
   </div>
 
   <app-form-button-bar
-    [mode]="queueIndex >= 0 ? FormMode.edit : mode"
+    [mode]="queueIndex() >= 0 ? FormMode.edit : mode()"
     [justifyContentEnd]="false"
     [inset]="saveBarInset()"
   >
     <div class="w-100 row">
       <div class="d-flex col">
-        @if (queueIndex > 0) {
+        @if (queueIndex() > 0) {
           <app-button
             matButtonType="iconButton"
             icon="arrow_back"
@@ -256,16 +256,16 @@
         }
       </div>
       <div class="d-flex col align-items-center justify-content-end">
-        @if (!(mode | inputReadonly)) {
+        @if (!(mode() | inputReadonly)) {
           <app-submit-button
             [onlyIcon]="false"
-            [mode]="mode"
+            [mode]="mode()"
             [disabled]="!canEditReceipt()"
             [disableOnLoading]="true"
-            [buttonText]="submitButtonText"
+            [buttonText]="submitButtonText()"
           ></app-submit-button>
         }
-        @if (queueIndex > -1 && queueIndex != queueIds.length - 1) {
+        @if (queueIndex() > -1 && queueIndex() != queueIds().length - 1) {
           <app-button
             matButtonType="iconButton"
             icon="arrow_forward"
@@ -304,7 +304,7 @@
     cdkDrag
     cdkDragHandle
     cdkDragRootElement=".cdk-overlay-pane"
-    [originalReceipt]="originalReceipt"
+    [originalReceipt]="originalReceipt()"
     [usersToOmit]="usersToOmit()"
     [amountToSplit]="form.get('amount')?.value || 0"
     (itemsToAdd)="onQuickActionItemsAdded($event)"
@@ -312,7 +312,7 @@
 </ng-template>
 
 <ng-template #formHeaderButtons>
-  @if (mode | inputReadonly) {
+  @if (mode() | inputReadonly) {
     <app-button
       class="ms-1"
       color="accent"
@@ -320,7 +320,7 @@
       tooltip="Edit"
       icon="edit"
       [disabled]="!canEditReceipt()"
-      [buttonRouterLink]="[editLink]"
+      [buttonRouterLink]="[editLink()]"
     ></app-button>
   }
   @if (canManageCustomFields()) {
@@ -331,13 +331,13 @@
       icon="list_alt"
       tooltip="Manage custom fields"
       color="accent"
-      [readonly]="mode | inputReadonly"
-      [items]="customFieldsStatefulMenuItems"
-      [headerText]="(mode | inputReadonly) ? 'View Custom Fields' : 'Edit Custom Fields'"
+      [readonly]="mode() | inputReadonly"
+      [items]="customFieldsStatefulMenuItems()"
+      [headerText]="(mode() | inputReadonly) ? 'View Custom Fields' : 'Edit Custom Fields'"
       (itemSelected)="customFieldChanged($event)"
     ></app-filtered-stateful-menu>
   }
-  @if (mode | inputReadonly) {
+  @if (mode() | inputReadonly) {
     <app-button
       class="ms-1"
       data-testid="receipt-duplicate"
@@ -349,7 +349,7 @@
       (clicked)="duplicateReceipt()"
     ></app-button>
   }
-  @if (mode !== formMode.add && canViewHistory()) {
+  @if (mode() !== formMode.add && canViewHistory()) {
     <app-button
       class="ms-1"
       data-testid="receipt-history-toggle"
@@ -365,7 +365,7 @@
 </ng-template>
 
 <ng-template #itemsSectionHeaderButtons>
-  @if (!(mode | inputReadonly)) {
+  @if (!(mode() | inputReadonly)) {
     <app-button
       type="button"
       matButtonType="iconButton"
@@ -379,7 +379,7 @@
 </ng-template>
 
 <ng-template #sharesSectionHeaderButtons>
-  @if (!(mode | inputReadonly)) {
+  @if (!(mode() | inputReadonly)) {
     <app-button
       type="button"
       matButtonType="iconButton"
@@ -390,7 +390,7 @@
       [disabled]="!canEditReceipt()"
     ></app-button>
   }
-  @if (!(mode | inputReadonly)) {
+  @if (!(mode() | inputReadonly)) {
     <app-button
       class="mb-4"
       customIcon="split"
@@ -404,7 +404,7 @@
 </ng-template>
 
 <ng-template #imagesSectionHeaderButtons>
-  @if (!(mode | inputReadonly)) {
+  @if (!(mode() | inputReadonly)) {
     <app-button
       class="mb-4"
       color="accent"
@@ -416,7 +416,7 @@
     ></app-button>
   }
   @if (images() && (images().length > 0 || filesToUpload().length > 0)) {
-    @if (this.mode != FormMode.add) {
+    @if (this.mode() != FormMode.add) {
       <app-button
         class="mb-4"
         color="accent"
@@ -461,7 +461,7 @@
       (clicked)="zoomImageOut()"
     ></app-button>
   }
-  @if (!(mode | inputReadonly) && (images().length > 0 || filesToUpload().length > 0) && aiPoweredReceipts()) {
+  @if (!(mode() | inputReadonly) && (images().length > 0 || filesToUpload().length > 0) && aiPoweredReceipts()) {
     <app-button
       matButtonType="iconButton"
       icon="receipt_long"
@@ -471,7 +471,7 @@
       (clicked)="magicFill()"
     ></app-button>
   }
-  @if (!(mode | inputReadonly) && (images().length > 0 || filesToUpload().length > 0)) {
+  @if (!(mode() | inputReadonly) && (images().length > 0 || filesToUpload().length > 0)) {
     <app-button
       data-testid="receipt-image-remove"
       matButtonType="iconButton"
@@ -498,7 +498,7 @@
       class="rw-carousel--fill"
       [images]="images()"
       [imagePreviews]="filesToUpload()"
-      [mode]="mode"
+      [mode]="mode()"
       [hideButtonControls]="true"
       stageHeight="100%"
       [initialIndex]="currentImageIndex"
@@ -506,9 +506,10 @@
   </div>
 </ng-template>
 
-@if (historyOpen() && mode !== formMode.add && canViewHistory() && originalReceipt) {
+@let historyReceipt = originalReceipt();
+@if (historyOpen() && mode() !== formMode.add && canViewHistory() && historyReceipt) {
   <app-receipt-history-drawer
-    [receiptId]="originalReceipt.id"
+    [receiptId]="historyReceipt.id"
     (occupiedChange)="historyOccupied.set($event)"
     (closed)="closeHistory()"
   ></app-receipt-history-drawer>

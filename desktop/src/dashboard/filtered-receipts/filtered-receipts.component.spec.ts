@@ -37,7 +37,7 @@ describe("FilteredReceiptsComponent", () => {
     const serviceSpy = jest.spyOn(
       TestBed.inject(ReceiptFilterService),
       "getPagedReceiptsForGroups"
-    ).mockReturnValue(of([] as any));
+    ).mockReturnValue(of({ data: [], totalCount: 0 } as any));
     store.reset({
       groups: {
         selectedGroupId: "1",

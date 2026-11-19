@@ -3,7 +3,7 @@ import { Component, OnInit, ViewEncapsulation, signal } from "@angular/core";
 import { FormBuilder, FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { Store } from "@ngxs/store";
-import { BehaviorSubject, catchError, EMPTY, finalize, switchMap, tap, } from "rxjs";
+import { BehaviorSubject, catchError, EMPTY, from, switchMap, tap } from "rxjs";
 import { AppData, AuthService, OidcProviderSummary } from "src/open-api";
 import { SnackbarService } from "src/services";
 import { setAppData } from "src/utils";
@@ -186,13 +186,25 @@ export class AuthForm implements OnInit {
       .login(this.form.value)
       .pipe(
         switchMap((appData: AppData) => setAppData(this.store, appData)),
-        tap(() =>
-          this.router.navigate([
+        // The spinner stays up until the dashboard replaces this page. Clearing it
+        // as soon as navigate() was called re-created the filled form for a moment,
+        // and ngx-mask writes an input's value a microtask later, so the field's
+        // label rendered as if empty (NG0100 in dev).
+        switchMap(() =>
+          from(this.router.navigate([
             this.store.selectSnapshot(GroupState.dashboardLink),
-          ]),
+          ]))
         ),
-        catchError(() => EMPTY), // the HTTP interceptor surfaces the failure toast
-        finalize(() => this.isLoading.set(false))
+        tap((navigated) => {
+          if (!navigated) {
+            this.isLoading.set(false);
+          }
+        }),
+        catchError(() => {
+          // the HTTP interceptor surfaces a failed login's toast
+          this.isLoading.set(false);
+          return EMPTY;
+        })
       )
       .subscribe();
   }

@@ -50,9 +50,9 @@ export class CategoryTableComponent implements OnInit, AfterViewInit {
 
   public dataSource = signal(new MatTableDataSource<PagedDataDataInner>([]));
 
-  public displayedColumns: string[] = [];
+  public displayedColumns = signal<string[]>([]);
 
-  public columns: TableColumn[] = [];
+  public columns = signal<TableColumn[]>([]);
 
   public totalCount = signal(0);
 
@@ -145,13 +145,13 @@ export class CategoryTableComponent implements OnInit, AfterViewInit {
       }
     }
 
-    this.columns = columns;
-    this.displayedColumns = [
+    this.columns.set(columns);
+    this.displayedColumns.set([
       "name",
       "description",
       "numberOfReceipts",
       "actions",
-    ];
+    ]);
   }
 
   public openEditDialog(categoryView: CategoryView): void {

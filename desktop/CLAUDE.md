@@ -40,15 +40,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    `/dashboard/group/<id>` ("All Dashboards", empty on a fresh DB).
 
 **Driving the UI / screenshots with Playwright in the sandbox.** `@playwright/test` is pinned to
-`1.59.1`, which expects Chromium build **1217**, but the sandbox pre-installs build **1194** at
-`/opt/pw-browsers/chromium` (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`). Do **not** run
+`1.59.1`, which expects Chromium build **1217**. The sandbox pre-installs whatever build its image
+ships under `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` (1243 as of 2026-11, 1194 before that), with
+`/opt/pw-browsers/chromium` a symlink to that build's binary. Do **not** run
 `playwright install` / `npm run e2e:install` (the download is blocked and pointless). Instead launch
 Chromium by explicit path:
 ```js
 const { chromium } = require('@playwright/test');
 const browser = await chromium.launch({
   headless: true,
-  executablePath: '/opt/pw-browsers/chromium',   // pre-installed 1194, ignore the 1217 mismatch
+  executablePath: '/opt/pw-browsers/chromium',   // the pre-installed build, whatever its number
 });
 ```
 Run a standalone script (one that lives outside `desktop/`) with
@@ -64,31 +65,31 @@ await page.waitForURL(/\/dashboard\/group\/\d+/);
 
 **Running the whole `npm run e2e` suite in the sandbox — bridge the build numbers with symlinks.**
 The `executablePath` trick above only helps ad-hoc scripts; `playwright.config.ts` has no
-`launchOptions` hook, so the suite resolves the 1217 paths and fails. Bridge them to the installed
-build with symlinks (outside the repo, so nothing is committed). Alongside the `chromium` convenience
-symlink, the image ships two **versioned directories** — `chromium-1194/` and
-`chromium_headless_shell-1194/` — and those are what you point at; confirm the number first, since it
-moves with the sandbox image:
+`launchOptions` hook, so the suite looks for the build the pinned Playwright expects and fails.
+Point that build number at the installed one with symlinks (outside the repo, so nothing is
+committed). Read both numbers rather than trusting this doc, since the installed one moves with the
+sandbox image:
 
 ```bash
-ls -d /opt/pw-browsers/chromium*   # chromium, chromium-1194, chromium_headless_shell-1194
-SRC=1194                           # installed build, from the listing above
-WANT=1217                          # build @playwright/test 1.59.1 resolves
-
-# full chromium: the installed layout already matches what $WANT expects
+cd /home/user/receipt-wrangler/desktop
+# required by file path: the package's `exports` map hides browsers.json
+WANT=$(node -p "require('./node_modules/playwright-core/browsers.json').browsers.find(b => b.name === 'chromium').revision")
+SRC=$(ls -d /opt/pw-browsers/chromium-[0-9]* | grep -v "chromium-$WANT$" | sed 's/.*-//' | sort -n | tail -1)
+echo "Playwright wants $WANT, image ships $SRC"
 ln -sfn /opt/pw-browsers/chromium-$SRC /opt/pw-browsers/chromium-$WANT
-
-# headless shell: the directory AND the binary are named differently, so build the shape by hand
-mkdir -p /opt/pw-browsers/chromium_headless_shell-$WANT
-ln -sfn /opt/pw-browsers/chromium_headless_shell-$SRC/chrome-linux \
-        /opt/pw-browsers/chromium_headless_shell-$WANT/chrome-headless-shell-linux64
-ln -sfn headless_shell \
-        /opt/pw-browsers/chromium_headless_shell-$SRC/chrome-linux/chrome-headless-shell
-touch /opt/pw-browsers/chromium_headless_shell-$WANT/{INSTALLATION_COMPLETE,DEPENDENCIES_VALIDATED}
+ln -sfn /opt/pw-browsers/chromium_headless_shell-$SRC /opt/pw-browsers/chromium_headless_shell-$WANT
 ```
 
+That works because the installed directories already have the layout 1.59.1 looks for:
+`chromium-$SRC/chrome-linux64/` and `chromium_headless_shell-$SRC/chrome-headless-shell-linux64/`
+(verified with build 1243, which ran the full suite). **An older image laid them out as
+`chrome-linux/`** (build 1194 did). There the headless shell needs its shape built by hand instead of
+the second link: `mkdir` `chromium_headless_shell-$WANT`, link its `chrome-headless-shell-linux64` to
+the installed `chrome-linux`, add a `chrome-headless-shell -> headless_shell` link inside that, and
+`touch` `INSTALLATION_COMPLETE` and `DEPENDENCIES_VALIDATED` in the new directory.
+
 `devices['Desktop Chrome']` runs headless, so it is the **headless shell** path that actually fails
-first — symlinking only `chromium-$WANT` is not enough. Then export the four `E2E_*` credential vars
+first — linking only `chromium-$WANT` is not enough. Then export the four `E2E_*` credential vars
 and run `npx playwright test`; leaving `E2E_BASE_URL` at `http://localhost:4200` keeps the config's
 `webServer` block active, which reuses an `ng serve` you already have running.
 
@@ -1279,9 +1280,10 @@ redirect, and administer the provider rows.
   edit, blank secret omitted / typed secret included, scope must contain `openid`, reserved and
   malformed names, the warning renders), `oidc-provider-table.component.spec.ts` (the actions-column
   gating in all three permission shapes), and `feature-config.state.spec.ts` (defaults to `[]`, and
-  survives a payload that omits the key). Note the table specs use **`detectChanges(false)`**, the
-  existing convention for these tables — `setColumns()` runs in `ngAfterViewInit` and mutates a plain
-  property, which trips NG0100 in the dev-mode check-no-changes pass.
+  survives a payload that omits the key). The table specs run a full `detectChanges()`, check-no-changes
+  pass included: `setColumns()` runs in `ngAfterViewInit` but writes column **signals**, so it no
+  longer trips NG0100. (It did while they were plain fields, and every table spec skipped the check
+  with `detectChanges(false)`.)
 
 ## Secure cookies setting
 
@@ -1604,6 +1606,22 @@ Angular no longer uses zone.js. Change detection is triggered ONLY by:
     trigger CD so the reset repainted, while on **failure** nothing did and the spinner stuck
     forever. State only written on a failure path is the easiest kind to miss — check that a
     converted signal is exercised by a test on the *error* branch, not just the happy one.
+  - **Any incidental repaint masks it the same way.** An audit converted 17 components whose
+    async-written fields only repainted because something else in the same callback ran change
+    detection: a success snackbar opening (the API key dialog's new key, the system-settings restart
+    alert), a neighbouring signal write, or a dialog closing. Take that side effect away and the screen
+    stops updating, so convert the field rather than lean on its neighbour.
+  - **Table `columns` / `displayedColumns` are signals.** They are built in `ngAfterViewInit`, because
+    the cell templates are view queries, which is after the view was checked, so a plain field there
+    only renders on some later pass. `BaseTableComponent` declares them as signals; build the arrays
+    in locals, then `.set()` once (`role-list`, `category-table`).
+  - **A form field created already filled can show a stale label.** Every `app-input` binds
+    `[mask]`, so ngx-mask is its value accessor, and ngx-mask writes the DOM value in a
+    `queueMicrotask` without notifying Angular. A field created with a value therefore renders its
+    label as if empty until its view is next checked, and dev mode logs NG0100 if a full
+    check-no-changes pass reaches it first. The login form did this by re-showing itself, filled, while
+    the dashboard loaded; `auth-form` now keeps its spinner up through a successful navigation and
+    only restores the form on a failed login or a refused navigation. Don't flash a filled form back.
 - `ChangeDetectorRef.detectChanges()` still works but is rarely needed — prefer signals.
 - `setTimeout` still works for delays but won't auto-trigger CD. The callback must write to a signal if the template needs updating.
 - All `@HostListener` handlers automatically trigger CD (same as template events).
@@ -1638,7 +1656,10 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
    is pre-installed and `e2e:install` is blocked — apply the `chromium-1217` /
    `chromium_headless_shell-1217` symlinks from "Running in the Claude Code Web/Cloud Sandbox" above
    instead.)
-2. **One-time:** create the two e2e accounts against your local DB. On a fresh DB, public sign-up is
+2. **One-time:** create the two e2e accounts against your local DB with
+   `../api/dev/seed-e2e-users.sh` (idempotent; it logs in as the auto-created `admin`/`admin` and
+   creates both below; it finds its own files, so it runs without leaving `desktop/`). By hand
+   instead: on a fresh DB, public sign-up is
    **off** (`enableLocalSignUp` defaults false) and the API has already auto-created `admin`/`admin`,
    so create them as `admin` (Users screen, or `POST /api/user/` with `appRoleId`):
    - username `e2e-admin`, password `e2e-admin-password`, display name `E2E Admin`, role Legacy Admin

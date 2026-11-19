@@ -61,9 +61,9 @@ export class OidcProviderTableComponent implements OnInit, AfterViewInit {
 
   public dataSource = signal(new MatTableDataSource<PagedDataDataInner>([]));
 
-  public displayedColumns: string[] = [];
+  public displayedColumns = signal<string[]>([]);
 
-  public columns: TableColumn[] = [];
+  public columns = signal<TableColumn[]>([]);
 
   public totalCount = signal(0);
 
@@ -224,8 +224,7 @@ export class OidcProviderTableComponent implements OnInit, AfterViewInit {
       }
     }
 
-    this.columns = columns;
-    this.displayedColumns = ["display_name", "issuer_url", "enabled"];
+    const displayedColumns = ["display_name", "issuer_url", "enabled"];
 
     // Gated on either action, not just delete -- gating on delete alone would
     // hide the whole column, and with it the edit button, from an update-only
@@ -238,7 +237,10 @@ export class OidcProviderTableComponent implements OnInit, AfterViewInit {
     );
 
     if (canUseRowActions) {
-      this.displayedColumns.push("actions");
+      displayedColumns.push("actions");
     }
+
+    this.columns.set(columns);
+    this.displayedColumns.set(displayedColumns);
   }
 }

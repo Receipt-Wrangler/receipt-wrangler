@@ -6,11 +6,11 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { NgxsModule, Store } from '@ngxs/store';
 import { of } from 'rxjs';
 import * as QRCode from 'qrcode';
-import { ApiModule } from '../../open-api';
+import { ApiModule, AppData, AuthService } from '../../open-api';
 import { SetFeatureConfig } from '../../store/feature-config.state.actions';
 
 jest.mock('qrcode', () => ({
@@ -23,6 +23,7 @@ import { SnackbarService } from '../../services/snackbar.service';
 import { AuthForm, buildOidcLoginUrl } from './auth-form.component';
 import { AuthState } from '../../store/auth.state';
 import { FeatureConfigState } from '../../store/feature-config.state';
+import { GroupState } from '../../store/group.state';
 import { AuthFormUtil } from './auth-form.util';
 import { LoginQrComponent } from '../../shared-ui/login-qr/login-qr.component';
 import { RouterTestingModule } from '@angular/router/testing';
@@ -37,7 +38,7 @@ describe('AuthForm', () => {
     await TestBed.configureTestingModule({
     imports: [FeatureDirective,
         MatSnackBarModule,
-        NgxsModule.forRoot([AuthState, FeatureConfigState]),
+        NgxsModule.forRoot([AuthState, FeatureConfigState, GroupState]),
         NoopAnimationsModule,
         ReactiveFormsModule,
         ApiModule,
@@ -111,6 +112,48 @@ describe('AuthForm', () => {
     ]);
 
     httpTesting.verify();
+  });
+
+  describe('after a successful login', () => {
+    const appData = {
+      claims: { userId: 1, username: 'wrangler', displayname: 'Wrangler' },
+      groups: [{ id: 1, name: 'My Receipts', groupMembers: [] }],
+      featureConfig: {},
+      userPreferences: {},
+      users: [],
+    } as unknown as AppData;
+
+    const logIn = async (navigation: Promise<boolean>) => {
+      jest.spyOn(TestBed.inject(AuthService), 'login').mockReturnValue(of(appData) as any);
+      const navigateSpy = jest.spyOn(TestBed.inject(Router), 'navigate').mockReturnValue(navigation);
+      component.form.setValue({ username: 'wrangler', password: 'right-password' });
+      component.submit();
+      await fixture.whenStable();
+      return navigateSpy;
+    };
+
+    // Re-creating the filled form while the dashboard loaded left its labels
+    // rendered as if the fields were empty: ngx-mask writes an input's value a
+    // microtask after the field is created (NG0100 in dev).
+    it('keeps the spinner up while the dashboard loads', async () => {
+      const navigateSpy = await logIn(new Promise<boolean>(() => undefined));
+
+      expect(navigateSpy).toHaveBeenCalled();
+      expect(component.isLoading()).toBe(true);
+      expect(fixture.nativeElement.querySelector('.loading-container')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('app-input')).toBeNull();
+    });
+
+    it('restores the populated form when the navigation is refused', async () => {
+      await logIn(Promise.resolve(false));
+      await fixture.whenStable();
+
+      expect(component.isLoading()).toBe(false);
+      const inputs: HTMLInputElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('app-input input')
+      );
+      expect(inputs.map((input) => input.value)).toEqual(['wrangler', 'right-password']);
+    });
   });
 
   // The QR itself is unit-tested in shared-ui/login-qr; these two only pin that

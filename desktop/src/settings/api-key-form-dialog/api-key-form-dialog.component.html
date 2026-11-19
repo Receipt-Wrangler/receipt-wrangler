@@ -1,5 +1,5 @@
 <app-dialog [headerText]="headerText">
-  @if (!apiKeyResult) {
+  @if (!apiKeyResult()) {
     <div>
       <form [formGroup]="form">
         <div class="mb-2">
@@ -49,7 +49,7 @@
       <div class="mb-4">
         <h4>Your new API key:</h4>
         <div class="d-flex align-items-center justify-content-center gap-2 mt-3">
-          <code class="p-2 bg-light border rounded flex-grow-1 text-break">{{ apiKeyResult.key }}</code>
+          <code class="p-2 bg-light border rounded flex-grow-1 text-break">{{ apiKeyResult()?.key }}</code>
           <app-button
             matButtonType="iconButton"
             icon="content_copy"

@@ -126,8 +126,8 @@ describe("CategoriesListComponent", () => {
   it("should set columns", () => {
     component.ngAfterViewInit();
 
-    expect(component.columns.length).toEqual(4);
-    expect(component.displayedColumns).toEqual([
+    expect(component.columns().length).toEqual(4);
+    expect(component.displayedColumns()).toEqual([
       "name",
       "description",
       "numberOfReceipts",

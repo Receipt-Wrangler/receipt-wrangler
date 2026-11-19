@@ -120,14 +120,14 @@ describe("ApiKeyTableComponent", () => {
 
   describe("scope column", () => {
     beforeEach(() => {
-      fixture.detectChanges(false);
+      fixture.detectChanges();
     });
 
     it("is displayed after the description and is not sortable", () => {
-      const displayed = component.displayedColumns;
+      const displayed = component.displayedColumns();
       expect(displayed.indexOf("scope")).toBe(displayed.indexOf("description") + 1);
 
-      const column = component.columns.find((c) => c.matColumnDef === "scope");
+      const column = component.columns().find((c) => c.matColumnDef === "scope");
       expect(column?.columnHeader).toBe("Scope");
       expect(column?.sortable).toBe(false);
     });
@@ -142,7 +142,7 @@ describe("ApiKeyTableComponent", () => {
       ];
       httpMock.match(() => true).forEach((req) => req.flush({ totalCount: data.length, data }));
       await fixture.whenStable();
-      fixture.detectChanges(false);
+      fixture.detectChanges();
 
       const cells = Array.from(
         (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="api-key-scope"]')

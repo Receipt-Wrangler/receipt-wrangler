@@ -112,8 +112,10 @@ export class SystemEmailFormComponent implements OnInit {
       dialogRef.afterClosed()
         .pipe(
           take(1),
+          // Esc or a backdrop click closes with undefined: treat it like Cancel,
+          // saving the other fields and keeping the stored password.
           tap((result) => {
-            this.callUpdateEndpoint(result);
+            this.callUpdateEndpoint(!!result);
           })
         )
         .subscribe();

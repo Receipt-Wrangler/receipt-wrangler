@@ -13,9 +13,9 @@
 </app-table-header>
 <div class="table-container">
   <app-table
-    [columns]="columns"
+    [columns]="columns()"
     [dataSource]="dataSource()"
-    [displayedColumns]="displayedColumns"
+    [displayedColumns]="displayedColumns()"
     [length]="totalCount()"
     [pageSize]="state()?.pageSize ?? 1"
     [page]="(state()?.page ?? 1) - 1"

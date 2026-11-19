@@ -1,7 +1,7 @@
 <app-table
   [dataSource]="dataSource()"
-  [columns]="columns"
-  [displayedColumns]="displayedColumns"
+  [columns]="columns()"
+  [displayedColumns]="displayedColumns()"
   [pagination]="true"
   [length]="totalCount()"
   [page]="((tableService.page$ | async)  || 1 ) - 1"

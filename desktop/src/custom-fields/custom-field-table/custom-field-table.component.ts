@@ -44,9 +44,9 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
 
   public dataSource = signal(new MatTableDataSource<PagedDataDataInner>([]));
 
-  public displayedColumns: string[] = [];
+  public displayedColumns = signal<string[]>([]);
 
-  public columns: TableColumn[] = [];
+  public columns = signal<TableColumn[]>([]);
 
   public totalCount = signal(0);
 
@@ -192,8 +192,7 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
     }
 
 
-    this.columns = columns;
-    this.displayedColumns = [
+    const displayedColumns = [
       "name",
       "type",
       "description",
@@ -206,8 +205,11 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
       ])
     );
     if (canUseRowActions) {
-      this.displayedColumns.push("actions");
+      displayedColumns.push("actions");
     }
+
+    this.columns.set(columns);
+    this.displayedColumns.set(displayedColumns);
   }
 
   public openDeleteConfirmationDialog(customField: CustomField) {

@@ -4,7 +4,7 @@ import { MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute } from '@angular/router';
 import { NgxsModule } from '@ngxs/store';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { API_KEY_SCOPE_OPTIONS } from '../../constants';
 import { ApiKeyResult, ApiKeyScope, ApiKeyService, ApiKeyView } from '../../open-api';
 import { SnackbarService } from '../../services';
@@ -12,6 +12,7 @@ import { LayoutState } from '../../store/layout.state';
 
 import { ApiKeyFormDialogComponent } from './api-key-form-dialog.component';
 import { provideNgxMask } from 'ngx-mask';
+import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
 
 describe('ApiKeyFormDialogComponent', () => {
   let component: ApiKeyFormDialogComponent;
@@ -80,8 +81,23 @@ describe('ApiKeyFormDialogComponent', () => {
       description: 'Test description',
       scope: ApiKeyScope.Rw
     });
-    expect(component.apiKeyResult).toEqual(mockResult);
+    expect(component.apiKeyResult()).toEqual(mockResult);
     expect(mockSnackbarService.success).toHaveBeenCalledWith('API key created successfully');
+  });
+
+  // Zoneless regression: the response lands after the first render, and the
+  // snackbar is mocked, so nothing but the result itself can repaint the dialog.
+  it('renders the new key once the create response arrives', async () => {
+    const response = new Subject<ApiKeyResult>();
+    mockApiKeyService.createApiKey.mockReturnValue(response as any);
+    component.form.patchValue({ name: 'Test API Key', scope: ApiKeyScope.R });
+    await fixture.whenStable();
+
+    component.submitButtonClicked();
+    response.next({ key: 'rendered-key-789' });
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('rendered-key-789');
   });
 
   it('should update API key when editing existing API key', () => {
@@ -147,7 +163,7 @@ describe('ApiKeyFormDialogComponent', () => {
     mockClipboard.writeText.mockReturnValue(Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: mockClipboard });
 
-    component.apiKeyResult = { key: 'test-key-123' };
+    component.apiKeyResult.set({ key: 'test-key-123' });
 
     await component.copyToClipboard();
 
@@ -157,7 +173,7 @@ describe('ApiKeyFormDialogComponent', () => {
 
   it('should close dialog with result when creating new API key', () => {
     const mockResult: ApiKeyResult = { key: 'test-api-key-123' };
-    component.apiKeyResult = mockResult;
+    component.apiKeyResult.set(mockResult);
 
     component.closeDialog();
 
@@ -236,9 +252,10 @@ describe('ApiKeyFormDialogComponent', () => {
         scope: ApiKeyScope.R
       });
 
-      component.submitButtonClicked();
+      const errors = swallowUnhandledRxjsErrors(() => component.submitButtonClicked());
 
       expect(mockApiKeyService.createApiKey).toHaveBeenCalled();
+      expect(errors).toEqual([error]);
     });
 
     it('should handle update API key error', () => {
@@ -259,9 +276,10 @@ describe('ApiKeyFormDialogComponent', () => {
         scope: ApiKeyScope.Rw
       });
 
-      component.submitButtonClicked();
+      const errors = swallowUnhandledRxjsErrors(() => component.submitButtonClicked());
 
       expect(mockApiKeyService.updateApiKey).toHaveBeenCalled();
+      expect(errors).toEqual([error]);
     });
 
     it('should handle clipboard copy failure', () => {
@@ -271,7 +289,7 @@ describe('ApiKeyFormDialogComponent', () => {
     });
 
     it('should not copy to clipboard when no API key result exists', () => {
-      component.apiKeyResult = undefined;
+      component.apiKeyResult.set(undefined);
 
       component.copyToClipboard();
 
@@ -281,7 +299,7 @@ describe('ApiKeyFormDialogComponent', () => {
     });
 
     it('should not copy to clipboard when API key is empty', () => {
-      component.apiKeyResult = { key: '' };
+      component.apiKeyResult.set({ key: '' });
 
       component.copyToClipboard();
 
@@ -351,14 +369,14 @@ describe('ApiKeyFormDialogComponent', () => {
     });
 
     it('should clear apiKeyResult when switching to edit mode', () => {
-      component.apiKeyResult = { key: 'test-key' };
+      component.apiKeyResult.set({ key: 'test-key' });
 
       const mockApiKey: ApiKeyView = { id: '123', name: 'Test' };
       component.apiKey = mockApiKey;
       component.ngOnInit();
 
       // apiKeyResult should be cleared when switching to edit mode
-      expect(component.apiKeyResult).toBeDefined(); // Component doesn't auto-clear this
+      expect(component.apiKeyResult()).toBeDefined(); // Component doesn't auto-clear this
     });
   });
 
@@ -416,7 +434,7 @@ describe('ApiKeyFormDialogComponent', () => {
 
     it('should handle closeDialog when no API key and no result', () => {
       component.apiKey = undefined;
-      component.apiKeyResult = undefined;
+      component.apiKeyResult.set(undefined);
 
       component.closeDialog();
 
@@ -456,12 +474,12 @@ describe('ApiKeyFormDialogComponent', () => {
       component.submitButtonClicked();
 
       expect(createSpy).toHaveBeenCalled();
-      expect(component.apiKeyResult).toEqual(mockResult);
+      expect(component.apiKeyResult()).toEqual(mockResult);
     });
 
     it('should handle clipboard permission denied gracefully', () => {
       // Test validates component behavior when clipboard API is unavailable
-      component.apiKeyResult = { key: 'test-key-123' };
+      component.apiKeyResult.set({ key: 'test-key-123' });
 
       // Should not throw error when called
       expect(() => component.copyToClipboard()).not.toThrow();
@@ -491,7 +509,7 @@ describe('ApiKeyFormDialogComponent', () => {
       });
 
       // Verify result is stored
-      expect(component.apiKeyResult).toEqual(mockResult);
+      expect(component.apiKeyResult()).toEqual(mockResult);
 
       // Verify success message
       expect(mockSnackbarService.success).toHaveBeenCalledWith('API key created successfully');
@@ -534,7 +552,7 @@ describe('ApiKeyFormDialogComponent', () => {
 
     it('should handle copy to clipboard workflow', () => {
       // Setup API key result
-      component.apiKeyResult = { key: 'copy-test-key-456' };
+      component.apiKeyResult.set({ key: 'copy-test-key-456' });
 
       // Copy to clipboard - basic test that method doesn't throw
       expect(() => component.copyToClipboard()).not.toThrow();

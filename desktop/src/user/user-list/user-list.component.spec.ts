@@ -8,11 +8,12 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { Sort } from "@angular/material/sort";
 import { MatTableDataSource } from "@angular/material/table";
 import { NgxsModule } from "@ngxs/store";
-import { config, of, throwError } from "rxjs";
+import { of, throwError } from "rxjs";
 import { ApiModule, User, UserService } from "../../open-api";
 import { AuthState } from "../../store";
 import { UserTableState } from "../../store/user-table.state";
 import { UserListComponent } from "./user-list.component";
+import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
 
 describe("UserListComponent", () => {
   let component: UserListComponent;
@@ -114,27 +115,16 @@ describe("UserListComponent", () => {
 
   it("should not corrupt datasource/total count when the fetch errors", () => {
     // getTableData delegates errors to the global HTTP interceptor (no component
-    // handler), so RxJS reports the error asynchronously. Swallow that rethrow with
-    // fake timers + a no-op onUnhandledError so the assertion stays deterministic.
-    jest.useFakeTimers();
-    const previousHandler = config.onUnhandledError;
-    config.onUnhandledError = () => {};
+    // handler), so RxJS reports the error as unhandled.
+    const serviceSpy = jest
+      .spyOn(TestBed.inject(UserService), "getPagedUsers")
+      .mockReturnValue(throwError(() => new Error("boom")) as any);
 
-    try {
-      const serviceSpy = jest
-        .spyOn(TestBed.inject(UserService), "getPagedUsers")
-        .mockReturnValue(throwError(() => new Error("boom")) as any);
+    const errors = swallowUnhandledRxjsErrors(() => component.getTableData());
 
-      component.getTableData();
-
-      expect(serviceSpy).toHaveBeenCalled();
-      expect(component.totalCount()).toBe(0);
-      expect(component.dataSource().data.length).toBe(0);
-
-      jest.runOnlyPendingTimers();
-    } finally {
-      config.onUnhandledError = previousHandler;
-      jest.useRealTimers();
-    }
+    expect(errors).toEqual([new Error("boom")]);
+    expect(serviceSpy).toHaveBeenCalled();
+    expect(component.totalCount()).toBe(0);
+    expect(component.dataSource().data.length).toBe(0);
   });
 });

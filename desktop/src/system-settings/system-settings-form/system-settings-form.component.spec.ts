@@ -5,7 +5,7 @@ import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from "@angular
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
-import { of, throwError } from "rxjs";
+import { of, Subject, throwError } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { CurrencySeparator, CurrencySymbolPosition, FeatureConfigService, QueueName, SystemSettingsService } from "../../open-api";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
@@ -19,6 +19,7 @@ import { SystemSettingsFormComponent } from "./system-settings-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { CurrencyPipe } from "@angular/common";
 import { provideNgxMask } from "ngx-mask";
+import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
 
 describe("SystemSettingsFormComponent", () => {
   let component: SystemSettingsFormComponent;
@@ -71,6 +72,32 @@ describe("SystemSettingsFormComponent", () => {
 
   it("should create", () => {
     expect(component).toBeTruthy();
+  });
+
+  // Zoneless regression: the restart response lands after the alert rendered, and
+  // the snackbar is stubbed, so nothing but the alert's own state can hide it.
+  describe("restart task server alert", () => {
+    function alert(): HTMLElement | null {
+      return fixture.nativeElement.querySelector("app-alert");
+    }
+
+    it("hides the alert once the restart response arrives", async () => {
+      const response = new Subject<void>();
+      jest.spyOn(TestBed.inject(SystemSettingsService), "restartTaskServer").mockReturnValue(response as any);
+      jest.spyOn(TestBed.inject(SnackbarService), "success").mockImplementation(() => undefined as any);
+
+      // Let ngAfterViewInit's deferred scroll run while the alert is still hidden.
+      await new Promise((resolve) => setTimeout(resolve));
+      component.showRestartTaskServerAlert.set(true);
+      await fixture.whenStable();
+      expect(alert()).not.toBeNull();
+
+      component.restartTaskServer();
+      response.next();
+      await fixture.whenStable();
+
+      expect(alert()).toBeNull();
+    });
   });
 
   describe("layout contracts", () => {
@@ -671,8 +698,9 @@ describe("SystemSettingsFormComponent", () => {
 
       component.ngOnInit();
       component.form.get("timeZone")!.setValue("America/New_York");
-      component.submit();
+      const errors = swallowUnhandledRxjsErrors(() => component.submit());
 
+      expect(errors).toEqual([new Error("400")]);
       expect(dispatchSpy).not.toHaveBeenCalledWith(new SetTimeZone("America/New_York"));
     });
   });

@@ -141,8 +141,8 @@ export class ReceiptProcessingSettingsTableComponent extends BaseTableComponent<
     ] as TableColumn[];
     this.setInitialSortedColumn(this.store.selectSnapshot(ReceiptProcessingSettingsTableState.state), columns);
 
-    this.columns = columns;
-    this.displayedColumns = columns.map((c) => c.matColumnDef);
+    this.columns.set(columns);
+    this.displayedColumns.set(columns.map((c) => c.matColumnDef));
   }
 
   public deleteReceiptProcessingSettings(receiptProcessingSettings: ReceiptProcessingSettings): void {

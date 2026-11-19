@@ -5,7 +5,7 @@
   >
     <div class="d-flex gap-2">
       <ng-container *hasAppPermission="Permission.AppUsersDelete">
-        @if (hasSelectedUsers) {
+        @if (hasSelectedUsers()) {
           <app-button
             buttonText="Delete Selected"
             color="warn"
@@ -26,8 +26,8 @@
   <div class="table-container">
     <app-table
       [dataSource]="dataSource()"
-      [columns]="columns"
-      [displayedColumns]="displayedColumns"
+      [columns]="columns()"
+      [displayedColumns]="displayedColumns()"
       [selectionCheckboxes]="true"
       [pagination]="true"
       [length]="totalCount()"

@@ -87,6 +87,28 @@ describe("GroupFormComponent", () => {
     expect(component.dataSource().data).toEqual([formGroup.value]);
   });
 
+  // Pins the delete button's disabled state as members are added through the
+  // add-member dialog: it stays disabled while only one member is left.
+  it("tracks whether the last member can be deleted as members are added", () => {
+    const matDialog = TestBed.inject(MatDialog);
+    const member = (userId: string) => {
+      const formGroup = buildGroupMemberForm();
+      formGroup.patchValue({ userId, groupId: "1", groupRoleId: 10 });
+      return formGroup;
+    };
+    const openSpy = jest.spyOn(matDialog, "open");
+    component.ngOnInit();
+    component.ngAfterViewInit();
+
+    openSpy.mockReturnValue({ afterClosed: () => of(member("2")), componentInstance: {} } as any);
+    component.addGroupMemberClicked();
+    expect(component.disableDeleteButton()).toBe(true);
+
+    openSpy.mockReturnValue({ afterClosed: () => of(member("3")), componentInstance: {} } as any);
+    component.addGroupMemberClicked();
+    expect(component.disableDeleteButton()).toBe(false);
+  });
+
   it("should update form on edit", () => {
     const result = [
       {

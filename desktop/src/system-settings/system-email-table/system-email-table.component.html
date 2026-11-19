@@ -14,8 +14,8 @@
   <div class="table-container">
     <app-table
       [dataSource]="dataSource()"
-      [columns]="columns"
-      [displayedColumns]="displayedColumns"
+      [columns]="columns()"
+      [displayedColumns]="displayedColumns()"
       [pagination]="true"
       [length]="totalCount()"
       [page]="(tableState()?.page || 1) - 1"
@@ -60,7 +60,7 @@
     ></app-button>
     <app-delete-button
       tooltip="Delete email"
-      [disabled]="(relatedSystemEmailMap.get(element.id)?.length || 0) > 0"
+      [disabled]="(relatedSystemEmailMap().get(element.id)?.length || 0) > 0"
       (clicked)="deleteButtonClicked(element)"
       (click)="disabledDeleteButtonClicked(element)"
     ></app-delete-button>

@@ -114,7 +114,7 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
   }
 
   private setColumns(): void {
-    this.columns = [
+    this.columns.set([
       {
         columnHeader: "Name",
         matColumnDef: "name",
@@ -157,8 +157,8 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
         template: this.actionsCell(),
         sortable: false,
       },
-    ];
-    this.displayedColumns = [
+    ]);
+    this.displayedColumns.set([
       "name",
       "description",
       "scope",
@@ -166,7 +166,7 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
       "created_at",
       "last_used_at",
       "actions",
-    ];
+    ]);
   }
 
   public isOwner(apiKey: ApiKeyView): boolean {

@@ -8,6 +8,7 @@ import { ReceiptFileUploadCommand } from "../../interfaces";
 import { ApiModule, ReceiptImageService } from "../../open-api";
 import { UploadImageComponent } from "./upload-image.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
 
 /**
  * jsdom's FileReader is asynchronous; this one finishes as soon as it is asked
@@ -103,8 +104,9 @@ describe("UploadImageComponent", () => {
     jest.spyOn(receiptImageService, "convertToJpg").mockReturnValue(conversion as any);
 
     pick(pdf());
-    conversion.error(new Error("conversion failed"));
+    const errors = swallowUnhandledRxjsErrors(() => conversion.error(new Error("conversion failed")));
 
+    expect(errors).toEqual([new Error("conversion failed")]);
     expect(loaded).toEqual([]);
     expect(processing).toEqual([true, false]);
   });

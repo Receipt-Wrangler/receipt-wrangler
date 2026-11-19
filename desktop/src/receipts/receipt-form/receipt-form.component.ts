@@ -115,9 +115,9 @@ export class ReceiptFormComponent implements OnInit {
 
   protected readonly FormMode = FormMode;
 
-  public categories: Category[] = [];
+  public categories = signal<Category[]>([]);
 
-  public tags: Tag[] = [];
+  public tags = signal<Tag[]>([]);
 
   // Inline category/tag creation is allowed only with the matching app create
   // permission (the receipt form otherwise restricts users to the granted set).
@@ -149,22 +149,22 @@ export class ReceiptFormComponent implements OnInit {
     this.historyOpen() ? saveBarInsetBesideDrawer(this.historyOccupied()) : null
   );
 
-  public customFields: CustomField[] = [];
+  public customFields = signal<CustomField[]>([]);
 
-  public customFieldsStatefulMenuItems: StatefulMenuItem[] = [];
+  public customFieldsStatefulMenuItems = signal<StatefulMenuItem[]>([]);
 
   // Custom fields this form added on its own from the selected group's defaults.
   // Only these are candidates for removal when the group changes - anything the
   // user added, or typed into, is theirs and is left alone.
   private autoAppliedCustomFieldIds = new Set<number>();
 
-  public originalReceipt?: Receipt;
+  public originalReceipt = signal<Receipt | undefined>(undefined);
 
   public images = signal<FileDataView[]>([]);
 
   public filesToUpload = signal<ReceiptFileUploadCommand[]>([]);
 
-  public mode: FormMode = FormMode.view;
+  public mode = signal<FormMode>(FormMode.view);
 
   public formMode = FormMode;
 
@@ -199,11 +199,11 @@ export class ReceiptFormComponent implements OnInit {
     receiptRequirementsFor(this.requirementsByGroup(), this.currentGroupId())
   );
 
-  public editLink = "";
+  public readonly editLink = computed(() => `/receipts/${this.originalReceipt()?.id}/edit`);
 
   public cancelLink = "";
 
-  public submitButtonText = "Save";
+  public submitButtonText = signal("Save");
 
   public imagesLoading = signal(false);
 
@@ -228,7 +228,11 @@ export class ReceiptFormComponent implements OnInit {
 
   public duplicatedSnackbarRef!: MatSnackBarRef<EmbeddedViewRef<any>>;
 
-  public formHeaderText!: Signal<string | undefined>;
+  // setHeaderText() builds a fresh signal off each new form's name control, so the
+  // header reads through this holder rather than a reassigned field.
+  private readonly formHeaderTextSource = signal<Signal<string | undefined>>(signal(undefined));
+
+  public readonly formHeaderText = computed(() => this.formHeaderTextSource()());
 
   public receiptStatusOptions = RECEIPT_STATUS_OPTIONS;
 
@@ -239,15 +243,15 @@ export class ReceiptFormComponent implements OnInit {
     return this.carouselComponent()?.currentlyShownImageIndex ?? 0;
   }
 
-  public queueIds: string[] = [];
+  public queueIds = signal<string[]>([]);
 
-  public queueIndex: number = -1;
+  public queueIndex = signal(-1);
 
   public queueMode: QueueMode | undefined;
 
-  public triggerItemListAddMode: boolean = false;
+  public triggerItemListAddMode = signal(false);
 
-  public triggerShareListAddMode: boolean = false;
+  public triggerShareListAddMode = signal(false);
 
   public get syncAmountWithItems(): boolean {
     return this.form.get("syncAmountWithItems")?.value ?? false;
@@ -278,9 +282,9 @@ export class ReceiptFormComponent implements OnInit {
   @HostListener("window:keydown", ["$event"])
   public handleKeyboardEvent(event: KeyboardEvent): void {
     const isBodyActive = document.activeElement === document.body;
-    if (event.key === "ArrowRight" && isBodyActive && this.queueIds.length > 0) {
+    if (event.key === "ArrowRight" && isBodyActive && this.queueIds().length > 0) {
       this.queueNext();
-    } else if (event.key === "ArrowLeft" && isBodyActive && this.queueIds.length > 0) {
+    } else if (event.key === "ArrowLeft" && isBodyActive && this.queueIds().length > 0) {
       this.queuePrevious();
     }
 
@@ -300,15 +304,14 @@ export class ReceiptFormComponent implements OnInit {
         this.duplicatedSnackbarRef?.dismiss();
         // categories/tags are sourced per-group from AppData (see
         // setCategoryTagPoolsForGroup), driven by the group-change listener.
-        this.originalReceipt = data["receipt"];
+        this.originalReceipt.set(data["receipt"]);
         // The resolver returns the full catalog only for users who can read it;
         // otherwise fall back to the definitions embedded on the receipt's own
         // custom field values so they still render.
-        this.customFields = this.buildCustomFieldPool(data["customFields"] ?? [], this.originalReceipt);
-        this.editLink = `/receipts/${this.originalReceipt?.id}/edit`;
-        this.mode = data["mode"];
-        this.customFieldsStatefulMenuItems = this.customFields.map(c => {
-          const selected = this.originalReceipt?.customFields.some(customField => customField.customFieldId === c.id) ?? false;
+        this.customFields.set(this.buildCustomFieldPool(data["customFields"] ?? [], this.originalReceipt()));
+        this.mode.set(data["mode"]);
+        this.customFieldsStatefulMenuItems.set(this.customFields().map(c => {
+          const selected = this.originalReceipt()?.customFields.some(customField => customField.customFieldId === c.id) ?? false;
 
           return {
             value: c.id.toString(),
@@ -316,7 +319,7 @@ export class ReceiptFormComponent implements OnInit {
             displayValue: c.name,
             selected: selected
           };
-        });
+        }));
         this.setCancelLink();
         this.initForm();
         this.setReceiptPermissions();
@@ -349,13 +352,14 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   private setQueueData(): void {
-    this.queueIds = this.activatedRoute.snapshot.queryParams["ids"] ?? [];
-    if (this.queueIds.length > 0) {
-      this.queueIndex = this.queueIds.indexOf(this.originalReceipt?.id.toString() ?? "");
+    const queueIds: string[] = this.activatedRoute.snapshot.queryParams["ids"] ?? [];
+    this.queueIds.set(queueIds);
+    if (queueIds.length > 0) {
+      this.queueIndex.set(queueIds.indexOf(this.originalReceipt()?.id.toString() ?? ""));
     }
 
-    if (this.queueIndex != this.queueIds.length - 1) {
-      this.submitButtonText = "Save & Next";
+    if (this.queueIndex() != queueIds.length - 1) {
+      this.submitButtonText.set("Save & Next");
     }
 
     this.queueMode = this.activatedRoute.snapshot.queryParams["queueMode"];
@@ -420,13 +424,13 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   private setHeaderText(): void {
-    this.formHeaderText = runInInjectionContext(this.injector, () => toSignal(
+    this.formHeaderTextSource.set(runInInjectionContext(this.injector, () => toSignal(
       (this.form.get("name") as AbstractControl).valueChanges.pipe(
         startWith(this.form.get("name")?.value),
         untilDestroyed(this),
         map((name) => {
           let action = "";
-          switch (this.mode) {
+          switch (this.mode()) {
             case FormMode.add:
               action = "Add";
               break;
@@ -441,7 +445,7 @@ export class ReceiptFormComponent implements OnInit {
           return `${action} ${name} Receipt`;
         })
       )
-    ));
+    )));
   }
 
   private setCancelLink(): void {
@@ -463,12 +467,12 @@ export class ReceiptFormComponent implements OnInit {
     // before. Gating on that blank seed instead would resolve NaN, and
     // hasGroupPermission would deny - rendering the whole add form read-only.
     const groupId =
-      this.mode === FormMode.add
+      this.mode() === FormMode.add
         ? (this.store.selectSnapshot(GroupState.addTargetGroupId) ??
           Number.parseInt(this.store.selectSnapshot(GroupState.selectedGroupId)))
-        : (this.originalReceipt?.groupId ?? 0);
+        : (this.originalReceipt()?.groupId ?? 0);
     const editPermission =
-      this.mode === FormMode.add
+      this.mode() === FormMode.add
         ? Permission.GroupReceiptsCreate
         : Permission.GroupReceiptsUpdate;
 
@@ -487,7 +491,7 @@ export class ReceiptFormComponent implements OnInit {
     // already implies.
     this.canViewHistory = this.store.selectSignal(
       AuthState.hasGroupPermission(
-        this.originalReceipt?.groupId ?? 0,
+        this.originalReceipt()?.groupId ?? 0,
         Permission.GroupReceiptsHistoryRead
       )
     );
@@ -511,46 +515,47 @@ export class ReceiptFormComponent implements OnInit {
     // groups whose name contains a zero.
     const addTargetGroupId: number | string =
       this.store.selectSnapshot(GroupState.addTargetGroupId) ?? "";
+    const receiptItems = this.originalReceipt()?.receiptItems;
 
     this.form = this.formBuilder.group({
-      name: [this.originalReceipt?.name ?? "", Validators.required],
+      name: [this.originalReceipt()?.name ?? "", Validators.required],
       amount: [
-        this.originalReceipt?.amount ?? "",
+        this.originalReceipt()?.amount ?? "",
         [Validators.required],
       ],
       syncAmountWithItems: false,
       categories: this.formBuilder.array(
-        this.originalReceipt?.categories ?? []
+        this.originalReceipt()?.categories ?? []
       ),
-      tags: this.formBuilder.array(this.originalReceipt?.tags ?? []),
+      tags: this.formBuilder.array(this.originalReceipt()?.tags ?? []),
       // A calendar day: stored as midnight UTC, shown in the datepicker as the
       // local midnight of that UTC day. A new receipt defaults to the app zone's
       // today, not the browser's.
       date: [
-        calendarDayToLocalDate(this.originalReceipt?.date) ??
+        calendarDayToLocalDate(this.originalReceipt()?.date) ??
           todayInZone(this.store.selectSnapshot(SystemSettingsState.timeZone)),
         Validators.required,
       ],
       paidByUserId: [
-        this.originalReceipt?.paidByUserId ?? "",
+        this.originalReceipt()?.paidByUserId ?? "",
         Validators.required,
       ],
       groupId: [
-        this.originalReceipt?.groupId ?? addTargetGroupId,
+        this.originalReceipt()?.groupId ?? addTargetGroupId,
         Validators.required,
       ],
-      status: this.originalReceipt?.status ?? ReceiptStatus.Open,
-      customFields: this.formBuilder.array(this.originalReceipt?.customFields?.map((customField) => this.buildCustomOptionFormGroup(customField)) ?? []),
+      status: this.originalReceipt()?.status ?? ReceiptStatus.Open,
+      customFields: this.formBuilder.array(this.originalReceipt()?.customFields?.map((customField) => this.buildCustomOptionFormGroup(customField)) ?? []),
       receiptItems: this.formBuilder.array(
-        this.originalReceipt?.receiptItems
-          ? this.originalReceipt.receiptItems.map((item) =>
-            buildItemForm(item, this.originalReceipt?.id?.toString(), !!item.chargedToUserId, false)
+        receiptItems
+          ? receiptItems.map((item) =>
+            buildItemForm(item, this.originalReceipt()?.id?.toString(), !!item.chargedToUserId, false)
           )
           : []
       )
     });
 
-    if (this.mode === FormMode.view) {
+    if (this.mode() === FormMode.view) {
       this.form.get("status")?.disable();
     }
 
@@ -564,12 +569,12 @@ export class ReceiptFormComponent implements OnInit {
   private setCategoryTagPoolsForGroup(groupId: number | string | null | undefined): void {
     const numericGroupId = Number(groupId);
     if (!groupId || Number.isNaN(numericGroupId)) {
-      this.categories = [];
-      this.tags = [];
+      this.categories.set([]);
+      this.tags.set([]);
       return;
     }
-    this.categories = this.store.selectSnapshot(AuthState.groupCategories(numericGroupId));
-    this.tags = this.store.selectSnapshot(AuthState.groupTags(numericGroupId));
+    this.categories.set(this.store.selectSnapshot(AuthState.groupCategories(numericGroupId)));
+    this.tags.set(this.store.selectSnapshot(AuthState.groupTags(numericGroupId)));
   }
 
   private listenForSyncWithItemsChanges(): void {
@@ -579,7 +584,7 @@ export class ReceiptFormComponent implements OnInit {
 
   private buildCustomOptionFormGroup(value: CustomFieldValue): FormGroup {
     return this.formBuilder.group({
-      receiptId: this.originalReceipt?.id ?? 0,
+      receiptId: this.originalReceipt()?.id ?? 0,
       customFieldId: value.customFieldId,
       stringValue: value?.stringValue ?? null,
       // Same calendar-day handling as the receipt's own date.
@@ -678,13 +683,11 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   private getImageFiles(): void {
-    if (
-      this.originalReceipt?.imageFiles &&
-      this.originalReceipt?.imageFiles?.length > 0
-    ) {
+    const imageFiles = this.originalReceipt()?.imageFiles;
+    if (imageFiles && imageFiles.length > 0) {
       this.imagesLoading.set(true);
       forkJoin(
-        this.originalReceipt.imageFiles.map((file) =>
+        imageFiles.map((file) =>
           this.receiptImageService.getReceiptImageById(file.id).pipe(
             catchError(() => of(null))
           )
@@ -723,7 +726,7 @@ export class ReceiptFormComponent implements OnInit {
    * while they are still loading).
    */
   public isImageMissing(): boolean {
-    if (this.mode === FormMode.view || !this.receiptRequirements().imageRequired) {
+    if (this.mode() === FormMode.view || !this.receiptRequirements().imageRequired) {
       return false;
     }
     return this.imageCount() === 0;
@@ -735,7 +738,7 @@ export class ReceiptFormComponent implements OnInit {
    * the receipt's saved comments (updated live) in edit mode.
    */
   public isCommentMissing(): boolean {
-    if (this.mode === FormMode.view || !this.receiptRequirements().commentRequired) {
+    if (this.mode() === FormMode.view || !this.receiptRequirements().commentRequired) {
       return false;
     }
     return (this.receiptCommentsComponent()?.commentCount() ?? 0) === 0;
@@ -744,7 +747,7 @@ export class ReceiptFormComponent implements OnInit {
   /** In edit mode the server refuses deleting the last required image. */
   public isLastImageLocked(): boolean {
     return (
-      this.mode === FormMode.edit &&
+      this.mode() === FormMode.edit &&
       this.receiptRequirements().imageRequired &&
       this.imageCount() <= 1
     );
@@ -752,15 +755,15 @@ export class ReceiptFormComponent implements OnInit {
 
   /** Passed to the comments child: in edit mode the last comment is kept. */
   public isCommentDeletionLimited(): boolean {
-    return this.mode === FormMode.edit && this.receiptRequirements().commentRequired;
+    return this.mode() === FormMode.edit && this.receiptRequirements().commentRequired;
   }
 
   private imageCount(): number {
-    if (this.mode === FormMode.add) {
+    if (this.mode() === FormMode.add) {
       return this.filesToUpload().length;
     }
     return this.imagesLoading()
-      ? (this.originalReceipt?.imageFiles?.length ?? 0)
+      ? (this.originalReceipt()?.imageFiles?.length ?? 0)
       : this.images().length;
   }
 
@@ -770,7 +773,7 @@ export class ReceiptFormComponent implements OnInit {
     }
     const index = this.currentImageIndex;
 
-    if (this.mode === FormMode.add) {
+    if (this.mode() === FormMode.add) {
       const newImages = Array.from(this.filesToUpload());
       newImages.splice(index, 1);
       this.filesToUpload.set(newImages);
@@ -796,9 +799,9 @@ export class ReceiptFormComponent implements OnInit {
     let file: Blob | undefined;
     let receiptImageId;
 
-    if (this.mode === FormMode.add) {
+    if (this.mode() === FormMode.add) {
       file = this.filesToUpload()[index].file;
-    } else if (this.mode === FormMode.edit) {
+    } else if (this.mode() === FormMode.edit) {
       const receiptImage = this.images()[index];
       receiptImageId = receiptImage?.id;
     }
@@ -829,7 +832,7 @@ export class ReceiptFormComponent implements OnInit {
       this.handleCategoryAndTagMagicFill(
         "categories",
         magicReceipt?.categories ?? [],
-        this.categories
+        this.categories()
       )
     ) {
       filledKeys.push("categories");
@@ -838,7 +841,7 @@ export class ReceiptFormComponent implements OnInit {
       this.handleCategoryAndTagMagicFill(
         "tags",
         magicReceipt?.tags ?? [],
-        this.tags
+        this.tags()
       )
     ) {
       filledKeys.push("tags");
@@ -905,7 +908,7 @@ export class ReceiptFormComponent implements OnInit {
     items.forEach((item) => {
       const itemForm = buildItemForm(
         item,
-        this.originalReceipt?.id?.toString(),
+        this.originalReceipt()?.id?.toString(),
         !!item.chargedToUserId,
         this.syncAmountWithItems
       );
@@ -989,7 +992,7 @@ export class ReceiptFormComponent implements OnInit {
     customFieldId: number,
     value?: CustomFieldValue
   ): boolean {
-    const definition = this.customFields.find(
+    const definition = this.customFields().find(
       (field) => field.id === customFieldId
     );
     if (!definition) {
@@ -1066,16 +1069,16 @@ export class ReceiptFormComponent implements OnInit {
     selected: boolean
   ): void {
     const menuValue = customFieldId.toString();
-    const index = this.customFieldsStatefulMenuItems.findIndex(
+    const index = this.customFieldsStatefulMenuItems().findIndex(
       (item) => item.value === menuValue
     );
     if (index === -1) {
       return;
     }
 
-    const updated = Array.from(this.customFieldsStatefulMenuItems);
+    const updated = Array.from(this.customFieldsStatefulMenuItems());
     updated[index] = { ...updated[index], selected: selected };
-    this.customFieldsStatefulMenuItems = updated;
+    this.customFieldsStatefulMenuItems.set(updated);
   }
 
   // Hands magic-filled comments to the comments child, which owns them and is
@@ -1183,7 +1186,7 @@ export class ReceiptFormComponent implements OnInit {
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
 
     dialogRef.componentInstance.headerText = "Duplicate Receipt";
-    dialogRef.componentInstance.dialogContent = `Are you sure you would like to duplicate the receipt ${this.originalReceipt?.name}?`;
+    dialogRef.componentInstance.dialogContent = `Are you sure you would like to duplicate the receipt ${this.originalReceipt()?.name}?`;
 
     dialogRef
       .afterClosed()
@@ -1192,7 +1195,7 @@ export class ReceiptFormComponent implements OnInit {
         tap((confirmed) => {
           if (confirmed) {
             this.receiptService
-              .duplicateReceipt(this.originalReceipt?.id as number)
+              .duplicateReceipt(this.originalReceipt()?.id as number)
               .pipe(
                 take(1),
                 tap((r: Receipt) => {
@@ -1211,7 +1214,7 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public imageFileLoaded(command: ReceiptFileUploadCommand): void {
-    switch (this.mode) {
+    switch (this.mode()) {
       case FormMode.add:
         this.filesToUpload.update(files => [...files, command]);
         break;
@@ -1220,7 +1223,7 @@ export class ReceiptFormComponent implements OnInit {
         this.receiptImageService
           .uploadReceiptImage(
             command.file,
-            this.originalReceipt?.id as number,
+            this.originalReceipt()?.id as number,
             ""
           )
           .pipe(
@@ -1286,9 +1289,9 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public initItemListAddMode(): void {
-    this.triggerItemListAddMode = true;
+    this.triggerItemListAddMode.set(true);
     // Reset the trigger after a short delay to allow for re-triggering
-    setTimeout(() => this.triggerItemListAddMode = false, 100);
+    setTimeout(() => this.triggerItemListAddMode.set(false), 100);
   }
 
   private isAnyInputFocused(): boolean {
@@ -1300,13 +1303,13 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public initShareListAddMode(): void {
-    this.triggerShareListAddMode = true;
+    this.triggerShareListAddMode.set(true);
     // Reset the trigger after a short delay to allow for re-triggering
-    setTimeout(() => this.triggerShareListAddMode = false, 100);
+    setTimeout(() => this.triggerShareListAddMode.set(false), 100);
   }
 
   public onItemAdded(item: Item): void {
-    const newFormGroup = buildItemForm(item, this.originalReceipt?.id?.toString(), !!item.chargedToUserId, this.syncAmountWithItems);
+    const newFormGroup = buildItemForm(item, this.originalReceipt()?.id?.toString(), !!item.chargedToUserId, this.syncAmountWithItems);
     this.receiptItemsFormArray.push(newFormGroup);
     this.refreshComponentsAndSync();
   }
@@ -1333,7 +1336,7 @@ export class ReceiptFormComponent implements OnInit {
     } else {
       // Adding items as regular receipt items
       items.forEach(item => {
-        const newFormGroup = buildItemForm(item, this.originalReceipt?.id?.toString(), true, this.syncAmountWithItems);
+        const newFormGroup = buildItemForm(item, this.originalReceipt()?.id?.toString(), true, this.syncAmountWithItems);
         this.receiptItemsFormArray.push(newFormGroup);
       });
     }
@@ -1360,7 +1363,7 @@ export class ReceiptFormComponent implements OnInit {
 
     // Add each item to the linkedItems array
     items.forEach(item => {
-      const newFormGroup = buildItemForm(item, this.originalReceipt?.id?.toString(), true, this.syncAmountWithItems);
+      const newFormGroup = buildItemForm(item, this.originalReceipt()?.id?.toString(), true, this.syncAmountWithItems);
       linkedItemsArray.push(newFormGroup);
     });
   }
@@ -1381,27 +1384,27 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public queueNext(): void {
-    if (this.queueIndex < this.queueIds.length - 1) {
-      this.receiptQueueService.queueNext(this.queueIndex, this.queueIds, this.queueMode ?? QueueMode.VIEW,);
+    if (this.queueIndex() < this.queueIds().length - 1) {
+      this.receiptQueueService.queueNext(this.queueIndex(), this.queueIds(), this.queueMode ?? QueueMode.VIEW,);
     }
   }
 
   public queuePrevious(): void {
-    if (this.queueIndex > 0) {
-      this.receiptQueueService.queuePrevious(this.queueIndex, this.queueIds, this.queueMode ?? QueueMode.VIEW,);
+    if (this.queueIndex() > 0) {
+      this.receiptQueueService.queuePrevious(this.queueIndex(), this.queueIds(), this.queueMode ?? QueueMode.VIEW,);
     }
   }
 
   public customFieldChanged(item: StatefulMenuItem): void {
-    const newCustomFields = Array.from(this.customFieldsStatefulMenuItems);
-    const selectedItemIndex = this.customFieldsStatefulMenuItems.findIndex(customField => customField.value === item.value);
+    const newCustomFields = Array.from(this.customFieldsStatefulMenuItems());
+    const selectedItemIndex = this.customFieldsStatefulMenuItems().findIndex(customField => customField.value === item.value);
 
     newCustomFields[selectedItemIndex] = {
       ...item,
       selected: !item.selected
     };
 
-    this.customFieldsStatefulMenuItems = newCustomFields;
+    this.customFieldsStatefulMenuItems.set(newCustomFields);
 
     const customFieldId = Number(item.value);
     // Either direction hands the field to the user: a group default they toggled
@@ -1410,7 +1413,7 @@ export class ReceiptFormComponent implements OnInit {
     this.autoAppliedCustomFieldIds.delete(customFieldId);
 
     // Custom field was just selected
-    if (this.customFieldsStatefulMenuItems[selectedItemIndex].selected) {
+    if (this.customFieldsStatefulMenuItems()[selectedItemIndex].selected) {
       this.addCustomFieldControl(customFieldId);
     } else {
       // Custom field was just removed
@@ -1437,9 +1440,9 @@ export class ReceiptFormComponent implements OnInit {
       return;
     }
 
-    if (this.originalReceipt) {
+    if (this.originalReceipt()) {
       this.updateReceipt();
-    } else if (this.mode === FormMode.add) {
+    } else if (this.mode() === FormMode.add) {
       this.createReceipt();
     }
   }
@@ -1484,17 +1487,17 @@ export class ReceiptFormComponent implements OnInit {
 
   private updateReceipt(): void {
     this.receiptService
-      .updateReceipt(this.originalReceipt?.id as number, this.buildSubmitCommand())
+      .updateReceipt(this.originalReceipt()?.id as number, this.buildSubmitCommand())
       .pipe(
         take(1),
         tap(() => {
           this.snackbarService.success("Successfully updated receipt");
 
-          if (this.queueIndex === -1) {
-            this.router.navigate([`/receipts/${this.originalReceipt?.id}/view`]);
-          } else if (this.queueIndex >= 0 && this.queueIndex !== this.queueIds.length - 1) {
+          if (this.queueIndex() === -1) {
+            this.router.navigate([`/receipts/${this.originalReceipt()?.id}/view`]);
+          } else if (this.queueIndex() >= 0 && this.queueIndex() !== this.queueIds().length - 1) {
             this.queueNext();
-          } else if (this.queueIndex === this.queueIds.length - 1) {
+          } else if (this.queueIndex() === this.queueIds().length - 1) {
             this.snackbarService.success("Successfully updated receipt. Congratulations! You have reached the end of the queue.");
           }
         })

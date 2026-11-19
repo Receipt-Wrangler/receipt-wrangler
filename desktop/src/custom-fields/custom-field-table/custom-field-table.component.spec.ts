@@ -40,13 +40,13 @@ describe("CustomFieldTableComponent", () => {
   // renders.
   const renderRowWith = (appPermissions: string[]) => {
     store.dispatch(new SetPermissions(appPermissions, {}));
-    fixture.detectChanges(false);
+    fixture.detectChanges();
     component.dataSource.set(
       new MatTableDataSource([customField as unknown as PagedDataDataInner])
     );
-    fixture.detectChanges(false);
+    fixture.detectChanges();
     TestBed.flushEffects();
-    fixture.detectChanges(false);
+    fixture.detectChanges();
   };
 
   beforeEach(async () => {
@@ -99,19 +99,19 @@ describe("CustomFieldTableComponent", () => {
     it("renders the actions column for an update-only holder", () => {
       renderRowWith([Permission.AppCustomFieldsUpdate]);
 
-      expect(component.displayedColumns).toContain("actions");
+      expect(component.displayedColumns()).toContain("actions");
     });
 
     it("renders the actions column for a delete-only holder", () => {
       renderRowWith([Permission.AppCustomFieldsDelete]);
 
-      expect(component.displayedColumns).toContain("actions");
+      expect(component.displayedColumns()).toContain("actions");
     });
 
     it("omits the actions column when the caller can neither update nor delete", () => {
       renderRowWith([Permission.AppCustomFieldsRead]);
 
-      expect(component.displayedColumns).not.toContain("actions");
+      expect(component.displayedColumns()).not.toContain("actions");
     });
   });
 
