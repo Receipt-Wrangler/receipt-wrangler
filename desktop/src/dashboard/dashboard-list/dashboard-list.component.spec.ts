@@ -11,12 +11,12 @@ describe("DashboardListComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [DashboardListComponent],
       imports: [
         ScrollingModule,
         NoopAnimationsModule,
         MatListModule,
-        RouterModule.forRoot([])
+        RouterModule.forRoot([]),
+        DashboardListComponent
       ]
     }).compileComponents();
 

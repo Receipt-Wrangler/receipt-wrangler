@@ -20,6 +20,13 @@ import {
 import { ReportColumnValue } from "../../models/report-command.mapper";
 import { deriveColumnName, validateFormulaExpr } from "../../models/report-column.util";
 import { nextReportRowId } from "../../models/report-form.factory";
+import { DialogComponent } from "../../../shared-ui/dialog/dialog.component";
+import { MatIcon } from "@angular/material/icon";
+import { SelectComponent } from "../../../select/select/select.component";
+import { InputComponent } from "../../../input/input/input.component";
+import { NgClass } from "@angular/common";
+import { ButtonComponent } from "../../../button/button/button.component";
+import { FormGetPipe } from "../../../pipes/form-get.pipe";
 
 export interface ColumnPickerDialogData {
   dimensions: ReportField[];
@@ -67,8 +74,16 @@ const LOCKED_SUBTITLE = "The column this grouping level adds to the report";
   selector: "app-column-picker-dialog",
   templateUrl: "./column-picker-dialog.component.html",
   styleUrls: ["./column-picker-dialog.component.scss"],
-  standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    DialogComponent,
+    MatIcon,
+    SelectComponent,
+    InputComponent,
+    NgClass,
+    ButtonComponent,
+    FormGetPipe,
+  ],
 })
 export class ColumnPickerDialogComponent {
   private readonly formBuilder = inject(FormBuilder);

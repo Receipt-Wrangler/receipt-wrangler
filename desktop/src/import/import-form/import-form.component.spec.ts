@@ -5,10 +5,10 @@ import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { NgxsModule } from "@ngxs/store";
 import { ImportType } from "../../open-api";
-import { PipesModule } from "../../pipes";
 
 import { ImportFormComponent } from "./import-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideRouter } from "@angular/router";
 
 describe("ImportFormComponent", () => {
   let component: ImportFormComponent;
@@ -16,13 +16,12 @@ describe("ImportFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [ImportFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ReactiveFormsModule,
         MatDialogModule,
-        PipesModule,
-        NgxsModule.forRoot([])],
+        NgxsModule.forRoot([]), ImportFormComponent],
     providers: [
+        provideRouter([]),
         { provide: MatDialogRef, useValue: {} },
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting()

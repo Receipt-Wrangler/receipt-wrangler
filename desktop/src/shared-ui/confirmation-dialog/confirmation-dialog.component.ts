@@ -1,11 +1,13 @@
 import { Component, Input, TemplateRef } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
+import { DialogComponent } from '../dialog/dialog.component';
+import { DialogFooterComponent } from '../dialog-footer/dialog-footer.component';
 
 @Component({
     selector: 'app-confirmation-dialog',
     templateUrl: './confirmation-dialog.component.html',
     styleUrls: ['./confirmation-dialog.component.scss'],
-    standalone: false
+    imports: [DialogComponent, DialogFooterComponent]
 })
 export class ConfirmationDialogComponent {
   constructor(private dialogRef: MatDialogRef<ConfirmationDialogComponent>) {}

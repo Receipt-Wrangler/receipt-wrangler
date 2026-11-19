@@ -5,7 +5,7 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { ActivatedRoute } from "@angular/router";
 import { ApiModule, Group } from "../../open-api";
-import { StoreModule } from "../../store/store.module";
+import { provideTestStore } from "../../store/test-store";
 import { GroupSettingsComponent } from "./group-settings.component";
 
 describe("GroupSettingsComponent", () => {
@@ -15,13 +15,11 @@ describe("GroupSettingsComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [GroupSettingsComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [ApiModule,
-        StoreModule,
-        MatSnackBarModule
-      ],
+        MatSnackBarModule, GroupSettingsComponent],
       providers: [
+        provideTestStore(),
         {
           provide: ActivatedRoute,
           useValue: {
@@ -29,6 +27,7 @@ describe("GroupSettingsComponent", () => {
               data: {
                 group: group,
                 formConfig: {},
+                systemEmails: [],
               },
             },
           },

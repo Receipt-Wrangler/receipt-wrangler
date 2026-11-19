@@ -4,9 +4,10 @@ import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatMenuModule } from "@angular/material/menu";
 import { QueueMode, ReceiptQueueService } from "../../services/receipt-queue.service";
-import { StoreModule } from "../../store/store.module";
+import { provideTestStore } from "../../store/test-store";
 
 import { QueueStartMenuComponent } from "./queue-start-menu.component";
+import { provideRouter } from "@angular/router";
 
 describe("QueueStartMenuComponent", () => {
   let component: QueueStartMenuComponent;
@@ -14,13 +15,14 @@ describe("QueueStartMenuComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [QueueStartMenuComponent],
       imports: [
-        StoreModule,
         MatMenuModule,
+        QueueStartMenuComponent,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
+        provideTestStore(),
+        provideRouter([]),
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),
       ]

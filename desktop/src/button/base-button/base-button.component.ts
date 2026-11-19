@@ -3,7 +3,6 @@ import { ThemePalette } from "@angular/material/core";
 
 @Component({
   selector: "app-base-button",
-  standalone: false,
   templateUrl: "./base-button.component.html",
   styleUrl: "./base-button.component.scss"
 })

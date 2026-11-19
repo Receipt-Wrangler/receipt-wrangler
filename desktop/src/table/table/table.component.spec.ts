@@ -11,7 +11,6 @@ import { TableColumn } from '../table-column.interface';
 
 /** Renders one templated column so the template's context can be inspected. */
 @Component({
-  standalone: false,
   template: `
     <ng-template #cell let-column="column">{{ column.columnHeader }}</ng-template>
     <app-table
@@ -20,6 +19,7 @@ import { TableColumn } from '../table-column.interface';
       [dataSource]="dataSource"
     ></app-table>
   `,
+  imports: [TableComponent],
 })
 class ColumnContextHostComponent {
   readonly cell = viewChild.required<TemplateRef<any>>('cell');
@@ -36,8 +36,7 @@ describe('TableComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [TableComponent, ColumnContextHostComponent],
-      imports: [CommonModule, MatTableModule, MatSortModule],
+      imports: [CommonModule, MatTableModule, MatSortModule, TableComponent, ColumnContextHostComponent],
       // The expandedDetail row carries an animation trigger, so rendering the
       // table (rather than only its class) needs an animations provider.
       providers: [provideNoopAnimations()],

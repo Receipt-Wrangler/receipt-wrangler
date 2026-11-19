@@ -4,7 +4,6 @@ import { Component, ViewEncapsulation } from '@angular/core';
     selector: 'app-receipt-list-icon',
     templateUrl: './receipt-list-icon.component.html',
     styleUrls: ['./receipt-list-icon.component.scss'],
-    encapsulation: ViewEncapsulation.None,
-    standalone: false
+    encapsulation: ViewEncapsulation.None
 })
 export class ReceiptListIconComponent {}

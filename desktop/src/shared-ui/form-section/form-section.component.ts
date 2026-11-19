@@ -1,10 +1,12 @@
 import { Component, Input, OnInit, TemplateRef, input } from "@angular/core";
+import { NgClass, NgTemplateOutlet } from "@angular/common";
+import { MatIcon } from "@angular/material/icon";
 
 @Component({
     selector: "app-form-section",
     templateUrl: "./form-section.component.html",
     styleUrls: ["./form-section.component.scss"],
-    standalone: false
+    imports: [NgClass, MatIcon, NgTemplateOutlet]
 })
 export class FormSectionComponent implements OnInit {
   public readonly headerText = input<string>("");

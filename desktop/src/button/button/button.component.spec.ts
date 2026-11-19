@@ -12,12 +12,12 @@ describe('ButtonComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ButtonComponent],
       imports: [
         MatBadgeModule,
         MatButtonModule,
         MatTooltipModule,
         RouterTestingModule,
+        ButtonComponent,
       ],
     }).compileComponents();
 

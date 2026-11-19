@@ -7,8 +7,7 @@ import { InputErrorMessage } from "./input-error-message";
 @Component({
     selector: "app-base-input",
     templateUrl: "./base-input.component.html",
-    styleUrls: ["./base-input.component.scss"],
-    standalone: false
+    styleUrls: ["./base-input.component.scss"]
 })
 export class BaseInputComponent implements OnInit, BaseInputInterface {
   @Input() public inputFormControl: FormControl = new FormControl();

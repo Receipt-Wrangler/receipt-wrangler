@@ -9,11 +9,9 @@ import { ActivatedRoute } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { CarouselModule } from "ngx-bootstrap/carousel";
 import { of } from "rxjs";
-import { SharedUiModule } from "src/shared-ui/shared-ui.module";
 import { LayoutState } from "src/store/layout.state";
 import { ReceiptFileUploadCommand } from "../../interfaces";
 import { ApiModule, ReceiptService, ReceiptStatus } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services";
 import { AuthState, GroupState } from "../../store";
 import { QUICK_SCAN_COMMENT_MAX_LENGTH, QuickScanDialogComponent } from "./quick-scan-dialog.component";
@@ -26,7 +24,6 @@ describe("QuickScanDialogComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [QuickScanDialogComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         CarouselModule,
@@ -34,9 +31,8 @@ describe("QuickScanDialogComponent", () => {
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, GroupState, LayoutState]),
         NoopAnimationsModule,
-        PipesModule,
         ReactiveFormsModule,
-        SharedUiModule],
+        QuickScanDialogComponent],
     providers: [
         {
             provide: ActivatedRoute,

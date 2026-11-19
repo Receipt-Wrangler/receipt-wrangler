@@ -1,5 +1,8 @@
 import { Component, computed, input } from "@angular/core";
 import { Group, User } from "../../open-api";
+import { MatTooltip } from "@angular/material/tooltip";
+import { MatIcon } from "@angular/material/icon";
+import { SlicePipe } from "@angular/common";
 
 /** The diameter every existing caller renders at; its sizing lives in the stylesheet. */
 export const DEFAULT_AVATAR_SIZE = 50;
@@ -8,7 +11,7 @@ export const DEFAULT_AVATAR_SIZE = 50;
     selector: "app-avatar",
     templateUrl: "./avatar.component.html",
     styleUrls: ["./avatar.component.scss"],
-    standalone: false
+    imports: [MatTooltip, MatIcon, SlicePipe]
 })
 export class AvatarComponent {
   public readonly user = input<User>();

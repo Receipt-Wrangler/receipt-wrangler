@@ -2,10 +2,7 @@ import { Pipe, PipeTransform } from "@angular/core";
 import { CustomFieldType } from "../open-api/index";
 
 
-@Pipe({
-  name: "customFieldType",
-  standalone: false
-})
+@Pipe({ name: "customFieldType" })
 export class CustomFieldTypePipe implements PipeTransform {
 
   public transform(type: CustomFieldType): string {

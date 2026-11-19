@@ -25,7 +25,6 @@ import { GroupState } from "../../store";
   templateUrl: "./oidc-callback.component.html",
   styleUrls: ["./oidc-callback.component.scss"],
   animations: [fadeInOut],
-  standalone: false,
 })
 export class OidcCallbackComponent implements OnInit {
   constructor(

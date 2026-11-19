@@ -14,12 +14,17 @@ import { PagedDataDataInner, PagedRequestCommand, Permission, TagService, TagVie
 import { SnackbarService } from "../../services";
 import { SetOrderBy, SetPage, SetPageSize, SetSortDirection } from "../../store/tag-table.state.actions";
 import { TagFormComponent } from "../tag-form/tag-form.component";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 
 @Component({
     selector: "app-tags-list",
     templateUrl: "./tag-table.component.html",
     styleUrls: ["./tag-table.component.scss"],
-    standalone: false
+    imports: [TableHeaderComponent, HasAppPermissionDirective, AddButtonComponent, TableComponent, EditButtonComponent, DeleteButtonComponent]
 })
 export class TagTableComponent implements OnInit, AfterViewInit {
   public readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");

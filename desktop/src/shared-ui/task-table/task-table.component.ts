@@ -16,6 +16,14 @@ import { downloadFile, filenameFromContentDisposition } from "../../utils/file";
 import { DescriptionViewerDialogComponent, DescriptionViewerDialogData } from "../description-viewer-dialog/description-viewer-dialog.component";
 import { ReceiptUpdateDiffDialogComponent, ReceiptUpdateDiffDialogData } from "../receipt-update-diff-dialog/receipt-update-diff-dialog.component";
 import { SourceFileViewerDialogComponent, SourceFileViewerDialogData } from "../source-file-viewer-dialog/source-file-viewer-dialog.component";
+import { TableComponent } from "../../table/table/table.component";
+import { StatusIconComponent } from "../status-icon/status-icon.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { PrettyJsonComponent } from "../pretty-json/pretty-json.component";
+import { AsyncPipe } from "@angular/common";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { UserPipe } from "../../pipes/user.pipe";
+import { SystemTaskTypePipe } from "./system-task-type.pipe";
 
 interface ReceiptUpdateRow {
   snapshots: ReceiptUpdateSnapshots;
@@ -26,7 +34,7 @@ interface ReceiptUpdateRow {
   selector: "app-task-table",
   templateUrl: "./task-table.component.html",
   styleUrl: "./task-table.component.scss",
-  standalone: false
+  imports: [TableComponent, StatusIconComponent, ButtonComponent, PrettyJsonComponent, AsyncPipe, AppDatePipe, UserPipe, SystemTaskTypePipe]
 })
 export class TaskTableComponent implements OnInit, AfterViewInit {
   public readonly typeCell = viewChild.required<TemplateRef<any>>("typeCell");

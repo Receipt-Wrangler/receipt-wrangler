@@ -14,12 +14,17 @@ import { CategoryService, CategoryView, PagedDataDataInner, PagedRequestCommand,
 import { SnackbarService } from "../../services";
 import { SetOrderBy, SetPage, SetPageSize, SetSortDirection } from "../../store/category-table.state.actions";
 import { CategoryForm } from "../category-form/category-form.component";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 
 @Component({
     selector: "app-category-table",
     templateUrl: "./category-table.component.html",
     styleUrls: ["./category-table.component.scss"],
-    standalone: false
+    imports: [TableHeaderComponent, HasAppPermissionDirective, AddButtonComponent, TableComponent, EditButtonComponent, DeleteButtonComponent]
 })
 export class CategoryTableComponent implements OnInit, AfterViewInit {
   public readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");

@@ -1,5 +1,7 @@
 import { Component, Inject } from "@angular/core";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
 
 export interface BulkDeleteResultFailure {
   name: string;
@@ -21,7 +23,7 @@ export interface BulkDeleteResultDialogData {
   selector: "app-bulk-delete-result-dialog",
   templateUrl: "./bulk-delete-result-dialog.component.html",
   styleUrls: ["./bulk-delete-result-dialog.component.scss"],
-  standalone: false,
+  imports: [DialogComponent, DialogFooterComponent],
 })
 export class BulkDeleteResultDialogComponent {
   constructor(

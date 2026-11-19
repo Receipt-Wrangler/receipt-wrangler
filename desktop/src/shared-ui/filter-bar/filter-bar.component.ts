@@ -1,5 +1,6 @@
 import { Component, input, model } from "@angular/core";
 import { FilterTab } from "./filter-tab.interface";
+import { MatIcon } from "@angular/material/icon";
 
 /**
  * Generic, reusable segmented filter bar — the standard pattern for simple
@@ -20,7 +21,7 @@ import { FilterTab } from "./filter-tab.interface";
   selector: "app-filter-bar",
   templateUrl: "./filter-bar.component.html",
   styleUrl: "./filter-bar.component.scss",
-  standalone: false,
+  imports: [MatIcon],
 })
 export class FilterBarComponent {
   public readonly tabs = input.required<FilterTab[]>();

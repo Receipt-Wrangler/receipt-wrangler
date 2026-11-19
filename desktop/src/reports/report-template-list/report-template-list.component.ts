@@ -10,7 +10,7 @@ import {
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
 import { MatTableDataSource } from "@angular/material/table";
-import { Router } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { EMPTY, catchError, finalize, take, tap } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS } from "../../constants";
@@ -31,6 +31,15 @@ import {
 import { ReportCatalogService } from "../services/report-catalog.service";
 import { ReportRunnerService } from "../services/report-runner.service";
 import { ReportTemplateTableService } from "./report-template-table.service";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { TableComponent } from "../../table/table/table.component";
+import { MatIcon } from "@angular/material/icon";
+import { ButtonComponent } from "../../button/button/button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { AsyncPipe } from "@angular/common";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
 
 /**
  * The Reports landing page: a paged table of saved report templates. Each row
@@ -45,7 +54,18 @@ import { ReportTemplateTableService } from "./report-template-table.service";
   styleUrls: ["./report-template-list.component.scss"],
   host: DEFAULT_HOST_CLASS,
   providers: [{ provide: BaseTableService, useClass: ReportTemplateTableService }],
-  standalone: false,
+  imports: [
+    TableHeaderComponent,
+    AddButtonComponent,
+    TableComponent,
+    MatIcon,
+    RouterLink,
+    ButtonComponent,
+    EditButtonComponent,
+    DeleteButtonComponent,
+    AsyncPipe,
+    AppDatePipe,
+  ],
 })
 export class ReportTemplateListComponent extends BaseTableComponent<ReportTemplate> implements AfterViewInit {
   private readonly router = inject(Router);

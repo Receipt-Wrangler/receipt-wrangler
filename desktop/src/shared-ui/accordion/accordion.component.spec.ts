@@ -10,9 +10,9 @@ describe('AccordionComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [AccordionComponent],
       imports: [
-        AccordionModule
+        AccordionModule,
+        AccordionComponent
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA]
     })

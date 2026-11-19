@@ -1,12 +1,13 @@
 import { Component, OnChanges, SimpleChanges, input } from "@angular/core";
 import { FormControl } from "@angular/forms";
 import { RECEIPT_STATUS_OPTIONS } from "src/constants";
+import { SelectComponent } from "../../select/select/select.component";
 
 @Component({
     selector: "app-status-select",
     templateUrl: "./status-select.component.html",
     styleUrls: ["./status-select.component.scss"],
-    standalone: false
+    imports: [SelectComponent]
 })
 export class StatusSelectComponent implements OnChanges {
   public readonly inputFormControl = input.required<FormControl>();

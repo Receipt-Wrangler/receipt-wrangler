@@ -7,9 +7,9 @@ import {
   DeleteAccountDialogComponent,
   DeleteAccountDialogData,
 } from "./delete-account-dialog.component";
-import { ButtonModule } from "src/button";
-import { PipesModule } from "src/pipes/pipes.module";
 import { CancelButtonComponent } from "src/shared-ui/cancel-button/cancel-button.component";
+import { provideStore } from "@ngxs/store";
+import { provideNgxMask } from "ngx-mask";
 
 describe("DeleteAccountDialogComponent", () => {
   let component: DeleteAccountDialogComponent;
@@ -23,6 +23,8 @@ describe("DeleteAccountDialogComponent", () => {
 
     // app-button carries a routerLink, so the real buttons need a router.
     const providers: any[] = [
+      provideStore([]),
+      provideNgxMask(),
       provideRouter([]),
       { provide: MatDialogRef, useValue: dialogRefSpy },
     ];
@@ -33,9 +35,8 @@ describe("DeleteAccountDialogComponent", () => {
     }
 
     await TestBed.configureTestingModule({
-      declarations: [CancelButtonComponent, DeleteAccountDialogComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [ButtonModule, ReactiveFormsModule, PipesModule],
+      imports: [CancelButtonComponent, ReactiveFormsModule, DeleteAccountDialogComponent],
       providers,
     }).compileComponents();
 

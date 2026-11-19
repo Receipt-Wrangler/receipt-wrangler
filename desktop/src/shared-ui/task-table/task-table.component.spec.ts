@@ -19,9 +19,8 @@ describe("TaskTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [TaskTableComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [NgxsModule.forRoot([SystemEmailTaskTableState])],
+    imports: [NgxsModule.forRoot([SystemEmailTaskTableState]), TaskTableComponent],
     providers: [
         {
             provide: TABLE_SERVICE_INJECTION_TOKEN,

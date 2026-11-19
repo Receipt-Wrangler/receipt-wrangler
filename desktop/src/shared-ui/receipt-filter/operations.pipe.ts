@@ -9,10 +9,7 @@ import {
 } from "src/constants";
 import { FilterOperation } from "src/open-api";
 
-@Pipe({
-    name: "operations",
-    standalone: false
-})
+@Pipe({ name: "operations" })
 export class OperationsPipe implements PipeTransform {
   public transform(type: string, display: boolean): string[] {
     let operationOptions: FilterOperation[] = [];

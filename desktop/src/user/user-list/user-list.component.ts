@@ -20,6 +20,13 @@ import { DummyUserConversionDialogComponent } from "../dummy-user-conversion-dia
 import { ResetPasswordComponent } from "../reset-password/reset-password.component";
 import { UserFormComponent } from "../user-form/user-form.component";
 import { UserTableService } from "./user-table.service";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { ButtonComponent } from "../../button/button/button.component";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { RoleNamePipe } from "../../pipes/role-name.pipe";
 
 @Component({
     selector: "app-user-list",
@@ -32,7 +39,7 @@ import { UserTableService } from "./user-table.service";
             useClass: UserTableService
         }
     ],
-    standalone: false
+    imports: [TableHeaderComponent, HasAppPermissionDirective, ButtonComponent, AddButtonComponent, TableComponent, DeleteButtonComponent, AppDatePipe, RoleNamePipe]
 })
 export class UserListComponent extends BaseTableComponent<User> implements AfterViewInit {
   protected readonly Permission = Permission;

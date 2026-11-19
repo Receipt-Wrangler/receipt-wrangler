@@ -6,15 +6,10 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, throwError } from "rxjs";
-import { AutocompleteModule } from "../../autocomplete/autocomplete.module";
-import { CheckboxModule } from "../../checkbox/checkbox.module";
-import { InputModule } from "../../input/index";
 import { FormMode } from "../../enums/form-mode.enum";
 import { CurrencySeparator, CurrencySymbolPosition, FeatureConfigService, QueueName, SystemSettingsService } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import { SnackbarService } from "../../services";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { AuthState } from "../../store/auth.state";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { SetTimeZone } from "../../store/system-settings.state.actions";
@@ -22,6 +17,8 @@ import { TaskQueueFormControlPipe } from "../pipes/task-queue-form-control.pipe"
 
 import { SystemSettingsFormComponent } from "./system-settings-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { CurrencyPipe } from "@angular/common";
+import { provideNgxMask } from "ngx-mask";
 
 describe("SystemSettingsFormComponent", () => {
   let component: SystemSettingsFormComponent;
@@ -30,18 +27,15 @@ describe("SystemSettingsFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [SystemSettingsFormComponent, CustomCurrencyPipe, TaskQueueFormControlPipe],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [AutocompleteModule,
-        CheckboxModule,
-        InputModule,
+    imports: [CustomCurrencyPipe,
         NgxsModule.forRoot([SystemSettingsState, AuthState]),
-        PipesModule,
         ReactiveFormsModule,
-        SharedUiModule,
-        NoopAnimationsModule],
+        NoopAnimationsModule, SystemSettingsFormComponent, TaskQueueFormControlPipe],
     providers: [
+        provideNgxMask(),
         provideZonelessChangeDetection(),
+        CurrencyPipe,
         CustomCurrencyPipe,
         {
             provide: ActivatedRoute,

@@ -2,9 +2,9 @@ import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute } from "@angular/router";
 import { FormConfig } from "../../interfaces";
-import { PipesModule } from "../../pipes";
 
 import { GroupSettingsAiComponent } from "./group-settings-ai.component";
+import { provideStore } from "@ngxs/store";
 
 describe("GroupSettingsAiComponent", () => {
   let component: GroupSettingsAiComponent;
@@ -12,9 +12,9 @@ describe("GroupSettingsAiComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [GroupSettingsAiComponent],
-      imports: [PipesModule],
+      imports: [GroupSettingsAiComponent],
       providers: [
+        provideStore([]),
         {
           provide: ActivatedRoute,
           useValue: {

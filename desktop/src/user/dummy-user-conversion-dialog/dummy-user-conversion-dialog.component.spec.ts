@@ -7,11 +7,12 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { ApiModule, UserService } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services";
 import { UpdateUser } from "../../store";
-import { StoreModule } from "../../store/store.module";
+import { provideTestStore } from "../../store/test-store";
 import { DummyUserConversionDialogComponent } from "./dummy-user-conversion-dialog.component";
+import { provideNgxMask } from "ngx-mask";
+import { provideRouter } from "@angular/router";
 
 describe("DummyUserConversionDialogComponent", () => {
   let component: DummyUserConversionDialogComponent;
@@ -19,15 +20,16 @@ describe("DummyUserConversionDialogComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DummyUserConversionDialogComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
         ApiModule,
         MatSnackBarModule,
-        StoreModule,
-        PipesModule,
+        DummyUserConversionDialogComponent,
       ],
       providers: [
+        provideTestStore(),
+        provideRouter([]),
+        provideNgxMask(),
         SnackbarService,
         {
           provide: MatDialogRef,

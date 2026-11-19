@@ -1,10 +1,15 @@
-import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, moveItemInArray, CdkDropList, CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { DEFAULT_RECEIPT_TABLE_COLUMNS, ReceiptTableColumnConfig } from '../../interfaces';
-import { CUSTOM_FIELD_BADGE } from '../../shared-ui/badge/badge.component';
+import { CUSTOM_FIELD_BADGE, BadgeComponent } from '../../shared-ui/badge/badge.component';
 import { CustomField } from '../../open-api';
 import { columnDisplayName, mergeCustomFieldColumns, parseCustomFieldColumnDef } from '../../utils';
+import { DialogComponent } from '../../shared-ui/dialog/dialog.component';
+import { MatIcon } from '@angular/material/icon';
+import { MatCheckbox } from '@angular/material/checkbox';
+import { DialogFooterComponent } from '../../shared-ui/dialog-footer/dialog-footer.component';
+import { ButtonComponent } from '../../button/button/button.component';
 
 interface ColumnConfigItem extends ReceiptTableColumnConfig {
   displayName: string;
@@ -15,7 +20,7 @@ interface ColumnConfigItem extends ReceiptTableColumnConfig {
   selector: 'app-column-configuration-dialog',
   templateUrl: './column-configuration-dialog.component.html',
   styleUrls: ['./column-configuration-dialog.component.scss'],
-  standalone: false
+  imports: [DialogComponent, CdkDropList, CdkDrag, CdkDragHandle, MatIcon, MatCheckbox, BadgeComponent, DialogFooterComponent, ButtonComponent]
 })
 export class ColumnConfigurationDialogComponent implements OnInit {
   public columns: ColumnConfigItem[] = [];

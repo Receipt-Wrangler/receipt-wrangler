@@ -21,6 +21,19 @@ import {AppInitService, SnackbarService} from "../../services";
 import {AddGroup, AuthState, UpdateGroup} from "../../store";
 import {GroupMemberFormComponent} from "../group-member-form/group-member-form.component";
 import {buildGroupMemberForm} from "../utils/group-member.utils";
+import { FormComponent } from "../../shared-ui/form/form.component";
+import { AuditDetailSectionComponent } from "../../shared-ui/audit-detail-section/audit-detail-section.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
+import { RoleNamePipe } from "../../pipes/role-name.pipe";
+import { UserPipe } from "../../pipes/user.pipe";
 
 @UntilDestroy()
 @Component({
@@ -28,7 +41,7 @@ import {buildGroupMemberForm} from "../utils/group-member.utils";
     templateUrl: "./group-form.component.html",
     styleUrls: ["./group-form.component.scss"],
     host: DEFAULT_HOST_CLASS,
-    standalone: false
+    imports: [FormComponent, AuditDetailSectionComponent, FormSectionComponent, InputComponent, SelectComponent, CheckboxComponent, TableComponent, ButtonComponent, EditButtonComponent, DeleteButtonComponent, FormGetPipe, InputReadonlyPipe, RoleNamePipe, UserPipe]
 })
 export class GroupFormComponent implements OnInit, AfterViewInit {
   protected readonly PermissionScope = PermissionScope;

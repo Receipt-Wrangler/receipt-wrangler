@@ -1,15 +1,19 @@
 import { Component, Input, OnInit } from "@angular/core";
-import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { take, tap } from "rxjs";
 import { User, UserService } from "../../open-api";
 import { SnackbarService } from "../../services";
+import { InputComponent } from "../../input/input/input.component";
+import { SubmitButtonComponent } from "../../shared-ui/submit-button/submit-button.component";
+import { CancelButtonComponent } from "../../shared-ui/cancel-button/cancel-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 @Component({
     selector: "app-reset-password",
     templateUrl: "./reset-password.component.html",
     styleUrls: ["./reset-password.component.scss"],
-    standalone: false
+    imports: [ReactiveFormsModule, InputComponent, SubmitButtonComponent, CancelButtonComponent, FormGetPipe]
 })
 export class ResetPasswordComponent implements OnInit {
   @Input() public user!: User;

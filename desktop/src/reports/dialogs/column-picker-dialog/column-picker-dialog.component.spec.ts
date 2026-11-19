@@ -2,9 +2,11 @@ import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core"
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
-import { PipesModule } from "../../../pipes";
 import { ReportColumn } from "../../../open-api";
 import { ColumnPickerDialogComponent, ColumnPickerDialogData } from "./column-picker-dialog.component";
+import { provideRouter } from "@angular/router";
+import { provideStore } from "@ngxs/store";
+import { provideNgxMask } from "ngx-mask";
 
 function configure(data: ColumnPickerDialogData): {
   fixture: ComponentFixture<ColumnPickerDialogComponent>;
@@ -13,9 +15,11 @@ function configure(data: ColumnPickerDialogData): {
 } {
   const close = jest.fn();
   TestBed.configureTestingModule({
-    declarations: [ColumnPickerDialogComponent],
-    imports: [PipesModule],
+    imports: [ColumnPickerDialogComponent],
     providers: [
+      provideNgxMask(),
+      provideStore([]),
+      provideRouter([]),
       provideZonelessChangeDetection(),
       FormBuilder,
       { provide: MatDialogRef, useValue: { close } },

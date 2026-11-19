@@ -8,9 +8,11 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { of } from "rxjs";
 import { DuplicateValidator } from "src/validators/duplicate-validator";
 import { ApiModule, CategoryService, CategoryView } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { CategoryForm } from "./category-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideStore } from "@ngxs/store";
+import { provideNgxMask } from "ngx-mask";
+import { provideRouter } from "@angular/router";
 
 describe("CategoryForm", () => {
   let component: CategoryForm;
@@ -18,15 +20,16 @@ describe("CategoryForm", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [CategoryForm],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         MatDialogModule,
         MatSnackBarModule,
-        PipesModule,
         ReactiveFormsModule,
-        NoopAnimationsModule],
+        NoopAnimationsModule, CategoryForm],
     providers: [
+        provideRouter([]),
+        provideNgxMask(),
+        provideStore([]),
         DuplicateValidator,
         {
             provide: MatDialogRef,

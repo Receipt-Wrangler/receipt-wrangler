@@ -7,14 +7,13 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { ActivatedRoute, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, throwError } from "rxjs";
-import { PipesModule } from "src/pipes/pipes.module";
-import { DirectivesModule } from "../../directives";
 import { ApiModule, OidcConnectionView, OidcService, Permission, UserService } from "../../open-api";
 import { SnackbarService, TokenRefreshService } from "../../services";
 import { AuthState, FeatureConfigState, Logout, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { buildOidcDeleteConfirmationUrl, UserProfileComponent } from "./user-profile.component";
 import { DeleteAccountDialogComponent } from "../delete-account-dialog/delete-account-dialog.component";
+import { provideNgxMask } from "ngx-mask";
 
 function connection(overrides: Partial<OidcConnectionView> = {}): OidcConnectionView {
   return {
@@ -32,17 +31,14 @@ describe("UserProfileComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [UserProfileComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
-        DirectivesModule,
-        PipesModule,
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, FeatureConfigState, UserState]),
-        PipesModule,
-        ReactiveFormsModule],
+        ReactiveFormsModule, UserProfileComponent],
     providers: [
+        provideNgxMask(),
         {
             provide: ActivatedRoute,
             useValue: { snapshot: { data: { formConfig: {} } } },

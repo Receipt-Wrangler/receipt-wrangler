@@ -1,8 +1,7 @@
-import { CommonModule } from "@angular/common";
-import { NgModule } from "@angular/core";
-import { NgxsReduxDevtoolsPluginModule } from "@ngxs/devtools-plugin";
-import { NgxsStoragePluginModule } from "@ngxs/storage-plugin";
-import { NgxsModule } from "@ngxs/store";
+import { EnvironmentProviders } from "@angular/core";
+import { withNgxsReduxDevtoolsPlugin } from "@ngxs/devtools-plugin";
+import { withNgxsStoragePlugin } from "@ngxs/storage-plugin";
+import { provideStore } from "@ngxs/store";
 import { environment } from "src/environments/environment.development";
 import { AboutState } from "./about.state";
 import { ApiKeyTableState } from "./api-key-table.state";
@@ -25,11 +24,10 @@ import { SystemTaskTableState } from "./system-task-table.state";
 import { TagTableState } from "./tag-table.state";
 import { UserState } from "./user.state";
 
-@NgModule({
-  declarations: [],
-  imports: [
-    CommonModule,
-    NgxsModule.forRoot([
+/** The NGXS store most component specs run against: these states, with the storage plugin. */
+export function provideTestStore(): EnvironmentProviders {
+  return provideStore(
+    [
       AboutState,
       ApiKeyTableState,
       AuthState,
@@ -50,33 +48,32 @@ import { UserState } from "./user.state";
       SystemTaskTableState,
       TagTableState,
       UserState,
-    ]),
-    NgxsReduxDevtoolsPluginModule.forRoot({
+    ],
+    withNgxsReduxDevtoolsPlugin({
       disabled: environment.isProd,
     }),
-    NgxsStoragePluginModule.forRoot({
+    withNgxsStoragePlugin({
       keys: [
-        "about",
-        "apiKeyTable",
-        "auth",
-        "categoryTable",
-        "customFieldTable",
-        "dashboards",
-        "groupTable",
-        "groups",
-        "layout",
-        "promptTable",
-        "receiptProcessingSettingsTable",
-        "receiptProcessingSettingsTaskTable",
-        "receiptTable",
-        "systemEmailTable",
-        "systemEmailTaskTable",
-        "systemSettings",
-        "systemTaskTable",
-        "tagTable",
-        "users",
+      "about",
+      "apiKeyTable",
+      "auth",
+      "categoryTable",
+      "customFieldTable",
+      "dashboards",
+      "groupTable",
+      "groups",
+      "layout",
+      "promptTable",
+      "receiptProcessingSettingsTable",
+      "receiptProcessingSettingsTaskTable",
+      "receiptTable",
+      "systemEmailTable",
+      "systemEmailTaskTable",
+      "systemSettings",
+      "systemTaskTable",
+      "tagTable",
+      "users",
       ],
     }),
-  ],
-})
-export class StoreModule {}
+  );
+}

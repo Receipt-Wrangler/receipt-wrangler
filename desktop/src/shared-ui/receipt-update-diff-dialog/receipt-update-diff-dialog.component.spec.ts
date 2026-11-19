@@ -8,6 +8,7 @@ import { SystemSettingsState } from "../../store/system-settings.state";
 import { CollapsedDiffRow } from "../../utils/line-diff";
 import { ReceiptUpdateSnapshots } from "../../utils/receipt-update-description";
 import { ReceiptUpdateDiffDialogComponent, ReceiptUpdateDiffDialogData } from "./receipt-update-diff-dialog.component";
+import { provideRouter } from "@angular/router";
 
 describe("ReceiptUpdateDiffDialogComponent", () => {
   let fixture: ComponentFixture<ReceiptUpdateDiffDialogComponent>;
@@ -43,10 +44,10 @@ describe("ReceiptUpdateDiffDialogComponent", () => {
   const create = async (snapshots: ReceiptUpdateSnapshots) => {
     dialogRef = { close: jest.fn() };
     await TestBed.configureTestingModule({
-      declarations: [ReceiptUpdateDiffDialogComponent],
-      imports: [AppDatePipe, CommonModule, NgxsModule.forRoot([SystemSettingsState])],
+      imports: [AppDatePipe, CommonModule, NgxsModule.forRoot([SystemSettingsState]), ReceiptUpdateDiffDialogComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
+        provideRouter([]),
         provideZonelessChangeDetection(),
         { provide: MatDialogRef, useValue: dialogRef },
         { provide: MAT_DIALOG_DATA, useValue: { snapshots } satisfies ReceiptUpdateDiffDialogData },

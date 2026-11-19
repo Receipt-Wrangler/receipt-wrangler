@@ -8,7 +8,7 @@ describe('FormButtonComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ FormButtonComponent ]
+      imports: [FormButtonComponent]
     })
     .compileComponents();
 

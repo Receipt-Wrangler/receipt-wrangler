@@ -8,14 +8,10 @@ import { of, throwError } from 'rxjs';
 import { API_KEY_SCOPE_OPTIONS } from '../../constants';
 import { ApiKeyResult, ApiKeyScope, ApiKeyService, ApiKeyView } from '../../open-api';
 import { SnackbarService } from '../../services';
-import { SharedUiModule } from '../../shared-ui/shared-ui.module';
 import { LayoutState } from '../../store/layout.state';
-import { ButtonModule } from '../../button';
-import { InputModule } from '../../input';
-import { PipesModule } from '../../pipes/pipes.module';
-import { SelectModule } from '../../select/select.module';
 
 import { ApiKeyFormDialogComponent } from './api-key-form-dialog.component';
+import { provideNgxMask } from 'ngx-mask';
 
 describe('ApiKeyFormDialogComponent', () => {
   let component: ApiKeyFormDialogComponent;
@@ -30,18 +26,14 @@ describe('ApiKeyFormDialogComponent', () => {
     mockSnackbarService = { success: jest.fn(), error: jest.fn() } as unknown as jest.Mocked<SnackbarService>;
 
     await TestBed.configureTestingModule({
-      declarations: [ApiKeyFormDialogComponent],
       imports: [
         ReactiveFormsModule,
         MatIconModule,
-        SharedUiModule,
-        ButtonModule,
-        InputModule,
-        PipesModule,
-        SelectModule,
-        NgxsModule.forRoot([LayoutState])
+        NgxsModule.forRoot([LayoutState]),
+        ApiKeyFormDialogComponent
       ],
       providers: [
+        provideNgxMask(),
         { provide: MatDialogRef, useValue: mockDialogRef },
         { provide: ApiKeyService, useValue: mockApiKeyService },
         { provide: SnackbarService, useValue: mockSnackbarService },

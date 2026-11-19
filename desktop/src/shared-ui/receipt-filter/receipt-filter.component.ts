@@ -9,12 +9,17 @@ import { setupAutoOperationSelection } from "src/utils/filter-form";
 import { FormCommand } from "../../form/index";
 import { Category, Tag } from "../../open-api";
 import { GroupState } from "../../store";
+import { DialogComponent } from "../dialog/dialog.component";
+import { NgTemplateOutlet } from "@angular/common";
+import { FilterFieldComponent } from "../filter-field/filter-field.component";
+import { DialogFooterComponent } from "../dialog-footer/dialog-footer.component";
+import { ButtonComponent } from "../../button/button/button.component";
 
 @Component({
   selector: "app-receipt-filter",
   templateUrl: "./receipt-filter.component.html",
   styleUrls: ["./receipt-filter.component.scss"],
-  standalone: false
+  imports: [DialogComponent, NgTemplateOutlet, FilterFieldComponent, DialogFooterComponent, ButtonComponent]
 })
 export class ReceiptFilterComponent implements OnInit {
   @Input() public headerText: string = "";

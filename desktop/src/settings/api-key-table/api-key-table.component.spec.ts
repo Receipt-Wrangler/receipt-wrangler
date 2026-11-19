@@ -7,12 +7,9 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { ApiKeyScope, ApiKeyView, Permission } from "../../open-api";
-import { PipesModule } from "../../pipes/pipes.module";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { AuthState } from "../../store/auth.state";
 import { SetAuthState, SetPermissions } from "../../store/auth.state.actions";
 import { ApiKeyTableState } from "../../store/api-key-table.state";
-import { TableModule } from "../../table/table.module";
 
 import { ApiKeyTableComponent } from "./api-key-table.component";
 
@@ -26,14 +23,11 @@ describe("ApiKeyTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ApiKeyTableComponent],
       imports: [
-        SharedUiModule,
-        PipesModule,
         NgxsModule.forRoot([AuthState, ApiKeyTableState]),
-        TableModule,
         MatDialogModule,
         NoopAnimationsModule,
+        ApiKeyTableComponent,
       ],
       providers: [
         provideZonelessChangeDetection(),

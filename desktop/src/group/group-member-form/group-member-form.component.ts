@@ -1,6 +1,6 @@
 import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
-import { FormGroup } from "@angular/forms";
+import { FormGroup, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { catchError, forkJoin, of, startWith, take, tap } from "rxjs";
@@ -18,7 +18,7 @@ import {
   TagService,
 } from "../../open-api";
 import { openRolePreviewDialog } from "../../roles/role-preview/role-preview-dialog.component";
-import { GrantSelection } from "../../shared-ui/grant-picker/grant-picker.component";
+import { GrantSelection, GrantPickerComponent } from "../../shared-ui/grant-picker/grant-picker.component";
 import {
   buildMemberGrantRow,
   emptySelectionHint,
@@ -27,12 +27,19 @@ import {
 } from "../../shared-ui/grant-picker/member-grant-assignment";
 import { AuthState } from "../../store";
 import { buildGroupMemberForm } from "../utils/group-member.utils";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { UserAutocompleteComponent } from "../../user-autocomplete/user-autocomplete/user-autocomplete.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { HasGroupPermissionDirective } from "../../directives/has-group-permission.directive";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 @Component({
     selector: "app-group-member-form",
     templateUrl: "./group-member-form.component.html",
     styleUrls: ["./group-member-form.component.scss"],
-    standalone: false
+    imports: [DialogComponent, ReactiveFormsModule, UserAutocompleteComponent, SelectComponent, ButtonComponent, HasGroupPermissionDirective, GrantPickerComponent, DialogFooterComponent, FormGetPipe]
 })
 export class GroupMemberFormComponent implements OnInit {
   protected readonly Permission = Permission;

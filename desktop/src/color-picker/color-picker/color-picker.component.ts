@@ -1,12 +1,13 @@
 import { Component, Input } from "@angular/core";
-import { FormControl } from "@angular/forms";
+import { FormControl, ReactiveFormsModule } from "@angular/forms";
 import { BaseInputInterface } from "../../base-input";
+import { MatFormField, MatLabel, MatInput } from "@angular/material/input";
 
 @Component({
     selector: "app-color-picker",
     templateUrl: "./color-picker.component.html",
     styleUrls: ["./color-picker.component.scss"],
-    standalone: false
+    imports: [MatFormField, MatLabel, MatInput, ReactiveFormsModule]
 })
 export class ColorPickerComponent implements BaseInputInterface {
   @Input() public inputFormControl: FormControl<any> = new FormControl();

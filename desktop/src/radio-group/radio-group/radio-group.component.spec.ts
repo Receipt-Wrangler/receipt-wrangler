@@ -10,8 +10,7 @@ describe('RadioGroupComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [RadioGroupComponent],
-      imports: [MatRadioModule, ReactiveFormsModule],
+      imports: [MatRadioModule, ReactiveFormsModule, RadioGroupComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(RadioGroupComponent);

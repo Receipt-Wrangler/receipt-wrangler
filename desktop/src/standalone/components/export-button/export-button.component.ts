@@ -1,12 +1,12 @@
 import { Component, input } from "@angular/core";
-import { ButtonModule } from "../../../button/index";
 import { ReceiptPagedRequestCommand } from "../../../open-api/index";
 import { ReceiptExportService } from "../../../services/receipt-export.service";
+import { ButtonComponent } from "../../../button/button/button.component";
 
 @Component({
   selector: "app-export-button",
   imports: [
-    ButtonModule
+    ButtonComponent
   ],
   templateUrl: "./export-button.component.html",
   styleUrl: "./export-button.component.scss"

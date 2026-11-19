@@ -11,7 +11,9 @@ import { ReportPreviewPanelComponent } from "./report-preview-panel.component";
 // buildReportForm wires untilDestroyed subscriptions, so it needs an
 // @UntilDestroy()-decorated context.
 @UntilDestroy()
-@Component({ selector: "app-noop", template: "", standalone: false })
+@Component({
+  selector: "app-noop", template: ""
+})
 class NoopComponent {}
 
 describe("ReportPreviewPanelComponent", () => {
@@ -23,7 +25,7 @@ describe("ReportPreviewPanelComponent", () => {
   beforeEach(async () => {
     dialog = { open: jest.fn() };
     await TestBed.configureTestingModule({
-      declarations: [ReportPreviewPanelComponent, NoopComponent],
+      imports: [ReportPreviewPanelComponent, NoopComponent],
       providers: [provideZonelessChangeDetection(), FormBuilder, { provide: MatDialog, useValue: dialog }],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();

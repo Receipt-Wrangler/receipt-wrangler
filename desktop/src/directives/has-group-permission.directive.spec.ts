@@ -7,7 +7,7 @@ import { HasGroupPermissionDirective, HasGroupPermissionInput } from "./has-grou
 
 @Component({
   template: `<span *hasGroupPermission="config" data-testid="gated">gated</span>`,
-  standalone: false,
+  imports: [HasGroupPermissionDirective],
 })
 class HostComponent {
   config: HasGroupPermissionInput = { groupId: 1, permission: "group.view" };
@@ -22,8 +22,7 @@ describe("HasGroupPermissionDirective", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [HostComponent, HasGroupPermissionDirective],
-      imports: [NgxsModule.forRoot([AuthState])],
+      imports: [NgxsModule.forRoot([AuthState]), HostComponent],
       providers: [provideZonelessChangeDetection()],
     }).compileComponents();
 

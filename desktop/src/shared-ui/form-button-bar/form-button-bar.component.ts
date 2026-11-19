@@ -1,5 +1,6 @@
 import { Component, HostBinding, input } from "@angular/core";
 import { FormMode } from "src/enums/form-mode.enum";
+import { NgClass } from "@angular/common";
 
 /**
  * How far, in px, the bar keeps clear of each viewport edge. The bar is fixed to
@@ -15,7 +16,7 @@ export interface FormButtonBarInset {
     selector: "app-form-button-bar",
     templateUrl: "./form-button-bar.component.html",
     styleUrls: ["./form-button-bar.component.scss"],
-    standalone: false
+    imports: [NgClass]
 })
 export class FormButtonBarComponent {
   public readonly mode = input<FormMode>();

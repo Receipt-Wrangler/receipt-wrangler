@@ -4,8 +4,7 @@ import { FormMode } from "src/enums/form-mode.enum";
 @Component({
   selector: "app-form-button",
   templateUrl: "./form-button.component.html",
-  styleUrls: ["./form-button.component.scss"],
-  standalone: false
+  styleUrls: ["./form-button.component.scss"]
 })
 export class FormButtonComponent {
   public readonly mode = input<FormMode>(FormMode.view);

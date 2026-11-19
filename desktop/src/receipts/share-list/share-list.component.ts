@@ -12,7 +12,7 @@ import {
   viewChildren
 } from "@angular/core";
 import { AbstractControl, FormArray, FormGroup, } from "@angular/forms";
-import { MatExpansionPanel } from "@angular/material/expansion";
+import { MatExpansionPanel, MatAccordion, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from "@angular/material/expansion";
 import { ActivatedRoute } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { RECEIPT_ITEM_STATUS_OPTIONS } from "src/constants/receipt-status-options";
@@ -21,6 +21,24 @@ import { InputComponent } from "../../input";
 import { Category, Group, Item, ItemStatus, Permission, Receipt, Tag, User } from "../../open-api";
 import { AuthState, UserState } from "../../store";
 import { buildItemForm } from "../utils/form.utils";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { UserAutocompleteComponent } from "../../user-autocomplete/user-autocomplete/user-autocomplete.component";
+import { CategoryAutocompleteComponent } from "../../category-autocomplete/category-autocomplete.component";
+import { TagAutocompleteComponent } from "../../tag-autocomplete/tag-autocomplete.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { NgClass } from "@angular/common";
+import { MatIcon } from "@angular/material/icon";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
+import { MapGetPipe } from "../../pipes/map-get.pipe";
+import { MapKeyPipe } from "../../pipes/map-key.pipe";
+import { UserPipe } from "../../pipes/user.pipe";
+import { UserTotalWithPercentagePipe } from "../user-total-with-percentage.pipe";
 
 export interface ItemData {
   item: Item;
@@ -35,7 +53,7 @@ export interface ItemData {
   templateUrl: "./share-list.component.html",
   styleUrls: ["./share-list.component.scss"],
   encapsulation: ViewEncapsulation.None,
-  standalone: false
+  imports: [MatAccordion, CardComponent, UserAutocompleteComponent, InputComponent, CategoryAutocompleteComponent, TagAutocompleteComponent, DialogFooterComponent, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription, AddButtonComponent, ButtonComponent, NgClass, MatIcon, DeleteButtonComponent, SelectComponent, CustomCurrencyPipe, FormGetPipe, InputReadonlyPipe, MapGetPipe, MapKeyPipe, UserPipe, UserTotalWithPercentagePipe]
 })
 export class ShareListComponent implements OnInit, OnChanges {
   public readonly userExpansionPanels = viewChildren<MatExpansionPanel>("userExpansionPanel");

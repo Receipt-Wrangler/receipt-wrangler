@@ -8,12 +8,17 @@ import { FormMode } from "../../enums/form-mode.enum";
 import { Group, GroupsService, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, UpdateGroup } from "../../store";
+import { FormComponent } from "../../shared-ui/form/form.component";
+import { AuditDetailSectionComponent } from "../../shared-ui/audit-detail-section/audit-detail-section.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { GroupSettingsEmailComponent } from "../group-settings-email/group-settings-email.component";
+import { GroupSettingsAiComponent } from "../group-settings-ai/group-settings-ai.component";
 
 @Component({
   selector: "app-group-settings",
   templateUrl: "./group-settings.component.html",
   styleUrls: ["./group-settings.component.scss"],
-  standalone: false
+  imports: [FormComponent, AuditDetailSectionComponent, FormSectionComponent, GroupSettingsEmailComponent, GroupSettingsAiComponent]
 })
 export class GroupSettingsComponent
   extends BaseFormComponent

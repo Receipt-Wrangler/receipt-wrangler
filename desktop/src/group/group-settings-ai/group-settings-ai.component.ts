@@ -4,12 +4,15 @@ import { ActivatedRoute } from "@angular/router";
 import { BaseFormComponent } from "../../form";
 import { FormConfig } from "../../interfaces";
 import { Group, Prompt } from "../../open-api";
+import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @Component({
     selector: "app-group-settings-ai",
     templateUrl: "./group-settings-ai.component.html",
     styleUrl: "./group-settings-ai.component.scss",
-    standalone: false
+    imports: [AutocomleteComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class GroupSettingsAiComponent extends BaseFormComponent implements OnInit {
   @Input() public override form: FormGroup = new FormGroup({});

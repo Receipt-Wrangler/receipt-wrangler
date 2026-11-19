@@ -7,9 +7,11 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { of } from "rxjs";
 import { DuplicateValidator } from "src/validators/duplicate-validator";
 import { ApiModule, TagService, TagView } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { TagFormComponent } from "./tag-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideStore } from "@ngxs/store";
+import { provideNgxMask } from "ngx-mask";
+import { provideRouter } from "@angular/router";
 
 describe("CategoryForm", () => {
   let component: TagFormComponent;
@@ -17,14 +19,15 @@ describe("CategoryForm", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [TagFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         MatDialogModule,
         MatSnackBarModule,
-        PipesModule,
-        ReactiveFormsModule],
+        ReactiveFormsModule, TagFormComponent],
     providers: [
+        provideRouter([]),
+        provideNgxMask(),
+        provideStore([]),
         DuplicateValidator,
         {
             provide: MatDialogRef,

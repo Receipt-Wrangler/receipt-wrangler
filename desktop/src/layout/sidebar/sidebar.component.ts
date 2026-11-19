@@ -1,7 +1,7 @@
 import { Component, computed, ViewEncapsulation } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
-import { Data, NavigationEnd, Router } from "@angular/router";
+import { Data, NavigationEnd, Router, RouterLinkActive, RouterLink, RouterOutlet } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { filter, map, startWith, switchMap, take } from "rxjs";
 import { LayoutState } from "src/store/layout.state";
@@ -13,13 +13,24 @@ import { AuthService, Group, GroupStatus, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, GroupState, Logout, SetSelectedGroupId } from "../../store";
 import { hasAll } from "../../utils/permission.utils";
+import { MatDrawerContainer, MatDrawer, MatDrawerContent } from "@angular/material/sidenav";
+import { AvatarComponent } from "../../avatar/avatar/avatar.component";
+import { MatMenuTrigger, MatMenu, MatMenuItem } from "@angular/material/menu";
+import { MatFabButton, MatIconButton } from "@angular/material/button";
+import { NgClass, NgTemplateOutlet } from "@angular/common";
+import { MatIcon } from "@angular/material/icon";
+import { HasGroupPermissionDirective } from "../../directives/has-group-permission.directive";
+import { MatTooltip } from "@angular/material/tooltip";
+import { QuickScanButtonComponent } from "../../shared-ui/quick-scan-button/quick-scan-button.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { HeaderComponent } from "../header/header.component";
 
 @Component({
     selector: "app-sidebar",
     templateUrl: "./sidebar.component.html",
     styleUrls: ["./sidebar.component.scss"],
     encapsulation: ViewEncapsulation.None,
-    standalone: false
+    imports: [MatDrawerContainer, MatDrawer, AvatarComponent, MatMenuTrigger, MatFabButton, NgClass, MatIcon, HasGroupPermissionDirective, MatIconButton, RouterLinkActive, MatTooltip, RouterLink, QuickScanButtonComponent, HasAppPermissionDirective, NgTemplateOutlet, MatMenu, MatMenuItem, MatDrawerContent, HeaderComponent, RouterOutlet]
 })
 export class SidebarComponent {
   constructor(

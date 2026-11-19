@@ -5,10 +5,7 @@ import { FeatureConfigState } from '../store/feature-config.state';
 /**
  * Add the template content to the DOM unless the condition is true.
  */
-@Directive({
-    selector: '[appFeature]',
-    standalone: false
-})
+@Directive({ selector: '[appFeature]' })
 export class FeatureDirective {
   private hasView = false;
 

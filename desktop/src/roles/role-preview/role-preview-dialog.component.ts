@@ -17,13 +17,13 @@ import {
   PermissionService,
   Role,
 } from "../../open-api";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import {
   friendlyActionLabel,
   friendlyResourceName,
   iconForResource,
   resourceKeyOf,
 } from "../role-presets";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
 
 export interface RolePreviewDialogData {
   role: Role;
@@ -56,7 +56,7 @@ interface PreviewGroup {
     MatButtonModule,
     MatDialogModule,
     MatIconModule,
-    SharedUiModule,
+    DialogComponent,
   ],
   templateUrl: "./role-preview-dialog.component.html",
   styleUrls: ["./role-preview-dialog.component.scss"],

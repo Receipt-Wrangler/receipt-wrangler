@@ -1,13 +1,17 @@
 import { Component, ElementRef, input, viewChild } from "@angular/core";
-import { MatAutocompleteTrigger } from "@angular/material/autocomplete";
+import { MatAutocompleteTrigger, MatAutocomplete, MatOption } from "@angular/material/autocomplete";
 import { BaseInputComponent } from "../../base-input";
 import { InputInterface } from "../../input";
+import { MatFormField, MatLabel, MatInput, MatHint, MatError } from "@angular/material/input";
+import { CdkTextareaAutosize } from "@angular/cdk/text-field";
+import { ReactiveFormsModule } from "@angular/forms";
+import { AsyncPipe } from "@angular/common";
 
 @Component({
     selector: "app-textarea",
     templateUrl: "./textarea.component.html",
     styleUrls: ["./textarea.component.scss"],
-    standalone: false
+    imports: [MatFormField, MatLabel, CdkTextareaAutosize, MatInput, ReactiveFormsModule, MatAutocompleteTrigger, MatHint, MatAutocomplete, MatOption, MatError, AsyncPipe]
 })
 export class TextareaComponent
   extends BaseInputComponent

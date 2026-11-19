@@ -1,5 +1,4 @@
-import { NgModule } from "@angular/core";
-import { RouterModule, Routes } from "@angular/router";
+import { Routes } from "@angular/router";
 import { FormMode } from "src/enums/form-mode.enum";
 import { appPermissionGuard } from "src/guards/app-permission.guard";
 import { groupPermissionGuard } from "src/guards/group-permission.guard";
@@ -16,7 +15,7 @@ import { GroupTabsComponent } from "./group-tabs/group-tabs.component";
 import { groupResolverFn } from "./resolvers/group-resolver.service";
 import { systemEmailsResolver } from "./resolvers/system-emails.resolver";
 
-const routes: Routes = [
+export const groupRoutes: Routes = [
   {
     // No app-permission guard: the groups table shows the caller's OWN groups
     // (backend GET /group/ -> GetGroupsForUser is auth-only), exactly like
@@ -170,9 +169,3 @@ const routes: Routes = [
     ],
   },
 ];
-
-@NgModule({
-  imports: [RouterModule.forChild(routes)],
-  exports: [RouterModule],
-})
-export class GroupRoutingModule {}

@@ -4,7 +4,6 @@ import { Component, ViewEncapsulation } from '@angular/core';
     selector: 'app-dashboard-icon',
     templateUrl: './dashboard-icon.component.html',
     styleUrls: ['./dashboard-icon.component.scss'],
-    encapsulation: ViewEncapsulation.None,
-    standalone: false
+    encapsulation: ViewEncapsulation.None
 })
 export class DashboardIconComponent {}

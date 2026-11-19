@@ -1,11 +1,19 @@
 import { Component, Input, OnInit } from "@angular/core";
-import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, ValidatorFn, Validators } from "@angular/forms";
+import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, ValidatorFn, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { finalize, Observable, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { OidcProviderService, OidcProviderView, UpsertOidcProviderCommand } from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
 import { absoluteUrlValidator, trimmedRequiredValidator } from "../../validators/index";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 /**
  * Slugs that would shadow a route under /api/oidc/. Mirrors the backend's
@@ -69,7 +77,17 @@ function openidScopeValidator(): ValidatorFn {
   selector: "app-oidc-provider-form",
   templateUrl: "./oidc-provider-form.component.html",
   styleUrl: "./oidc-provider-form.component.scss",
-  standalone: false,
+  imports: [
+    DialogComponent,
+    ReactiveFormsModule,
+    FormSectionComponent,
+    InputComponent,
+    ButtonComponent,
+    CheckboxComponent,
+    DialogFooterComponent,
+    FormGetPipe,
+    InputReadonlyPipe,
+  ],
 })
 export class OidcProviderFormComponent implements OnInit {
   @Input() public headerText: string = "";

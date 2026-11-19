@@ -9,12 +9,22 @@ import { Permission, UserPreferencesService, UserShortcut } from "../../open-api
 import { SnackbarService } from "../../services";
 import { AuthState, SetUserPreferences } from "../../store";
 import { UserShortcutComponent } from "../user-shortcut/user-shortcut.component";
+import { FormComponent } from "../../shared-ui/form/form.component";
+import { FeatureDirective } from "../../directives/feature.directive";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { GroupAutocompleteComponent } from "../../shared-ui/group-autocomplete/group-autocomplete.component";
+import { UserAutocompleteComponent } from "../../user-autocomplete/user-autocomplete/user-autocomplete.component";
+import { StatusSelectComponent } from "../../shared-ui/status-select/status-select.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @Component({
     selector: "app-user-preferences",
     templateUrl: "./user-preferences.component.html",
     styleUrls: ["./user-preferences.component.scss"],
-    standalone: false
+    imports: [FormComponent, FeatureDirective, FormSectionComponent, GroupAutocompleteComponent, UserAutocompleteComponent, StatusSelectComponent, CheckboxComponent, UserShortcutComponent, AddButtonComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class UserPreferencesComponent extends BaseFormComponent implements OnInit {
   public readonly userShortcutComponent = viewChild(UserShortcutComponent);

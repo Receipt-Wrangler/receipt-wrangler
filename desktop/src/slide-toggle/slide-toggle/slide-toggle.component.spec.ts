@@ -10,8 +10,7 @@ describe('SlideToggleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SlideToggleComponent],
-      imports: [MatSlideToggleModule],
+      imports: [MatSlideToggleModule, SlideToggleComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();
 

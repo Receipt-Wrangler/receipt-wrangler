@@ -9,8 +9,7 @@ describe('StatusIconComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [StatusIconComponent],
-      imports: [MatIconModule],
+      imports: [MatIconModule, StatusIconComponent],
     })
     .compileComponents();
     

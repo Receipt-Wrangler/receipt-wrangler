@@ -7,12 +7,14 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { Dashboard, DashboardService, ReportService, WidgetType } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services";
 import { EditableListComponent } from "../../shared-ui/editable-list/editable-list.component";
 import { AuthState, GroupState } from "../../store";
 import { DashboardFormComponent } from "./dashboard-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideNgxMask } from "ngx-mask";
+import { provideRouter } from "@angular/router";
+import { LayoutState } from "../../store/layout.state";
 
 describe("DashboardFormComponent", () => {
   let component: DashboardFormComponent;
@@ -21,13 +23,14 @@ describe("DashboardFormComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [DashboardFormComponent, EditableListComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [MatSnackBarModule,
-        NgxsModule.forRoot([GroupState, AuthState]),
-        PipesModule,
-        ReactiveFormsModule],
+    imports: [EditableListComponent,
+        MatSnackBarModule,
+        NgxsModule.forRoot([GroupState, AuthState, LayoutState]),
+        ReactiveFormsModule, DashboardFormComponent],
     providers: [
+        provideRouter([]),
+        provideNgxMask(),
         provideZonelessChangeDetection(),
         DashboardService,
         MatDialog,

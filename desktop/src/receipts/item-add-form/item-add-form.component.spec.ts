@@ -3,11 +3,12 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { Subject } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
-import { PipesModule } from "src/pipes/pipes.module";
 import { KEYBOARD_SHORTCUT_ACTIONS } from "../../constants/keyboard-shortcuts.constant";
 import { Group } from "../../open-api";
 import { KeyboardShortcutService } from "../../services/keyboard-shortcut.service";
 import { ItemAddFormComponent } from "./item-add-form.component";
+import { provideStore } from "@ngxs/store";
+import { provideNgxMask } from "ngx-mask";
 
 describe("ItemAddFormComponent", () => {
   let component: ItemAddFormComponent;
@@ -27,10 +28,11 @@ describe("ItemAddFormComponent", () => {
     };
 
     await TestBed.configureTestingModule({
-      declarations: [ItemAddFormComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [ReactiveFormsModule, PipesModule],
+      imports: [ReactiveFormsModule, ItemAddFormComponent],
       providers: [
+        provideNgxMask(),
+        provideStore([]),
         { provide: KeyboardShortcutService, useValue: keyboardSpy }
       ]
     }).compileComponents();

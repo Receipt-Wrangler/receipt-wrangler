@@ -8,7 +8,6 @@ import { MatExpansionPanel } from "@angular/material/expansion";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { FormMode } from "src/enums/form-mode.enum";
-import { PipesModule } from "src/pipes/pipes.module";
 import { InputComponent } from "../../input";
 import { Category, Group, Item, ItemStatus, Receipt, Tag, User } from "../../open-api";
 import { AuthState, UserState } from "../../store/index";
@@ -17,6 +16,7 @@ import { UserTotalWithPercentagePipe } from "../user-total-with-percentage.pipe"
 import { buildItemForm } from "../utils/form.utils";
 
 import { ShareListComponent } from "./share-list.component";
+import { provideNgxMask } from "ngx-mask";
 
 describe("ShareListComponent", () => {
   let component: ShareListComponent;
@@ -80,10 +80,10 @@ describe("ShareListComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ShareListComponent, UserTotalWithPercentagePipe],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [CurrencyPipe, PipesModule, NgxsModule.forRoot([AuthState, UserState, SystemSettingsState])],
+      imports: [CurrencyPipe, NgxsModule.forRoot([AuthState, UserState, SystemSettingsState]), ShareListComponent, UserTotalWithPercentagePipe],
       providers: [
+        provideNgxMask(),
         {
           provide: ActivatedRoute,
           useValue: mockActivatedRoute,
@@ -104,7 +104,8 @@ describe("ShareListComponent", () => {
       users: {
         users: mockUsers
       },
-      systemSettings: {}
+      // The real app-input reads the currency separators from here.
+      systemSettings: store.snapshot().systemSettings
     });
 
     // Setup default component state

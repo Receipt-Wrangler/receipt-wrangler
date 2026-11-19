@@ -5,6 +5,7 @@ import { of } from "rxjs";
 import { ApiModule, Notification, NotificationsService } from "../../open-api";
 import { NotificationsListComponent } from "./notifications-list.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideRouter } from "@angular/router";
 
 describe("NotificationsListComponent", () => {
   let component: NotificationsListComponent;
@@ -13,10 +14,9 @@ describe("NotificationsListComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [NotificationsListComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [ApiModule],
-    providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
+    imports: [ApiModule, NotificationsListComponent],
+    providers: [provideRouter([]), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 });
 
     service = TestBed.inject(NotificationsService);

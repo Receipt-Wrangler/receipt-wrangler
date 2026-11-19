@@ -5,10 +5,7 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormGroup, ReactiveFormsModule } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 import { FormMode } from "src/enums/form-mode.enum";
-import { PipesModule } from "src/pipes/pipes.module";
-import { ButtonModule } from "../../button";
-import { StoreModule } from "../../store/store.module";
-import { SharedUiModule } from "../shared-ui.module";
+import { provideTestStore } from "../../store/test-store";
 import { FormComponent } from "./form.component";
 
 describe("FormComponent", () => {
@@ -17,16 +14,13 @@ describe("FormComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [FormComponent],
       imports: [
-        PipesModule,
         ReactiveFormsModule,
-        ButtonModule,
-        SharedUiModule,
-        StoreModule,
+        FormComponent,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
+        provideTestStore(),
         {
           provide: ActivatedRoute,
           useValue: {},

@@ -3,8 +3,7 @@ import { intervalToDuration, isToday, isValid } from "date-fns";
 
 @Pipe({
   name: "duration",
-  pure: true,
-  standalone: false
+  pure: true
 })
 export class DurationPipe implements PipeTransform {
   public transform(date: string | Date | null | undefined): string {

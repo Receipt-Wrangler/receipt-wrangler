@@ -18,8 +18,7 @@ describe('AvatarComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [AvatarComponent],
-      imports: [MatIconModule, MatTooltipModule],
+      imports: [MatIconModule, MatTooltipModule, AvatarComponent],
       providers: [provideZonelessChangeDetection()],
     }).compileComponents();
 

@@ -9,7 +9,7 @@ describe('TableHeaderComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ TableHeaderComponent ],
+      imports: [ TableHeaderComponent ],
       providers: [ provideZonelessChangeDetection() ]
     })
     .compileComponents();
@@ -50,7 +50,7 @@ describe('TableHeaderComponent', () => {
       </p>
     </app-table-header>
   `,
-  standalone: false,
+  imports: [TableHeaderComponent],
 })
 class TableHeaderHostComponent {}
 
@@ -59,7 +59,7 @@ describe('TableHeaderComponent — projected subtitle', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [TableHeaderComponent, TableHeaderHostComponent],
+      imports: [TableHeaderHostComponent],
       providers: [provideZonelessChangeDetection()],
     }).compileComponents();
 

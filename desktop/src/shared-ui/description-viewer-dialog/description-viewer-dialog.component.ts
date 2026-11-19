@@ -1,5 +1,9 @@
 import { Component, Inject } from "@angular/core";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
+import { DialogComponent } from "../dialog/dialog.component";
+import { CopyButtonComponent } from "../copy-button/copy-button.component";
+import { PrettyJsonComponent } from "../pretty-json/pretty-json.component";
+import { ButtonComponent } from "../../button/button/button.component";
 
 export interface DescriptionViewerDialogData {
   description: string;
@@ -10,7 +14,12 @@ export interface DescriptionViewerDialogData {
   selector: "app-description-viewer-dialog",
   templateUrl: "./description-viewer-dialog.component.html",
   styleUrl: "./description-viewer-dialog.component.scss",
-  standalone: false,
+  imports: [
+    DialogComponent,
+    CopyButtonComponent,
+    PrettyJsonComponent,
+    ButtonComponent,
+  ],
 })
 export class DescriptionViewerDialogComponent {
   constructor(

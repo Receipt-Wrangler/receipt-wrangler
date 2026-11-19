@@ -7,10 +7,7 @@ import { MatDialog } from "@angular/material/dialog";
 import { MatListModule } from "@angular/material/list";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
-import { DirectivesModule } from "../../directives/directives.module";
 import { Permission, SystemTaskService, SystemTaskStatus, SystemTaskType } from "../../open-api";
-import { PipesModule } from "../../pipes/pipes.module";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { SystemTaskTypePipe } from "../../shared-ui/task-table/system-task-type.pipe";
 import { AuthState } from "../../store/auth.state";
 import { SetPermissions } from "../../store/auth.state.actions";
@@ -19,6 +16,7 @@ import { downloadFile } from "../../utils/file";
 import { DashboardListComponent } from "../dashboard-list/dashboard-list.component";
 
 import { ActivityComponent } from "./activity.component";
+import { provideRouter } from "@angular/router";
 
 jest.mock("../../utils/file", () => ({
   ...jest.requireActual("../../utils/file"),
@@ -63,19 +61,16 @@ describe("ActivityComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ActivityComponent, DashboardListComponent],
       imports: [
-        SharedUiModule,
         ScrollingModule,
         MatListModule,
-        DirectivesModule,
-        PipesModule,
-        // Standalone, and not re-exported by SharedUiModule, so the spec imports it
-        // the same way DashboardModule does.
+        // The spec renders the system task type through the real pipe.
         SystemTaskTypePipe,
         NgxsModule.forRoot([AuthState, GroupState]),
+        ActivityComponent, DashboardListComponent,
       ],
       providers: [
+        provideRouter([]),
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),

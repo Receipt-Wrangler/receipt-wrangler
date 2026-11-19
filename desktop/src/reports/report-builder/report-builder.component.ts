@@ -8,7 +8,7 @@ import {
 } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
-import { ActivatedRoute } from "@angular/router";
+import { ActivatedRoute, RouterLink } from "@angular/router";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { EMPTY, catchError, debounceTime, finalize, startWith, switchMap, take, tap } from "rxjs";
@@ -24,6 +24,11 @@ import { AuthState } from "../../store";
 import { buildReportForm, buildReportFormFromCommand } from "../models/report-form.factory";
 import { ReportCatalogService } from "../services/report-catalog.service";
 import { ReportRunnerService } from "../services/report-runner.service";
+import { ButtonComponent } from "../../button/button/button.component";
+import { MatIcon } from "@angular/material/icon";
+import { ReportConfigPanelComponent } from "../report-config-panel/report-config-panel.component";
+import { ReportPreviewPanelComponent } from "../report-preview-panel/report-preview-panel.component";
+import { ReportGenerateBarComponent } from "../report-generate-bar/report-generate-bar.component";
 
 /**
  * The Report Builder screen: owns the report form, drives the debounced live
@@ -37,8 +42,15 @@ import { ReportRunnerService } from "../services/report-runner.service";
   selector: "app-report-builder",
   templateUrl: "./report-builder.component.html",
   styleUrls: ["./report-builder.component.scss"],
-  standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    ButtonComponent,
+    MatIcon,
+    RouterLink,
+    ReportConfigPanelComponent,
+    ReportPreviewPanelComponent,
+    ReportGenerateBarComponent,
+  ],
 })
 export class ReportBuilderComponent {
   private readonly formBuilder = inject(FormBuilder);

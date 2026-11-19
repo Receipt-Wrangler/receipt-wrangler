@@ -4,7 +4,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { NgxsModule, Store } from "@ngxs/store";
-import { PipesModule } from "../../pipes";
 import { GroupTableState } from "../../store/group-table.state";
 import { SetFilter } from "../../store/group-table.state.actions";
 
@@ -19,9 +18,8 @@ describe("GroupTableFilterComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [GroupTableFilterComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [ReactiveFormsModule, NgxsModule.forRoot([GroupTableState]), PipesModule, ReactiveFormsModule],
+    imports: [ReactiveFormsModule, NgxsModule.forRoot([GroupTableState]), ReactiveFormsModule, GroupTableFilterComponent],
     providers: [
         { provide: MatDialogRef, useValue: { close: jest.fn() } },
         provideHttpClient(withInterceptorsFromDi()),

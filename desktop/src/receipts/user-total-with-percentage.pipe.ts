@@ -4,8 +4,7 @@ import { ItemData } from "./share-list/share-list.component";
 
 @Pipe({
   name: "userTotalWithPercentage",
-  pure: false,
-  standalone: false
+  pure: false
 })
 export class UserTotalWithPercentagePipe implements PipeTransform {
   public transform(

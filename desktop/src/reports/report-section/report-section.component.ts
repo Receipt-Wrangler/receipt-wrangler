@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from "@angular/core";
+import { MatIcon } from "@angular/material/icon";
 
 /**
  * The card shell every report-builder config section shares: an accent icon, a
@@ -7,7 +8,6 @@ import { ChangeDetectionStrategy, Component, input } from "@angular/core";
  */
 @Component({
   selector: "app-report-section",
-  standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="report-section">
@@ -73,6 +73,7 @@ import { ChangeDetectionStrategy, Component, input } from "@angular/core";
       }
     `,
   ],
+  imports: [MatIcon],
 })
 export class ReportSectionComponent {
   public readonly icon = input<string>("");

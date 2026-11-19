@@ -13,12 +13,12 @@ import {
   ReportRequestCommand,
   ReportService,
 } from "../../../open-api";
-import { PipesModule } from "../../../pipes";
 import { SystemSettingsState } from "../../../store/system-settings.state";
 import {
   ReportReceiptsDialogComponent,
   ReportReceiptsDialogData,
 } from "./report-receipts-dialog.component";
+import { provideRouter } from "@angular/router";
 
 const receipts: Receipt[] = [
   { id: 7, name: "Coffee", date: "2026-07-03", amount: "12.50", status: "RESOLVED", groupId: 1, paidByUserId: 1, categories: [], tags: [] } as Receipt,
@@ -52,9 +52,9 @@ function configure(
 } {
   const reportService = { getReportReceipts: jest.fn(() => response) };
   TestBed.configureTestingModule({
-    declarations: [ReportReceiptsDialogComponent],
-    imports: [PipesModule],
+    imports: [ReportReceiptsDialogComponent],
     providers: [
+      provideRouter([]),
       provideZonelessChangeDetection(),
       { provide: ReportService, useValue: reportService },
       { provide: MatDialogRef, useValue: { close: jest.fn() } },

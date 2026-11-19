@@ -14,8 +14,7 @@ describe('GroupAutocompleteComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [GroupAutocompleteComponent],
-      imports: [NgxsModule.forRoot([GroupState])],
+      imports: [NgxsModule.forRoot([GroupState]), GroupAutocompleteComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
         provideHttpClient(withInterceptorsFromDi()),

@@ -3,6 +3,7 @@ import { Store } from "@ngxs/store";
 import { Permission } from "../../open-api";
 import { TabConfig } from "../../shared-ui/tabs/tab-config.interface";
 import { AuthState } from "../../store";
+import { TabsComponent } from "../../shared-ui/tabs/tabs.component";
 
 interface SystemSettingsTab extends TabConfig {
   readPermission: Permission;
@@ -12,7 +13,7 @@ interface SystemSettingsTab extends TabConfig {
     selector: "app-system-settings",
     templateUrl: "./system-settings.component.html",
     styleUrl: "./system-settings.component.scss",
-    standalone: false
+    imports: [TabsComponent]
 })
 export class SystemSettingsComponent implements OnInit {
   public tabs: TabConfig[] = [];

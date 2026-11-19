@@ -2,8 +2,6 @@ import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
-import { ButtonModule } from "../../../button/index";
-import { InputModule } from "../../../input/index";
 
 import { FilteredStatefulMenuComponent } from "./filtered-stateful-menu.component";
 import { StatefulMenuItem } from "./stateful-menu-item";
@@ -23,8 +21,6 @@ describe("FilteredStatefulMenuComponent", () => {
     await TestBed.configureTestingModule({
       imports: [
         FilteredStatefulMenuComponent,
-        ButtonModule,
-        InputModule,
         NoopAnimationsModule
       ],
       providers: [

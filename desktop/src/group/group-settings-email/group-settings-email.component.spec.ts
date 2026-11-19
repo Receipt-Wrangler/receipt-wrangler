@@ -3,12 +3,13 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, Validators } from "@angular/forms";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { ActivatedRoute } from "@angular/router";
-import { PipesModule } from "src/pipes/pipes.module";
 import { FormMode } from "../../enums/form-mode.enum";
 import { FormConfig } from "../../interfaces";
 import { Group, ReceiptStatus } from "../../open-api";
 
 import { GroupSettingsEmailComponent } from "./group-settings-email.component";
+import { provideStore } from "@ngxs/store";
+import { GroupState } from "../../store/group.state";
 
 describe("GroupSettingsEmailComponent", () => {
   let component: GroupSettingsEmailComponent;
@@ -20,9 +21,9 @@ describe("GroupSettingsEmailComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [GroupSettingsEmailComponent],
-      imports: [MatSnackBarModule, PipesModule, PipesModule],
+      imports: [MatSnackBarModule, GroupSettingsEmailComponent],
       providers: [
+        provideStore([GroupState]),
         {
           provide: ActivatedRoute,
           useValue: {
@@ -30,6 +31,7 @@ describe("GroupSettingsEmailComponent", () => {
               data: {
                 formConfig: formConfig,
                 group: { id: 1 },
+                systemEmails: [],
               },
             },
           },

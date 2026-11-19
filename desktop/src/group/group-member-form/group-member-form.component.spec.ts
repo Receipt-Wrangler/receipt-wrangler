@@ -18,9 +18,10 @@ import {
   Tag,
   TagService,
 } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { AuthState } from "../../store";
 import { GroupMemberFormComponent } from "./group-member-form.component";
+import { UserState } from "../../store/user.state";
+import { provideRouter } from "@angular/router";
 
 describe("GroupMemberFormComponent", () => {
   const defaultGroupRole: Role = {
@@ -85,15 +86,15 @@ describe("GroupMemberFormComponent", () => {
     getGroupByIdMock = jest.fn().mockReturnValue(of({ id: 5, groupMembers: [] } as unknown as Group));
     updateGrantsMock = jest.fn().mockReturnValue(of({}));
     await TestBed.configureTestingModule({
-      declarations: [GroupMemberFormComponent],
       imports: [
-        NgxsModule.forRoot([AuthState]),
-        PipesModule,
+        NgxsModule.forRoot([AuthState, UserState]),
         ReactiveFormsModule,
         MatDialogModule,
+        GroupMemberFormComponent,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
+        provideRouter([]),
         provideZonelessChangeDetection(),
         { provide: MatDialogRef, useValue: dialogRefMock },
         { provide: RoleService, useValue: { getRoles: getRolesMock } },
@@ -111,7 +112,7 @@ describe("GroupMemberFormComponent", () => {
       ],
     }).compileComponents();
 
-    TestBed.inject(Store).reset({ auth: { userId: "1" } });
+    TestBed.inject(Store).reset({ auth: { userId: "1" }, users: { users: [] } });
   });
 
   // Creates and initialises a fresh component after the role mock is configured;

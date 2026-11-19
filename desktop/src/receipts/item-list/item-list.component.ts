@@ -17,7 +17,7 @@ import {
 } from "@angular/core";
 import { FormArray, FormGroup } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
-import { MatExpansionPanel } from "@angular/material/expansion";
+import { MatExpansionPanel, MatAccordion, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from "@angular/material/expansion";
 import { ActivatedRoute } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { FormMode } from "src/enums/form-mode.enum";
@@ -29,6 +29,16 @@ import { Subject, takeUntil } from "rxjs";
 import { KEYBOARD_SHORTCUT_ACTIONS } from "../../constants/keyboard-shortcuts.constant";
 import { QuickActionsDialogComponent } from "../quick-actions-dialog/quick-actions-dialog.component";
 import { DEFAULT_DIALOG_CONFIG } from "src/constants";
+import { ItemAddFormComponent } from "../item-add-form/item-add-form.component";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { CategoryAutocompleteComponent } from "../../category-autocomplete/category-autocomplete.component";
+import { TagAutocompleteComponent } from "../../tag-autocomplete/tag-autocomplete.component";
+import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 export interface ItemData {
   item: Item;
@@ -40,7 +50,7 @@ export interface ItemData {
   templateUrl: "./item-list.component.html",
   styleUrls: ["./item-list.component.scss"],
   encapsulation: ViewEncapsulation.None,
-  standalone: false
+  imports: [ItemAddFormComponent, MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription, AddButtonComponent, CardComponent, ButtonComponent, DeleteButtonComponent, InputComponent, CategoryAutocompleteComponent, TagAutocompleteComponent, CustomCurrencyPipe, FormGetPipe, InputReadonlyPipe]
 })
 export class ItemListComponent implements OnInit, OnChanges, OnDestroy {
   public readonly itemsExpansionPanel = viewChild.required<MatExpansionPanel>("itemsExpansionPanel");

@@ -11,8 +11,7 @@ describe("SearchResultPipe", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SearchResultPipe],
-      imports: [NgxsModule.forRoot([GroupState, SystemSettingsState])],
+      imports: [NgxsModule.forRoot([GroupState, SystemSettingsState]), SearchResultPipe],
       providers: [SearchResultPipe],
     }).compileComponents();
 

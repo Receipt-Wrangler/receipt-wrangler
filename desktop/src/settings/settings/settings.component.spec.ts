@@ -10,6 +10,7 @@ import { NgxsModule, Store } from '@ngxs/store';
 import { Permission } from '../../open-api';
 import { AuthState } from '../../store';
 import { SetPermissions } from '../../store/auth.state.actions';
+import { TabsComponent } from '../../shared-ui/tabs/tabs.component';
 
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
@@ -20,22 +21,29 @@ describe('SettingsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SettingsComponent],
       imports: [
         MatTabsModule,
         MatTooltipModule,
         NgxsModule.forRoot([AuthState]),
         ReactiveFormsModule,
         RouterModule,
+        SettingsComponent,
       ],
       providers: [
         {
           provide: ActivatedRoute,
-          useValue: {},
+          useValue: { snapshot: { queryParams: {} } },
         },
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    }).compileComponents();
+    })
+      // The spec covers which tabs are offered; the real app-tabs assumes at
+      // least one, which the route guard guarantees but these cases do not.
+      .overrideComponent(SettingsComponent, {
+        remove: { imports: [TabsComponent] },
+        add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] },
+      })
+      .compileComponents();
 
     store = TestBed.inject(Store);
     fixture = TestBed.createComponent(SettingsComponent);

@@ -1,4 +1,4 @@
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, getDebugNode } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
@@ -21,7 +21,6 @@ describe("ReceiptProcessingSettingsChildSystemTaskAccordionComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ReceiptProcessingSettingsChildSystemTaskAccordionComponent],
       providers: [
         {
           provide: ActivatedRoute,
@@ -35,7 +34,7 @@ describe("ReceiptProcessingSettingsChildSystemTaskAccordionComponent", () => {
         }
       ],
       // The pipe and store let the panel templates themselves render (their dates use appDate).
-      imports: [AccordionModule, AppDatePipe, NgxsModule.forRoot([SystemSettingsState])],
+      imports: [AccordionModule, AppDatePipe, NgxsModule.forRoot([SystemSettingsState]), ReceiptProcessingSettingsChildSystemTaskAccordionComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA]
     })
       .compileComponents();
@@ -117,10 +116,10 @@ describe("ReceiptProcessingSettingsChildSystemTaskAccordionComponent", () => {
     status.detectChanges();
     const statusIcon = (status.rootNodes as Node[]).find(node => node.nodeName === "APP-STATUS-ICON") as any;
 
-    expect(prettyJson.json).toBe("chat-json");
+    expect(getDebugNode(prettyJson)?.componentInstance.json()).toBe("chat-json");
     expect(contentText).toContain("2031");
     expect(contentText).not.toContain("2020");
-    expect(statusIcon.taskStatus).toBe(SystemTaskStatus.Failed);
+    expect(getDebugNode(statusIcon)?.componentInstance.taskStatus()).toBe(SystemTaskStatus.Failed);
 
     content.destroy();
     status.destroy();

@@ -20,12 +20,11 @@ describe("CategoriesListComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [CategoryTableComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         MatDialogModule,
         NgxsModule.forRoot([CategoryTableState]),
-        MatSnackBarModule],
+        MatSnackBarModule, CategoryTableComponent],
     providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 });
     fixture = TestBed.createComponent(CategoryTableComponent);

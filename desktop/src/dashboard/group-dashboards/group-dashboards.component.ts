@@ -1,6 +1,6 @@
 import { Component, computed, effect } from "@angular/core";
 import { MatDialog } from "@angular/material/dialog";
-import { Router } from "@angular/router";
+import { Router, RouterLink, RouterOutlet } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
@@ -12,6 +12,13 @@ import { Dashboard, DashboardService, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { GroupState, SetSelectedDashboardId } from "../../store";
 import { DashboardFormComponent } from "../dashboard-form/dashboard-form.component";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasGroupPermissionDirective } from "../../directives/has-group-permission.directive";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { MatChipListbox, MatChipOption } from "@angular/material/chips";
+import { GroupPipe } from "../../pipes/group.pipe";
 
 // Stable empty reference so the dashboards computed doesn't emit a fresh [] on
 // every recompute (which would needlessly re-run the auto-select effect).
@@ -22,7 +29,7 @@ const EMPTY_DASHBOARDS: Dashboard[] = [];
     selector: "app-group-dashboards",
     templateUrl: "./group-dashboards.component.html",
     styleUrls: ["./group-dashboards.component.scss"],
-    standalone: false
+    imports: [TableHeaderComponent, HasGroupPermissionDirective, AddButtonComponent, EditButtonComponent, DeleteButtonComponent, MatChipListbox, MatChipOption, RouterLink, RouterOutlet, GroupPipe]
 })
 export class GroupDashboardsComponent {
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);

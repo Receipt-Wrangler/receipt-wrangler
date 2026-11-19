@@ -1,5 +1,4 @@
-import { NgModule } from "@angular/core";
-import { RouterModule, Routes } from "@angular/router";
+import { Routes } from "@angular/router";
 import { FormMode } from "../enums/form-mode.enum";
 import { appPermissionGuard } from "../guards/app-permission.guard";
 import { systemSettingsLandingGuard } from "../guards/system-settings-landing.guard";
@@ -27,7 +26,7 @@ import { SystemSettingsFormComponent } from "./system-settings-form/system-setti
 import { SystemSettingsComponent } from "./system-settings/system-settings.component";
 import { SystemTaskTableComponent } from "./system-task-table/system-task-table.component";
 
-const routes: Routes = [
+export const systemSettingsRoutes: Routes = [
   {
     path: "",
     canActivate: [systemSettingsLandingGuard],
@@ -264,10 +263,3 @@ const routes: Routes = [
     }
   },
 ];
-
-@NgModule({
-  imports: [RouterModule.forChild(routes)],
-  exports: [RouterModule]
-})
-export class SystemSettingsRoutingModule {
-}

@@ -12,7 +12,7 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { MatTableDataSource } from "@angular/material/table";
-import { Router } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
 import { EMPTY, catchError, take, tap } from "rxjs";
 import {
   Permission,
@@ -31,6 +31,17 @@ import {
   RoleListItem,
   RoleScope,
 } from "./role-list-item.interface";
+import { BreadcrumbComponent } from "../../shared-ui/breadcrumb/breadcrumb.component";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { MatIcon } from "@angular/material/icon";
+import { SelectComponent } from "../../select/select/select.component";
+import { FilterBarComponent } from "../../shared-ui/filter-bar/filter-bar.component";
+import { TableComponent } from "../../table/table/table.component";
+import { NgClass } from "@angular/common";
+import { ButtonComponent } from "../../button/button/button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 
 // A role carries no icon of its own; pick a sensible default per scope. These
 // are inline style values, so the violet "group" accent is a literal (matching
@@ -44,7 +55,20 @@ const SCOPE_ICON: Record<RoleScope, { icon: string; color: string; tint: string 
   selector: "app-role-list",
   templateUrl: "./role-list.component.html",
   styleUrl: "./role-list.component.scss",
-  standalone: false,
+  imports: [
+    BreadcrumbComponent,
+    TableHeaderComponent,
+    HasAppPermissionDirective,
+    AddButtonComponent,
+    RouterLink,
+    MatIcon,
+    SelectComponent,
+    FilterBarComponent,
+    TableComponent,
+    NgClass,
+    ButtonComponent,
+    DeleteButtonComponent,
+  ],
 })
 export class RoleListComponent implements AfterViewInit {
   private readonly permissionService = inject(PermissionService);

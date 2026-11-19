@@ -18,7 +18,7 @@ import { stubTokenRefresh } from './helpers/auth';
 // (needs app.groups.read, not a system tab), so the role can grant exactly one
 // system-tab read without dragging in another. (The Prompts/System Tasks/Settings
 // tabs resolve allReceiptProcessingSettings/systemSettings, which would force
-// granting those tabs' reads too — see system-settings-routing.module.ts.) The
+// granting those tabs' reads too — see system-settings.routes.ts.) The
 // role also grants Account (GetAppData requires app.account.read) and
 // Notifications (the bootstrap's notificationCount) so the user can load the app
 // at all — neither is a system-settings tab, so the per-tab matrix is unaffected.
@@ -186,7 +186,7 @@ test.describe('System settings per-tab gating (partial-access role)', () => {
     // BEFORE the route's resolvers, which is what we assert here: route-level
     // denial is the actual security boundary. (We deliberately don't assert
     // landing on / rendering the System Emails tab: its allGroups resolver — like
-    // every system tab's resolvers, see system-settings-routing.module.ts — fires
+    // every system tab's resolvers, see system-settings.routes.ts — fires
     // a paged request a freshly provisioned user can't satisfy. Tab *rendering*
     // is covered by the admin contrast below; tab *gating* is covered here.)
     for (const tab of ['prompts', 'system-tasks', 'receipt-processing-settings']) {

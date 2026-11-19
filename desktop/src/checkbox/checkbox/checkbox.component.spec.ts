@@ -9,7 +9,7 @@ describe('CheckboxComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [CheckboxComponent],
+      imports: [CheckboxComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });
     fixture = TestBed.createComponent(CheckboxComponent);

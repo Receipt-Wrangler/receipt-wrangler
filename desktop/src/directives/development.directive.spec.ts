@@ -9,7 +9,7 @@ describe('DevelopmentDirective', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DevelopmentDirective],
+      imports: [DevelopmentDirective],
       providers: [
         EnvironmentService,
         DevelopmentDirective,

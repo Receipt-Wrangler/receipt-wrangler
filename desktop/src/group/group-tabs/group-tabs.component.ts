@@ -3,12 +3,13 @@ import { Store } from "@ngxs/store";
 import { TabConfig } from "src/shared-ui/tabs/tab-config.interface";
 import { Permission } from "../../open-api";
 import { AuthState, FeatureConfigState } from "../../store";
+import { TabsComponent } from "../../shared-ui/tabs/tabs.component";
 
 @Component({
     selector: "app-group-tabs",
     templateUrl: "./group-tabs.component.html",
     styleUrls: ["./group-tabs.component.scss"],
-    standalone: false
+    imports: [TabsComponent]
 })
 export class GroupTabsComponent {
   public tabs: TabConfig[] = [];

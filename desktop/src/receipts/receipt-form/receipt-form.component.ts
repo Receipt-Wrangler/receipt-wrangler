@@ -1,6 +1,6 @@
 import { Component, EmbeddedViewRef, HostListener, Injector, OnInit, Signal, TemplateRef, computed, runInInjectionContext, signal, viewChild } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
-import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { MatExpansionPanel } from "@angular/material/expansion";
 import { MatSnackBarRef } from "@angular/material/snack-bar";
@@ -51,6 +51,27 @@ import { ShareListComponent } from "../share-list/share-list.component";
 
 import { UploadImageComponent } from "../upload-image/upload-image.component";
 import { buildItemForm } from "../utils/form.utils";
+import { FormHeaderComponent } from "../../shared-ui/form-header/form-header.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { AuditDetailSectionComponent } from "../../shared-ui/audit-detail-section/audit-detail-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { CategoryAutocompleteComponent } from "../../category-autocomplete/category-autocomplete.component";
+import { TagAutocompleteComponent } from "../../tag-autocomplete/tag-autocomplete.component";
+import { DatepickerComponent } from "../../datepicker/datepicker/datepicker.component";
+import { GroupAutocompleteComponent } from "../../shared-ui/group-autocomplete/group-autocomplete.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { CustomFieldComponent } from "../custom-field/custom-field.component";
+import { MatProgressSpinner } from "@angular/material/progress-spinner";
+import { FormButtonBarComponent } from "../../shared-ui/form-button-bar/form-button-bar.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { SubmitButtonComponent } from "../../shared-ui/submit-button/submit-button.component";
+import { QuickActionsDialogComponent } from "../quick-actions-dialog/quick-actions-dialog.component";
+import { CdkDrag, CdkDragHandle } from "@angular/cdk/drag-drop";
+import { FilteredStatefulMenuComponent } from "../../standalone/components/filtered-stateful-menu/filtered-stateful-menu.component";
+import { ReceiptHistoryDrawerComponent } from "../receipt-history-drawer/receipt-history-drawer.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @UntilDestroy()
 @Component({
@@ -59,7 +80,7 @@ import { buildItemForm } from "../utils/form.utils";
   styleUrls: ["./receipt-form.component.scss"],
   providers: [CustomFieldTypePipe],
   host: DEFAULT_HOST_CLASS,
-  standalone: false
+  imports: [ReactiveFormsModule, FormHeaderComponent, FormSectionComponent, AuditDetailSectionComponent, InputComponent, CheckboxComponent, CategoryAutocompleteComponent, TagAutocompleteComponent, DatepickerComponent, GroupAutocompleteComponent, UserAutocompleteComponent, SelectComponent, CustomFieldComponent, UploadImageComponent, MatProgressSpinner, CarouselComponent, ItemListComponent, ShareListComponent, ReceiptCommentsComponent, FormButtonBarComponent, ButtonComponent, SubmitButtonComponent, QuickActionsDialogComponent, CdkDrag, CdkDragHandle, FilteredStatefulMenuComponent, ReceiptHistoryDrawerComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class ReceiptFormComponent implements OnInit {
   public readonly shareListComponent = viewChild.required(ShareListComponent);

@@ -1,11 +1,12 @@
 import { Component, input, output } from '@angular/core';
 import { FormMode } from 'src/enums/form-mode.enum';
+import { ButtonComponent } from '../../button/button/button.component';
 
 @Component({
     selector: 'app-cancel-button',
     templateUrl: './cancel-button.component.html',
     styleUrls: ['./cancel-button.component.scss'],
-    standalone: false
+    imports: [ButtonComponent]
 })
 export class CancelButtonComponent {
   public readonly mode = input<FormMode>();

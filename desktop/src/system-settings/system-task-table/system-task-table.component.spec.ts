@@ -9,7 +9,6 @@ import { ActivatedRoute } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { ButtonComponent } from "../../button/index";
 import { FilterOperation } from "../../open-api";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { UserState } from "../../store";
 import { buildDefaultSystemTaskFilter, SystemTaskTableState } from "../../store/system-task-table.state";
 import {
@@ -17,7 +16,6 @@ import {
   SetSystemTaskFilter,
   SetSystemTaskFilterField
 } from "../../store/system-task-table.state.actions";
-import { TableModule } from "../../table/table.module";
 
 import { SystemTaskTableComponent } from "./system-task-table.component";
 
@@ -28,14 +26,12 @@ describe("SystemTaskTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SystemTaskTableComponent, ButtonComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [SharedUiModule,
+      imports: [ButtonComponent,
         MatChipsModule,
         MatIconModule,
         NgxsModule.forRoot([SystemTaskTableState, UserState]),
-        TableModule,
-        NoopAnimationsModule],
+        NoopAnimationsModule, SystemTaskTableComponent],
       providers: [{
         provide: ActivatedRoute,
         useValue: {

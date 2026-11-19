@@ -1,5 +1,4 @@
-import { NgModule } from "@angular/core";
-import { RouterModule, Routes } from "@angular/router";
+import { Routes } from "@angular/router";
 import { FormMode } from "src/enums/form-mode.enum";
 import { groupPermissionGuard } from "src/guards/group-permission.guard";
 import { GroupGuard } from "src/guards/group.guard";
@@ -10,7 +9,7 @@ import { receiptResolverFn } from "../resolvers/receipt.resolver";
 import { ReceiptFormComponent } from "./receipt-form/receipt-form.component";
 import { ReceiptsTableComponent } from "./receipts-table/receipts-table.component";
 
-const routes: Routes = [
+export const receiptsRoutes: Routes = [
   {
     path: "group/:groupId",
     component: ReceiptsTableComponent,
@@ -73,10 +72,3 @@ const routes: Routes = [
     pathMatch: "full",
   },
 ];
-
-@NgModule({
-  imports: [RouterModule.forChild(routes)],
-  exports: [RouterModule],
-})
-export class ReceiptsRoutingModule {
-}

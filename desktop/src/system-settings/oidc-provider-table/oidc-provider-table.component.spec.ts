@@ -7,16 +7,11 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { RouterTestingModule } from "@angular/router/testing";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
-import { ButtonModule } from "../../button";
-import { DirectivesModule } from "../../directives/directives.module";
 import { ApiModule, OidcProviderService, Permission } from "../../open-api";
-import { PipesModule } from "../../pipes/pipes.module";
 import { SnackbarService } from "../../services/snackbar.service";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { AuthState } from "../../store/auth.state";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { OidcProviderTableState } from "../../store/oidc-provider-table.state";
-import { TableModule } from "../../table/table.module";
 import { OidcProviderTableComponent } from "./oidc-provider-table.component";
 
 describe("OidcProviderTableComponent", () => {
@@ -26,19 +21,14 @@ describe("OidcProviderTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [OidcProviderTableComponent],
       imports: [
         ApiModule,
-        ButtonModule,
-        DirectivesModule,
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, OidcProviderTableState]),
         NoopAnimationsModule,
-        PipesModule,
         RouterTestingModule,
-        SharedUiModule,
-        TableModule,
+        OidcProviderTableComponent,
       ],
       providers: [
         SnackbarService,

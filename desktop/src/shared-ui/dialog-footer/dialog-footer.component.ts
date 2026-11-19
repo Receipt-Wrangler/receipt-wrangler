@@ -1,12 +1,15 @@
 import { Component, Input, TemplateRef, input, output } from "@angular/core";
 import { Store } from "@ngxs/store";
 import { LayoutState } from "src/store/layout.state";
+import { SubmitButtonComponent } from "../submit-button/submit-button.component";
+import { CancelButtonComponent } from "../cancel-button/cancel-button.component";
+import { NgTemplateOutlet } from "@angular/common";
 
 @Component({
     selector: "app-dialog-footer",
     templateUrl: "./dialog-footer.component.html",
     styleUrls: ["./dialog-footer.component.scss"],
-    standalone: false
+    imports: [SubmitButtonComponent, CancelButtonComponent, NgTemplateOutlet]
 })
 export class DialogFooterComponent {
   @Input() public additionalButtonsTemplate?: TemplateRef<any>;

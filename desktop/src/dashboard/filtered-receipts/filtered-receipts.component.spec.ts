@@ -17,10 +17,9 @@ describe("FilteredReceiptsComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [FilteredReceiptsComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [NgxsModule.forRoot([GroupState]),
-        ScrollingModule],
+        ScrollingModule, FilteredReceiptsComponent],
     providers: [CustomCurrencyPipe, provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 });
     store = TestBed.inject(Store);

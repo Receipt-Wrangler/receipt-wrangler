@@ -27,12 +27,16 @@ import {
 } from "../models/report-form.factory";
 import { ReportRunnerService } from "../services/report-runner.service";
 import { ReportBuilderComponent } from "./report-builder.component";
+import { provideNgxMask } from "ngx-mask";
+import { GroupState } from "../../store/group.state";
 
 // buildReceiptFilterForm wires untilDestroyed subscriptions, so building a canonical
 // filter fixture needs an @UntilDestroy()-decorated context — a throwaway host, as the
 // factory spec does.
 @UntilDestroy()
-@Component({ selector: "app-noop", template: "", standalone: false })
+@Component({
+  selector: "app-noop", template: ""
+})
 class NoopComponent {}
 
 describe("ReportBuilderComponent", () => {
@@ -61,11 +65,11 @@ describe("ReportBuilderComponent", () => {
     activatedRoute.snapshot.data = {};
 
     await TestBed.configureTestingModule({
-      declarations: [ReportBuilderComponent, NoopComponent],
       // AuthState feeds the Save/Generate permission gates (saveTemplateAllowed /
       // generateAllowed), which resolve through the hasAnyAppPermission selector.
-      imports: [NgxsModule.forRoot([AuthState])],
+      imports: [NgxsModule.forRoot([AuthState, GroupState]), ReportBuilderComponent, NoopComponent],
       providers: [
+        provideNgxMask(),
         provideZonelessChangeDetection(),
         FormBuilder,
         { provide: ReportRunnerService, useValue: runner },

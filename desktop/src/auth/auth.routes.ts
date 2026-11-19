@@ -1,5 +1,4 @@
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
+import { Routes } from '@angular/router';
 import { FeatureGuard } from '../guards/feature.guard';
 import { OidcCallbackComponent } from './oidc-callback/oidc-callback.component';
 import { AuthForm } from './sign-up/auth-form.component';
@@ -27,9 +26,3 @@ export const authRoutes: Routes = [
     component: OidcCallbackComponent,
   },
 ];
-
-@NgModule({
-  imports: [RouterModule.forChild(authRoutes)],
-  exports: [RouterModule],
-})
-export class AuthRoutingModule {}

@@ -9,8 +9,7 @@ import { FormCommand } from "../interfaces/form-command";
 @Component({
     selector: "app-base-form",
     templateUrl: "./base-form.component.html",
-    styleUrls: ["./base-form.component.scss"],
-    standalone: false
+    styleUrls: ["./base-form.component.scss"]
 })
 export class BaseFormComponent {
   protected readonly FormMode = FormMode;

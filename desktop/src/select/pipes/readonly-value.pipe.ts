@@ -1,10 +1,7 @@
 import { Pipe, PipeTransform } from "@angular/core";
 import { OptionDisplayPipe } from "./option-display.pipe";
 
-@Pipe({
-  name: "readonlyValue",
-  standalone: false,
-})
+@Pipe({ name: "readonlyValue" })
 export class ReadonlyValuePipe implements PipeTransform {
   constructor(private optionDisplayPipe: OptionDisplayPipe) {}
 

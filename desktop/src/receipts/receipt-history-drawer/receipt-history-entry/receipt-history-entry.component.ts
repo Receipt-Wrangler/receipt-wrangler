@@ -3,11 +3,9 @@ import { Component, LOCALE_ID, computed, inject, input, signal } from "@angular/
 import { rxResource } from "@angular/core/rxjs-interop";
 import { MatIconModule } from "@angular/material/icon";
 import { Store } from "@ngxs/store";
-import { AvatarModule } from "../../../avatar";
 import { ReceiptHistoryEntry, ReceiptService } from "../../../open-api";
-import { formatAppDate } from "../../../pipes/app-date.pipe";
+import { formatAppDate, AppDatePipe } from "../../../pipes/app-date.pipe";
 import { CustomCurrencyPipe } from "../../../pipes/custom-currency.pipe";
-import { PipesModule } from "../../../pipes/pipes.module";
 import { UserState } from "../../../store/user.state";
 import { SystemSettingsState } from "../../../store/system-settings.state";
 import {
@@ -20,6 +18,7 @@ import {
   historyBeforeStateNotice,
   historySnapshotsJson,
 } from "../receipt-history.utils";
+import { AvatarComponent } from "../../../avatar/avatar/avatar.component";
 
 /**
  * One save in the receipt history timeline: who and when, the field-level
@@ -33,8 +32,8 @@ import {
 @Component({
   selector: "app-receipt-history-entry",
   standalone: true,
-  imports: [AvatarModule, MatIconModule, PipesModule],
-  // CustomCurrencyPipe is declared in PipesModule and needs CurrencyPipe;
+  imports: [AvatarComponent, MatIconModule, AppDatePipe],
+  // CustomCurrencyPipe needs CurrencyPipe;
   // neither is providedIn: "root" (the receipts-table precedent).
   providers: [CurrencyPipe, CustomCurrencyPipe],
   templateUrl: "./receipt-history-entry.component.html",

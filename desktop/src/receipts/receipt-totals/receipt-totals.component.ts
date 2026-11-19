@@ -1,8 +1,8 @@
 import { Component, computed, input, output } from "@angular/core";
 import { MatChipsModule } from "@angular/material/chips";
 import { Group, ReceiptSummary, ReceiptSummaryPosition, ReceiptSummaryRow } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { formatStatus } from "../../utils";
+import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 
 /**
  * The block of totals under the receipts table: a receipt count and amount total
@@ -22,7 +22,7 @@ import { formatStatus } from "../../utils";
 @Component({
   selector: "app-receipt-totals",
   standalone: true,
-  imports: [MatChipsModule, PipesModule],
+  imports: [MatChipsModule, CustomCurrencyPipe],
   templateUrl: "./receipt-totals.component.html",
   styleUrl: "./receipt-totals.component.scss",
 })

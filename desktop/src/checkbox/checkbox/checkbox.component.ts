@@ -1,12 +1,15 @@
 import { Component, Input } from "@angular/core";
-import { FormControl } from "@angular/forms";
+import { FormControl, ReactiveFormsModule } from "@angular/forms";
 import { BaseInputInterface } from "../../base-input";
+import { MatCheckbox } from "@angular/material/checkbox";
+import { NgClass } from "@angular/common";
+import { HelpIconComponent } from "../../shared-ui/help-icon/help-icon.component";
 
 @Component({
   selector: "app-checkbox",
   templateUrl: "./checkbox.component.html",
   styleUrls: ["./checkbox.component.scss"],
-  standalone: false
+  imports: [MatCheckbox, NgClass, ReactiveFormsModule, HelpIconComponent]
 })
 export class CheckboxComponent implements BaseInputInterface {
   @Input() public inputFormControl: FormControl<any> = new FormControl();

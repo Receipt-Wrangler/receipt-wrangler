@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from "@angular/core";
 import { FormGroup } from "@angular/forms";
+import { MatIcon } from "@angular/material/icon";
+import { ButtonComponent } from "../../button/button/button.component";
 
 interface FormatChip {
   key: string;
@@ -16,8 +18,8 @@ interface FormatChip {
   selector: "app-report-generate-bar",
   templateUrl: "./report-generate-bar.component.html",
   styleUrls: ["./report-generate-bar.component.scss"],
-  standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatIcon, ButtonComponent],
 })
 export class ReportGenerateBarComponent {
   public readonly form = input.required<FormGroup>();

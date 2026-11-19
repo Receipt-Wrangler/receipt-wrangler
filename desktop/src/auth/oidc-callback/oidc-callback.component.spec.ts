@@ -35,12 +35,12 @@ describe("OidcCallbackComponent", () => {
 
   async function setup(queryParams: Record<string, string> = {}): Promise<void> {
     await TestBed.configureTestingModule({
-      declarations: [OidcCallbackComponent],
       imports: [
         ApiModule,
         NgxsModule.forRoot([AuthState, FeatureConfigState, GroupState, UserState]),
         NoopAnimationsModule,
         RouterTestingModule,
+        OidcCallbackComponent,
       ],
       providers: [
         {

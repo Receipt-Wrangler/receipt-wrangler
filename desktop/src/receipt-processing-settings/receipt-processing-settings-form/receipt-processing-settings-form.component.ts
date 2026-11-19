@@ -1,5 +1,5 @@
 import { Component, OnInit, viewChild } from "@angular/core";
-import { FormBuilder, Validators } from "@angular/forms";
+import { FormBuilder, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { ActivatedRoute, Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
@@ -25,6 +25,22 @@ import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog
 import { TaskTableComponent } from "../../shared-ui/task-table/task-table.component";
 import { aiTypeOptions } from "../constants/ai-type-options";
 import { ocrEngineOptions } from "../constants/ocr-engine-options";
+import { FormHeaderComponent } from "../../shared-ui/form-header/form-header.component";
+import { AuditDetailSectionComponent } from "../../shared-ui/audit-detail-section/audit-detail-section.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { FormButtonBarComponent } from "../../shared-ui/form-button-bar/form-button-bar.component";
+import { SubmitButtonComponent } from "../../shared-ui/submit-button/submit-button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { ReceiptProcessingSettingsChildSystemTaskAccordionComponent } from "../receipt-processing-settings-child-system-task-accordion/receipt-processing-settings-child-system-task-accordion.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
+import { UrlLabelPipe } from "../pipes/url-label.pipe";
+import { UrlHintPipe } from "../pipes/url-hint.pipe";
 
 @UntilDestroy()
 @Component({
@@ -35,7 +51,7 @@ import { ocrEngineOptions } from "../constants/ocr-engine-options";
             provide: TABLE_SERVICE_INJECTION_TOKEN,
             useClass: ReceiptProcessingSettingsTaskTableService
         }],
-    standalone: false
+    imports: [ReactiveFormsModule, FormHeaderComponent, AuditDetailSectionComponent, FormSectionComponent, InputComponent, AutocomleteComponent, SelectComponent, CheckboxComponent, TaskTableComponent, FormButtonBarComponent, SubmitButtonComponent, EditButtonComponent, ButtonComponent, ReceiptProcessingSettingsChildSystemTaskAccordionComponent, FormGetPipe, InputReadonlyPipe, UrlLabelPipe, UrlHintPipe]
 })
 export class ReceiptProcessingSettingsFormComponent extends BaseFormComponent implements OnInit {
   public readonly taskTableComponent = viewChild.required(TaskTableComponent);

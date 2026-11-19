@@ -4,13 +4,14 @@ import { DEFAULT_HOST_CLASS } from "src/constants";
 import { Permission } from "../../open-api";
 import { AuthState } from "../../store";
 import { TabConfig } from "../../shared-ui/tabs/tab-config.interface";
+import { TabsComponent } from "../../shared-ui/tabs/tabs.component";
 
 @Component({
     selector: "app-settings",
     templateUrl: "./settings.component.html",
     styleUrls: ["./settings.component.scss"],
     host: DEFAULT_HOST_CLASS,
-    standalone: false
+    imports: [TabsComponent]
 })
 export class SettingsComponent {
   private readonly canReadProfile = this.store.selectSignal(

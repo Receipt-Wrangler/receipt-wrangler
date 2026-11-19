@@ -96,8 +96,7 @@ describe("ReportTemplateListComponent", () => {
     };
 
     await TestBed.configureTestingModule({
-      declarations: [ReportTemplateListComponent],
-      imports: [CommonModule],
+      imports: [CommonModule, ReportTemplateListComponent],
       providers: [
         provideZonelessChangeDetection(),
         { provide: ReportRunnerService, useValue: runner },
@@ -119,7 +118,12 @@ describe("ReportTemplateListComponent", () => {
         },
       ],
       schemas: [NO_ERRORS_SCHEMA],
-    }).compileComponents();
+    })
+      // Router and Store are mocks, so the children stay unrendered as before.
+      .overrideComponent(ReportTemplateListComponent, {
+        set: { imports: [CommonModule], schemas: [NO_ERRORS_SCHEMA] },
+      })
+      .compileComponents();
 
     // Installed before createComponent because the builder-entry gate reads the selector
     // at field init. Call through (default) so selectSignal still receives a real selector

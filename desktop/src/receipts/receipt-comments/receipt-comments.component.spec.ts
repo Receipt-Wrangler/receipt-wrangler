@@ -6,12 +6,12 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
-import { PipesModule } from "src/pipes/pipes.module";
 import { ApiModule, Comment, CommentService, Permission } from "../../open-api";
 import { AuthState, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { ReceiptCommentsComponent } from "./receipt-comments.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideRouter } from "@angular/router";
 
 describe("ReceiptCommentsComponent", () => {
   let component: ReceiptCommentsComponent;
@@ -40,14 +40,13 @@ describe("ReceiptCommentsComponent", () => {
     ];
 
     await TestBed.configureTestingModule({
-    declarations: [ReceiptCommentsComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         ReactiveFormsModule,
         NgxsModule.forRoot([AuthState, UserState]),
         MatSnackBarModule,
-        PipesModule],
-    providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
+        ReceiptCommentsComponent],
+    providers: [provideRouter([]), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 }).compileComponents();
 
     store = TestBed.inject(Store);

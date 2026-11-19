@@ -2,7 +2,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
 import { LayoutState } from "src/store/layout.state";
-import { ButtonModule } from "../../button";
 import { SubmitButtonComponent } from "./submit-button.component";
 
 describe("SubmitButtonComponent", () => {
@@ -11,8 +10,7 @@ describe("SubmitButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SubmitButtonComponent],
-      imports: [ButtonModule, NgxsModule.forRoot([LayoutState])],
+      imports: [NgxsModule.forRoot([LayoutState]), SubmitButtonComponent],
       providers: [
         {
           provide: ActivatedRoute,

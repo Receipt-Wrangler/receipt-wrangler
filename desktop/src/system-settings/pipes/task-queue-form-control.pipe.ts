@@ -1,10 +1,7 @@
 import { Pipe, PipeTransform } from "@angular/core";
 import { FormArray, FormControl, FormGroup } from "@angular/forms";
 
-@Pipe({
-    name: "taskQueueFormControl",
-    standalone: false
-})
+@Pipe({ name: "taskQueueFormControl" })
 export class TaskQueueFormControlPipe implements PipeTransform {
   public transform(form: FormGroup, queueName: string, formKey: string): FormControl {
     const formControl = (form.get("taskQueueConfigurations") as FormArray)?.controls?.find(c => c?.value?.["name"] === queueName);
