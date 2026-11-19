@@ -1,4 +1,3 @@
-import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { Routes } from "@angular/router";
 import { appPermissionGuard } from "src/guards/app-permission.guard";
 import { AuthGuard } from "src/guards/auth.guard";
@@ -34,9 +33,6 @@ export const appRoutes: Routes = [
       },
       {
         path: "tags",
-        // Carried over unchanged from the former TagsModule: a route-scoped
-        // HttpClient that does not run the root httpInterceptor.
-        providers: [provideHttpClient(withInterceptorsFromDi())],
         loadChildren: () =>
           import("../tags/tags.routes").then((m) => m.tagsRoutes),
         canActivate: [AuthGuard, appPermissionGuard],

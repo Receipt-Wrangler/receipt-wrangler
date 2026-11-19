@@ -135,7 +135,7 @@ Receipt Wrangler Desktop is an Angular 21 application built from standalone comp
 ### Key Directories
 
 #### Core Application
-- `src/app/` - Main application module and routing
+- `src/app/` - Root component, `app.config.ts` providers and `app.routes.ts`
 - `src/store/` - NGXS state management (18+ state files)
 - `src/services/` - Application services and business logic
 - `src/guards/` - Route guards for authentication and authorization
@@ -195,9 +195,12 @@ do not undo them without re-checking `npm audit`:
   `webpack-dev-server` and `http-proxy-middleware` (both → `braces`) plus ~400 more webpack-era
   packages. Do not add it back; nothing here uses a webpack builder.
 - **Exact pins (no caret):** `ngx-bootstrap` (`21.0.1`) and `@playwright/test` (`1.59.1`) are pinned
-  because their next minor introduced an incompatibility (ngx-bootstrap dropped `CarouselModule.forRoot()`
-  used by `src/carousel/`; Playwright `1.61` needs a newer browser build than the pinned `e2e:install`
-  cache). Bump these deliberately — update the consuming code / reinstall browsers in the same change.
+  because their next minor introduced an incompatibility (ngx-bootstrap dropped `CarouselModule.forRoot()`;
+  Playwright `1.61` needs a newer browser build than the pinned `e2e:install` cache). Bump these
+  deliberately — update the consuming code / reinstall browsers in the same change. The ngx-bootstrap
+  reason no longer applies on its own: `src/carousel/` was the `forRoot()` caller, and since the
+  standalone conversion it imports ngx-bootstrap's `CarouselComponent` / `SlideComponent` directly and
+  calls no `forRoot()`. Re-check the next minor against the receipt carousel before relaxing the pin.
 - Stay on the Angular `21.2.x` patch line for security fixes; a jump to Angular 22 is a separate,
   breaking upgrade and out of scope for audit hygiene.
 
@@ -319,7 +322,7 @@ process.exit(bad.length ? 1 : 0);
 - SCSS for styling with component-scoped styles
 - TypeScript strict mode enabled
 - Angular style guide followed for component organization
-- Lazy loading for feature modules to optimize bundle size
+- Lazy-loaded feature routes (`loadChildren` → `<feature>.routes.ts`) to keep the initial bundle small
 - Templates use built-in control flow (`@if` / `@else`, `@switch` / `@case`, `@for`), not the
   deprecated `*ngIf` / `ngSwitch` / `*ngFor` structural directives — all three are fully migrated;
   don't add new ones. When wrapping an element Material projects into a named slot (`matSuffix`,
@@ -445,9 +448,10 @@ Three things about it are load-bearing:
 
 The panel handling runs inside the existing `setTimeout(…, 0)` in `optionSelected()`, so the two
 tests in `autocomlete.component.spec.ts` that call `jest.runAllTimers()` are the only ones that
-exercise it at all — every other `optionSelected` case stops at the `FormArray` push. They stub the
-trigger (`textarea.component.spec.ts` is the precedent), because `CUSTOM_ELEMENTS_SCHEMA` leaves the
-template's real `#auto` trigger unresolvable.
+exercise it at all — every other `optionSelected` case stops at the `FormArray` push. They stub both
+required view children (`textarea.component.spec.ts` is the precedent): `#inputMultiple` sits behind
+`@if (multiple)`, which the fixture never renders, and the real `MatAutocompleteTrigger` drives a CDK
+overlay neither test is about.
 
 Because the component now injects `Store`, **any spec that instantiates a real `AutocomleteComponent`
 needs `AuthState` registered** — `NgxsModule.forRoot([AuthState])`. That covers the base spec, the
@@ -507,7 +511,7 @@ Two call-site rules the e2e suites depend on:
 ### Roles & Permissions (Manage Roles)
 
 The admin-only **Manage Roles** feature (`src/roles/` — `role-list`, `role-form`, `role-presets`,
-`roles.module`) provides CRUD for the backend's app- and group-scoped roles (see the backend
+`roles.routes`) provides CRUD for the backend's app- and group-scoped roles (see the backend
 "Roles & Permissions" section in `api/CLAUDE.md` for the permission model). The Manage Roles routes are
 gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based UI gating** below).
 

@@ -817,7 +817,7 @@ receipt-wrangler-api/          # Monorepo root
 │   └── CLAUDE.md              # Backend-specific guidance
 ├── desktop/                   # Angular web app
 │   ├── src/
-│   │   ├── app/               # Application modules
+│   │   ├── app/               # Root component, providers, routes
 │   │   ├── store/             # NGXS state management
 │   │   ├── shared-ui/         # Reusable components
 │   │   └── open-api/          # Generated API client (DO NOT EDIT)

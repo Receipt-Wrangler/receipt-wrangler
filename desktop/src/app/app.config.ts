@@ -15,7 +15,6 @@ import { httpInterceptor } from "../interceptors/http-interceptor";
 import { MatIconRegistry } from "@angular/material/icon";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTooltipModule } from "@angular/material/tooltip";
-import { NgxMaskDirective, NgxMaskPipe } from "ngx-mask";
 import { ApiModule, Configuration } from "../open-api";
 import { AboutState } from "../store/about.state";
 import { ApiKeyTableState } from "../store/api-key-table.state";
@@ -125,8 +124,6 @@ export const appConfig: ApplicationConfig = {
       ApiModule.forRoot(() => new Configuration({ basePath: undefined })),
       MatSnackBarModule,
       MatTooltipModule,
-      NgxMaskDirective,
-      NgxMaskPipe,
     ),
   ],
 };
