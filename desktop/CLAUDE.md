@@ -1657,8 +1657,9 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
    `chromium_headless_shell-1217` symlinks from "Running in the Claude Code Web/Cloud Sandbox" above
    instead.)
 2. **One-time:** create the two e2e accounts against your local DB with
-   `cd ../api && ./dev/seed-e2e-users.sh` (idempotent; it logs in as the auto-created `admin`/`admin`
-   and creates both below). By hand instead: on a fresh DB, public sign-up is
+   `../api/dev/seed-e2e-users.sh` (idempotent; it logs in as the auto-created `admin`/`admin` and
+   creates both below; it finds its own files, so it runs without leaving `desktop/`). By hand
+   instead: on a fresh DB, public sign-up is
    **off** (`enableLocalSignUp` defaults false) and the API has already auto-created `admin`/`admin`,
    so create them as `admin` (Users screen, or `POST /api/user/` with `appRoleId`):
    - username `e2e-admin`, password `e2e-admin-password`, display name `E2E Admin`, role Legacy Admin

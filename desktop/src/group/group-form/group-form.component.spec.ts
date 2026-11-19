@@ -87,8 +87,8 @@ describe("GroupFormComponent", () => {
     expect(component.dataSource().data).toEqual([formGroup.value]);
   });
 
-  // The add-member dialog closes asynchronously, so the delete button's disabled
-  // state has to be a signal for the table to pick it up.
+  // Pins the delete button's disabled state as members are added through the
+  // add-member dialog: it stays disabled while only one member is left.
   it("tracks whether the last member can be deleted as members are added", () => {
     const matDialog = TestBed.inject(MatDialog);
     const member = (userId: string) => {
