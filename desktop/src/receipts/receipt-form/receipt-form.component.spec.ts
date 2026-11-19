@@ -1,7 +1,8 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA, getDebugNode } from "@angular/core";
-import { By } from "@angular/platform-browser";
+import { By, DomSanitizer } from "@angular/platform-browser";
+import { MatIconRegistry } from "@angular/material/icon";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
@@ -55,9 +56,16 @@ describe("ReceiptFormComponent", () => {
       ]
     }).compileComponents();
 
+    // app.config registers the custom "split" icon; without it the edit form's
+    // lookup error is rethrown at the first whenStable().
+    TestBed.inject(MatIconRegistry).addSvgIconLiteral(
+      "split",
+      TestBed.inject(DomSanitizer).bypassSecurityTrustHtml("<svg></svg>")
+    );
+
     fixture = TestBed.createComponent(ReceiptFormComponent);
     component = fixture.componentInstance;
-    component.mode = FormMode.edit;
+    component.mode.set(FormMode.edit);
     fixture.detectChanges();
   });
 
@@ -80,7 +88,7 @@ describe("ReceiptFormComponent", () => {
 
     component.ngOnInit();
 
-    expect(component.customFields).toEqual([definition]);
+    expect(component.customFields()).toEqual([definition]);
   });
 
   it("should init form correctly when there is no initial data", () => {
@@ -113,21 +121,21 @@ describe("ReceiptFormComponent", () => {
   it("should patch magic fill values correctly", () => {
     component.images.set([{ id: 1 } as any]);
     component.ngOnInit();
-    component.mode = FormMode.edit;
+    component.mode.set(FormMode.edit);
     Object.defineProperty(component, 'carouselComponent', {
       value: () => ({
         currentlyShownImageIndex: 0,
       }),
       configurable: true,
     });
-    component.categories = [
+    component.categories.set([
       { id: 1, name: "category" } as any,
       { id: 2, name: "category2" } as any,
-    ];
-    component.tags = [
+    ]);
+    component.tags.set([
       { id: 1, name: "tag" } as any,
       { id: 2, name: "tag2" } as any,
-    ];
+    ]);
 
     const magicReceipt = {
       name: "magic",
@@ -162,8 +170,8 @@ describe("ReceiptFormComponent", () => {
     // Midnight UTC from the API is shown as that calendar day in the picker:
     // the local midnight of Aug 5, in any browser zone.
     expect(receiptValue.date).toEqual(new Date(2023, 7, 5));
-    expect(receiptValue.categories).toEqual([component.categories[0]]);
-    expect(receiptValue.tags).toEqual([component.tags[1]]);
+    expect(receiptValue.categories).toEqual([component.categories()[0]]);
+    expect(receiptValue.tags).toEqual([component.tags()[1]]);
     expect(snackbarSpy).toHaveBeenCalledWith(
       "Magic fill successfully filled name, amount, date, categories, tags from selected image!",
       { duration: 10000 }
@@ -173,7 +181,7 @@ describe("ReceiptFormComponent", () => {
   it("should not patch magic fill values if they are the defaults", () => {
     component.images.set([{ id: 1 } as any]);
     component.ngOnInit();
-    component.mode = FormMode.edit;
+    component.mode.set(FormMode.edit);
     Object.defineProperty(component, 'carouselComponent', {
       value: () => ({
         currentlyShownImageIndex: 0,
@@ -214,7 +222,7 @@ describe("ReceiptFormComponent", () => {
   it("should not patch any values when they are all default values and pop error snackbar", () => {
     component.images.set([{ id: 1 } as any]);
     component.ngOnInit();
-    component.mode = FormMode.edit;
+    component.mode.set(FormMode.edit);
     Object.defineProperty(component, 'carouselComponent', {
       value: () => ({
         currentlyShownImageIndex: 0,
@@ -264,10 +272,10 @@ describe("ReceiptFormComponent", () => {
   it("should set queue data when there is no data", () => {
     component.ngOnInit();
 
-    expect(component.queueIndex).toEqual(-1);
-    expect(component.queueIds).toEqual([]);
+    expect(component.queueIndex()).toEqual(-1);
+    expect(component.queueIds()).toEqual([]);
     expect(component.queueMode).toEqual(undefined);
-    expect(component.submitButtonText).toEqual("Save");
+    expect(component.submitButtonText()).toEqual("Save");
   });
 
   it("should set queue data when there is data", () => {
@@ -279,10 +287,10 @@ describe("ReceiptFormComponent", () => {
       receipt: { id: 2 } as any,
     });
 
-    expect(component.queueIndex).toEqual(1);
-    expect(component.queueIds).toEqual(["1", "2", "3"]);
+    expect(component.queueIndex()).toEqual(1);
+    expect(component.queueIds()).toEqual(["1", "2", "3"]);
     expect(component.queueMode).toEqual(QueueMode.VIEW);
-    expect(component.submitButtonText).toEqual("Save & Next");
+    expect(component.submitButtonText()).toEqual("Save & Next");
   });
 
   it("rebuilds form state when route data emits a new receipt (duplicate navigation)", () => {
@@ -290,17 +298,34 @@ describe("ReceiptFormComponent", () => {
       receipt: { id: 1, name: "Original", amount: "10.00", customFields: [] } as any,
     });
 
-    expect(component.originalReceipt?.id).toEqual(1);
+    expect(component.originalReceipt()?.id).toEqual(1);
     expect(component.form.get("name")?.value).toEqual("Original");
-    expect(component.editLink).toEqual("/receipts/1/edit");
+    expect(component.editLink()).toEqual("/receipts/1/edit");
 
     routeDataSubject.next({
       receipt: { id: 2, name: "Duplicate", amount: "10.00", customFields: [] } as any,
     });
 
-    expect(component.originalReceipt?.id).toEqual(2);
+    expect(component.originalReceipt()?.id).toEqual(2);
     expect(component.form.get("name")?.value).toEqual("Duplicate");
-    expect(component.editLink).toEqual("/receipts/2/edit");
+    expect(component.editLink()).toEqual("/receipts/2/edit");
+  });
+
+  // Navigating to another receipt on the same route (following Duplicate's link)
+  // reuses this component, so the route-data re-emission is all that repaints it.
+  it("repaints the queue position and header when route data re-emits", async () => {
+    TestBed.inject(ActivatedRoute).snapshot.queryParams = { ids: ["1", "2", "3"], queueMode: QueueMode.VIEW };
+    const receipt = (id: number, name: string) => ({ id, name, amount: "1.00", customFields: [] }) as any;
+
+    routeDataSubject.next({ mode: FormMode.view, receipt: receipt(1, "First") });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain("Receipt 1 of 3");
+    expect(fixture.nativeElement.textContent).toContain("View First Receipt");
+
+    routeDataSubject.next({ mode: FormMode.view, receipt: receipt(2, "Second") });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain("Receipt 2 of 3");
+    expect(fixture.nativeElement.textContent).toContain("View Second Receipt");
   });
 
   // Full-receipt magic-fill ingest: proves the form takes in every field the
@@ -371,21 +396,21 @@ describe("ReceiptFormComponent", () => {
     it("ingests every field of a full magic-filled receipt", () => {
       component.images.set([{ id: 1 } as any]);
       routeDataSubject.next({ mode: FormMode.edit, customFields: customFieldDefs });
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
 
       stubCarousel();
       const { setItems, setUserItemMap } = stubItemAndShareLists();
       const { addMagicFilledComments } = stubCommentsComponent();
       const { syncSingleDisplay } = stubPaidByAutocomplete();
 
-      component.categories = [
+      component.categories.set([
         { id: 1, name: "category" } as any,
         { id: 2, name: "category2" } as any,
-      ];
-      component.tags = [
+      ]);
+      component.tags.set([
         { id: 1, name: "tag" } as any,
         { id: 2, name: "tag2" } as any,
-      ];
+      ]);
 
       const magicReceipt = {
         name: "Full Receipt",
@@ -439,8 +464,8 @@ describe("ReceiptFormComponent", () => {
       expect(syncSingleDisplay).toHaveBeenCalled();
 
       // Categories/tags matched from the pool by id
-      expect(value.categories).toEqual([component.categories[0]]);
-      expect(value.tags).toEqual([component.tags[1]]);
+      expect(value.categories).toEqual([component.categories()[0]]);
+      expect(value.tags).toEqual([component.tags()[1]]);
 
       // Items (regular + share + linked + per-item cats/tags + taxed)
       expect(value.receiptItems.length).toEqual(2);
@@ -473,7 +498,7 @@ describe("ReceiptFormComponent", () => {
       expect(byId(5).booleanValue).toEqual(true);
       // Manage-fields menu entries flip to selected
       customFieldDefs.forEach((def) => {
-        const menuItem = component.customFieldsStatefulMenuItems.find(
+        const menuItem = component.customFieldsStatefulMenuItems().find(
           (m) => m.value === def.id.toString()
         );
         expect(menuItem?.selected).toBe(true);
@@ -492,7 +517,7 @@ describe("ReceiptFormComponent", () => {
     it("treats items with a chargedToUserId as shares and excludes them from the item total", () => {
       component.images.set([{ id: 1 } as any]);
       component.ngOnInit();
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
       stubCarousel();
       stubItemAndShareLists();
 
@@ -523,7 +548,7 @@ describe("ReceiptFormComponent", () => {
     it("fills nothing and shows an error when the response is all defaults/empty", () => {
       component.images.set([{ id: 1 } as any]);
       component.ngOnInit();
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
       stubCarousel();
 
       const originalData = {
@@ -567,7 +592,7 @@ describe("ReceiptFormComponent", () => {
     it("fills only the fields present and labels just those in the snackbar", () => {
       component.images.set([{ id: 1 } as any]);
       component.ngOnInit();
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
       stubCarousel();
       stubItemAndShareLists();
 
@@ -595,7 +620,7 @@ describe("ReceiptFormComponent", () => {
     it("skips custom field values whose field is not in the catalog pool", () => {
       component.images.set([{ id: 1 } as any]);
       routeDataSubject.next({ mode: FormMode.edit, customFields: [customFieldDefs[0]] });
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
       stubCarousel();
 
       const magicReceipt = {
@@ -630,7 +655,7 @@ describe("ReceiptFormComponent", () => {
           customFields: [{ customFieldId: 1, stringValue: "existing" }],
         } as any,
       });
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
       stubCarousel();
 
       const magicReceipt = {
@@ -663,13 +688,13 @@ describe("ReceiptFormComponent", () => {
           customFields: [],
         } as any,
       });
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
       stubCarousel();
       stubItemAndShareLists();
-      component.categories = [
+      component.categories.set([
         { id: 1, name: "existing cat" } as any,
         { id: 2, name: "new cat" } as any,
-      ];
+      ]);
 
       const magicReceipt = {
         categories: [{ id: 2 }],
@@ -705,9 +730,9 @@ describe("ReceiptFormComponent", () => {
           customFields: [],
         } as any,
       });
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
       stubCarousel();
-      component.categories = [{ id: 1, name: "existing cat" } as any];
+      component.categories.set([{ id: 1, name: "existing cat" } as any]);
 
       const magicReceipt = { categories: [{ id: 1 }] } as any;
 
@@ -729,7 +754,7 @@ describe("ReceiptFormComponent", () => {
     it("round-trips negative refund amounts on the receipt and items", () => {
       component.images.set([{ id: 1 } as any]);
       component.ngOnInit();
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
       stubCarousel();
       stubItemAndShareLists();
 
@@ -753,7 +778,7 @@ describe("ReceiptFormComponent", () => {
     it("skips paid-by when the backend returns the unset sentinel (0)", () => {
       component.images.set([{ id: 1 } as any]);
       component.ngOnInit();
-      component.mode = FormMode.edit;
+      component.mode.set(FormMode.edit);
       stubCarousel();
       const { syncSingleDisplay } = stubPaidByAutocomplete();
       component.form.patchValue({ paidByUserId: 4 });
@@ -803,7 +828,7 @@ describe("ReceiptFormComponent", () => {
       component.customFieldsFormArray.value.map((value: any) => value.customFieldId);
 
     const menuItemFor = (customFieldId: number): StatefulMenuItem =>
-      component.customFieldsStatefulMenuItems.find(
+      component.customFieldsStatefulMenuItems().find(
         (item) => item.value === customFieldId.toString()
       ) as StatefulMenuItem;
 
@@ -1393,7 +1418,7 @@ describe("ReceiptFormComponent", () => {
       } as any);
 
     beforeEach(() => {
-      component.originalReceipt = { id: 4, name: "Lunch" } as any;
+      component.originalReceipt.set({ id: 4, name: "Lunch" } as any);
       receiptService = TestBed.inject(ReceiptService);
       jest
         .spyOn(receiptService, "duplicateReceipt")
