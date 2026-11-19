@@ -13,9 +13,9 @@ import { TableColumn } from "../../table/table-column.interface";
     styleUrl: "./base-table.component.scss"
 })
 export class BaseTableComponent<T> {
-  public columns: TableColumn[] = [];
+  public columns = signal<TableColumn[]>([]);
 
-  public displayedColumns: string[] = [];
+  public displayedColumns = signal<string[]>([]);
 
   public dataSource = signal(new MatTableDataSource<T>([]));
 

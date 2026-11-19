@@ -99,19 +99,19 @@ describe("CustomFieldTableComponent", () => {
     it("renders the actions column for an update-only holder", () => {
       renderRowWith([Permission.AppCustomFieldsUpdate]);
 
-      expect(component.displayedColumns).toContain("actions");
+      expect(component.displayedColumns()).toContain("actions");
     });
 
     it("renders the actions column for a delete-only holder", () => {
       renderRowWith([Permission.AppCustomFieldsDelete]);
 
-      expect(component.displayedColumns).toContain("actions");
+      expect(component.displayedColumns()).toContain("actions");
     });
 
     it("omits the actions column when the caller can neither update nor delete", () => {
       renderRowWith([Permission.AppCustomFieldsRead]);
 
-      expect(component.displayedColumns).not.toContain("actions");
+      expect(component.displayedColumns()).not.toContain("actions");
     });
   });
 

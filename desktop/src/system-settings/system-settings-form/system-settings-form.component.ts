@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnInit, viewChild } from "@angular/core";
+import { AfterViewInit, Component, ElementRef, OnInit, viewChild, signal } from "@angular/core";
 import { FormArray, FormBuilder, FormGroup, ValidatorFn, Validators, ReactiveFormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
@@ -65,7 +65,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
 
   public filteredReceiptProcessingSettings: ReceiptProcessingSettings[] = [];
 
-  public showRestartTaskServerAlert = false;
+  public showRestartTaskServerAlert = signal(false);
 
   public readonly queueData: QueueData[] = [
     {
@@ -174,14 +174,14 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
     this.setFormConfigFromRoute(this.activatedRoute);
     this.allReceiptProcessingSettings = this.activatedRoute.snapshot.data?.["allReceiptProcessingSettings"];
     this.originalSystemSettings = this.activatedRoute.snapshot.data?.["systemSettings"];
-    this.showRestartTaskServerAlert = this.activatedRoute.snapshot?.queryParams?.["restartTaskServer"] === "true";
+    this.showRestartTaskServerAlert.set(this.activatedRoute.snapshot?.queryParams?.["restartTaskServer"] === "true");
     this.initForm();
   }
 
   public ngAfterViewInit(): void {
     setTimeout(() => {
 
-      if (this.showRestartTaskServerAlert) {
+      if (this.showRestartTaskServerAlert()) {
         this.alert().nativeElement.scrollIntoView({ behavior: "smooth" });
       }
 
@@ -474,7 +474,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       take(1),
       tap(() => {
           this.snackbarService.success("Task server restarted successfully");
-          this.showRestartTaskServerAlert = false;
+          this.showRestartTaskServerAlert.set(false);
         },
       )).subscribe();
   }

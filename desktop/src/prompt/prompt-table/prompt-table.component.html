@@ -11,7 +11,7 @@
         tooltip="Add Prompt"
         [buttonRouterLink]="['create']"
       ></app-add-button>
-      @if (!defaultPromptExists) {
+      @if (!defaultPromptExists()) {
         <app-button
           color="accent"
           tooltip="Create default prompt"
@@ -25,8 +25,8 @@
   <div class="table-container">
     <app-table
       [dataSource]="dataSource()"
-      [columns]="columns"
-      [displayedColumns]="displayedColumns"
+      [columns]="columns()"
+      [displayedColumns]="displayedColumns()"
       [pagination]="true"
       [length]="totalCount()"
       [page]="(tableState()?.page || 1) - 1"
@@ -71,7 +71,7 @@
     ></app-button>
     <app-delete-button
       tooltip="Delete Prompt"
-      [disabled]="(relatedPromptMap.get(element.id)?.length || 0) > 0"
+      [disabled]="(relatedPromptMap().get(element.id)?.length || 0) > 0"
       (clicked)="deletePrompt(element)"
       (click)="disabledDeleteButtonClicked(element)"
     ></app-delete-button>

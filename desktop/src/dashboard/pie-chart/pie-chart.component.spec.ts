@@ -5,11 +5,12 @@ import { CUSTOM_ELEMENTS_SCHEMA, SimpleChange } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { NgxsModule } from "@ngxs/store";
-import { of, throwError } from "rxjs";
+import { of, Subject, throwError } from "rxjs";
 import { ChartGrouping, PieChartData, Widget, WidgetService, WidgetType } from "../../open-api";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import { SystemSettingsState } from "../../store/system-settings.state";
 
+import { PieChartUiComponent } from "../../shared-ui/pie-chart/pie-chart.component";
 import { PieChartComponent } from "./pie-chart.component";
 
 describe("PieChartComponent", () => {
@@ -75,14 +76,14 @@ describe("PieChartComponent", () => {
     });
 
     it("should have default empty pieChartData", () => {
-      expect(component.pieChartData.labels).toEqual([]);
-      expect(component.pieChartData.datasets[0].data).toEqual([]);
+      expect(component.pieChartData().labels).toEqual([]);
+      expect(component.pieChartData().datasets[0].data).toEqual([]);
     });
 
     it("should have backgroundColor array in pieChartData", () => {
-      expect(component.pieChartData.datasets[0].backgroundColor).toBeDefined();
+      expect(component.pieChartData().datasets[0].backgroundColor).toBeDefined();
       expect(
-        (component.pieChartData.datasets[0].backgroundColor as string[]).length
+        (component.pieChartData().datasets[0].backgroundColor as string[]).length
       ).toBeGreaterThan(0);
     });
   });
@@ -102,12 +103,12 @@ describe("PieChartComponent", () => {
 
       expect(component.isLoading()).toBe(false);
       expect(component.hasData()).toBe(true);
-      expect(component.pieChartData.labels).toEqual([
+      expect(component.pieChartData().labels).toEqual([
         "Category A",
         "Category B",
         "Category C",
       ]);
-      expect(component.pieChartData.datasets[0].data).toEqual([100, 200, 150]);
+      expect(component.pieChartData().datasets[0].data).toEqual([100, 200, 150]);
     });
 
     it("should not call service if groupId is not set", () => {
@@ -168,6 +169,20 @@ describe("PieChartComponent", () => {
 
       expect(widgetService.getPieChartData).not.toHaveBeenCalled();
     });
+
+    it("passes a reloaded result through to the chart", async () => {
+      await fixture.whenStable();
+      const response = new Subject<PieChartData>();
+      widgetService.getPieChartData.mockReturnValue(response);
+
+      fixture.componentRef.setInput("groupId", 2);
+      await fixture.whenStable();
+      response.next({ data: [{ label: "Reloaded", value: 42 }] });
+      await fixture.whenStable();
+
+      const chart = fixture.debugElement.query(By.directive(PieChartUiComponent));
+      expect((chart.componentInstance as PieChartUiComponent).chartData().labels).toEqual(["Reloaded"]);
+    });
   });
 
   describe("loadData", () => {
@@ -211,7 +226,7 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.labels).toEqual(["Unknown", "Category B"]);
+      expect(component.pieChartData().labels).toEqual(["Unknown", "Category B"]);
     });
 
     it("should handle data points with missing values", () => {
@@ -225,16 +240,16 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.datasets[0].data).toEqual([0, 200]);
+      expect(component.pieChartData().datasets[0].data).toEqual([0, 200]);
     });
   });
 
   describe("updateChartData", () => {
     it("should preserve backgroundColor when updating data", () => {
-      const originalColors = component.pieChartData.datasets[0].backgroundColor;
+      const originalColors = component.pieChartData().datasets[0].backgroundColor;
       fixture.detectChanges();
 
-      expect(component.pieChartData.datasets[0].backgroundColor).toEqual(
+      expect(component.pieChartData().datasets[0].backgroundColor).toEqual(
         originalColors
       );
     });
@@ -247,8 +262,8 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.labels).toEqual(["Only One"]);
-      expect(component.pieChartData.datasets[0].data).toEqual([500]);
+      expect(component.pieChartData().labels).toEqual(["Only One"]);
+      expect(component.pieChartData().datasets[0].data).toEqual([500]);
       expect(component.hasData()).toBe(true);
     });
 
@@ -262,8 +277,8 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.labels?.length).toBe(20);
-      expect(component.pieChartData.datasets[0].data.length).toBe(20);
+      expect(component.pieChartData().labels?.length).toBe(20);
+      expect(component.pieChartData().datasets[0].data.length).toBe(20);
     });
   });
 
@@ -507,7 +522,7 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.datasets[0].data).toEqual([999999999, 1]);
+      expect(component.pieChartData().datasets[0].data).toEqual([999999999, 1]);
     });
 
     it("should handle decimal values", () => {
@@ -521,7 +536,7 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.datasets[0].data).toEqual([10.55, 20.45]);
+      expect(component.pieChartData().datasets[0].data).toEqual([10.55, 20.45]);
     });
 
     it("should handle zero values", () => {
@@ -535,7 +550,7 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.datasets[0].data).toEqual([0, 100]);
+      expect(component.pieChartData().datasets[0].data).toEqual([0, 100]);
       expect(component.hasData()).toBe(true);
     });
 
@@ -550,7 +565,7 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.datasets[0].data).toEqual([-50, 100]);
+      expect(component.pieChartData().datasets[0].data).toEqual([-50, 100]);
     });
 
     it("should handle special characters in labels", () => {
@@ -564,7 +579,7 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.labels).toEqual([
+      expect(component.pieChartData().labels).toEqual([
         "Category & Special <chars>",
         'With "quotes"',
       ]);
@@ -581,7 +596,7 @@ describe("PieChartComponent", () => {
       );
       fixture.detectChanges();
 
-      expect(component.pieChartData.labels).toEqual(["日本語", "Émojis 🎉"]);
+      expect(component.pieChartData().labels).toEqual(["日本語", "Émojis 🎉"]);
     });
   });
 });

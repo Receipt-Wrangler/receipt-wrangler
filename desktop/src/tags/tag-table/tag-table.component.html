@@ -13,8 +13,8 @@
 </app-table-header>
 <div class="table-container">
   <app-table
-    [columns]="columns"
-    [displayedColumns]="displayedColumns"
+    [columns]="columns()"
+    [displayedColumns]="displayedColumns()"
     [dataSource]="dataSource()"
     [pagination]="true"
     [page]="(tagTableState()?.page ?? 1) - 1"

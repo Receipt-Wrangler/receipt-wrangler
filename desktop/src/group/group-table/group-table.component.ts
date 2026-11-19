@@ -117,7 +117,7 @@ export class GroupTableComponent extends BaseTableComponent<Group> implements On
   }
 
   private setColumns(): void {
-    this.columns = [
+    this.columns.set([
       {
         columnHeader: "Name",
         matColumnDef: "name",
@@ -148,14 +148,14 @@ export class GroupTableComponent extends BaseTableComponent<Group> implements On
         template: this.actionsCell(),
         sortable: false,
       },
-    ];
-    this.displayedColumns = [
+    ]);
+    this.displayedColumns.set([
       "name",
       "number_of_members",
       "created_at",
       "updated_at",
       "actions",
-    ];
+    ]);
   }
 
   public deleteGroup(index: number): void {

@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, DestroyRef, inject, TemplateRef, viewChild } from "@angular/core";
+import { AfterViewInit, Component, DestroyRef, inject, signal, TemplateRef, viewChild } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
@@ -74,7 +74,7 @@ export class UserListComponent extends BaseTableComponent<User> implements After
     { initialValue: [] as Role[] }
   );
 
-  public hasSelectedUsers: boolean = false;
+  public hasSelectedUsers = signal(false);
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -95,7 +95,7 @@ export class UserListComponent extends BaseTableComponent<User> implements After
   }
 
   private setColumns(): void {
-    this.columns = [
+    const columns: TableColumn[] = [
       {
         columnHeader: "Username",
         matColumnDef: "username",
@@ -135,7 +135,13 @@ export class UserListComponent extends BaseTableComponent<User> implements After
       },
     ];
 
-    this.displayedColumns = [
+    this.setInitialSortedColumn(
+      this.baseTableService.getPagedRequestCommand() as PagedTableInterface,
+      columns
+    );
+
+    this.columns.set(columns);
+    this.displayedColumns.set([
       "select",
       "username",
       "display_name",
@@ -143,12 +149,7 @@ export class UserListComponent extends BaseTableComponent<User> implements After
       "created_at",
       "updated_at",
       "actions",
-    ];
-
-    this.setInitialSortedColumn(
-      this.baseTableService.getPagedRequestCommand() as PagedTableInterface,
-      this.columns
-    );
+    ]);
   }
 
   private setupSelectionListener(): void {
@@ -160,7 +161,7 @@ export class UserListComponent extends BaseTableComponent<User> implements After
   }
 
   private updateSelectionState(): void {
-    this.hasSelectedUsers = this.table().selection.selected.length > 0;
+    this.hasSelectedUsers.set(this.table().selection.selected.length > 0);
   }
 
   public openUserFormDialog(user?: User): void {

@@ -42,9 +42,9 @@ export class SystemEmailTableComponent implements OnInit, AfterViewInit {
 
   public tableState = this.store.selectSignal(SystemEmailTableState.state);
 
-  public displayedColumns: string[] = [];
+  public displayedColumns = signal<string[]>([]);
 
-  public columns: TableColumn[] = [];
+  public columns = signal<TableColumn[]>([]);
 
   public dataSource = signal(new MatTableDataSource<SystemEmail>([]));
 
@@ -52,7 +52,7 @@ export class SystemEmailTableComponent implements OnInit, AfterViewInit {
 
   public allGroups: Group[] = [];
 
-  public relatedSystemEmailMap: Map<number, Group[]> = new Map<number, Group[]>();
+  public relatedSystemEmailMap = signal(new Map<number, Group[]>());
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -120,8 +120,8 @@ export class SystemEmailTableComponent implements OnInit, AfterViewInit {
       }
     }
 
-    this.columns = columns;
-    this.displayedColumns = ["username", "host", "created_at", "updated_at", "actions"];
+    this.columns.set(columns);
+    this.displayedColumns.set(["username", "host", "created_at", "updated_at", "actions"]);
   }
 
   private getTableData(): void {
@@ -145,7 +145,7 @@ export class SystemEmailTableComponent implements OnInit, AfterViewInit {
       map.set(systemEmail.id, groups);
     });
 
-    this.relatedSystemEmailMap = map;
+    this.relatedSystemEmailMap.set(map);
   }
 
   public sorted(sort: Sort): void {
@@ -216,7 +216,7 @@ export class SystemEmailTableComponent implements OnInit, AfterViewInit {
   }
 
   public disabledDeleteButtonClicked(email: SystemEmail): void {
-    const mapData = this.relatedSystemEmailMap.get(email.id);
+    const mapData = this.relatedSystemEmailMap().get(email.id);
     const disabled = mapData && mapData.length > 0;
 
     if (disabled) {

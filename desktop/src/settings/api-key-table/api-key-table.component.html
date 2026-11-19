@@ -27,8 +27,8 @@
   <div class="table-container">
     <app-table
       [dataSource]="dataSource()"
-      [columns]="columns"
-      [displayedColumns]="displayedColumns"
+      [columns]="columns()"
+      [displayedColumns]="displayedColumns()"
       [pagination]="true"
       [length]="totalCount()"
       [page]="((baseTableService.page$ | async) || 1) - 1"

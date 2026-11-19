@@ -41,9 +41,9 @@
       [indent]="true"
     >
       <app-table
-        [columns]="columns"
+        [columns]="columns()"
         [dataSource]="dataSource()"
-        [displayedColumns]="displayedColumns"
+        [displayedColumns]="displayedColumns()"
         (sorted)="sortName($event)"
       >
       </app-table>
@@ -85,7 +85,7 @@
     @if (canDeleteGroupMembers()) {
       <app-delete-button
         tooltip="Remove group member"
-        [disabled]="disableDeleteButton"
+        [disabled]="disableDeleteButton()"
         (clicked)="removeGroupMember(index)"
       ></app-delete-button>
     }

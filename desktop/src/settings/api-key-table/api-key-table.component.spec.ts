@@ -124,10 +124,10 @@ describe("ApiKeyTableComponent", () => {
     });
 
     it("is displayed after the description and is not sortable", () => {
-      const displayed = component.displayedColumns;
+      const displayed = component.displayedColumns();
       expect(displayed.indexOf("scope")).toBe(displayed.indexOf("description") + 1);
 
-      const column = component.columns.find((c) => c.matColumnDef === "scope");
+      const column = component.columns().find((c) => c.matColumnDef === "scope");
       expect(column?.columnHeader).toBe("Scope");
       expect(column?.sortable).toBe(false);
     });

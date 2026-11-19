@@ -3,7 +3,7 @@
   [headerButtonsTemplate]="headerButtons"
 ></app-form-header>
 
-@if (showRestartTaskServerAlert) {
+@if (showRestartTaskServerAlert()) {
   <div class="m-2">
     <app-alert
       #alert

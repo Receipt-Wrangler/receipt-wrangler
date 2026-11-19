@@ -42,9 +42,9 @@ export class PromptTableComponent implements OnInit, AfterViewInit {
 
   public readonly actionsCell = viewChild.required<TemplateRef<any>>("actionsCell");
 
-  public columns: TableColumn[] = [];
+  public columns = signal<TableColumn[]>([]);
 
-  public displayedColumns: string[] = [];
+  public displayedColumns = signal<string[]>([]);
 
   public dataSource = signal(new MatTableDataSource<Prompt>([]));
 
@@ -52,9 +52,9 @@ export class PromptTableComponent implements OnInit, AfterViewInit {
 
   public receiptProcessingSettings: ReceiptProcessingSettings[] = [];
 
-  public relatedPromptMap: Map<number, (ReceiptProcessingSettings | Group)[]> = new Map<number, ReceiptProcessingSettings[]>();
+  public relatedPromptMap = signal(new Map<number, (ReceiptProcessingSettings | Group)[]>());
 
-  public defaultPromptExists: boolean = true;
+  public defaultPromptExists = signal(true);
 
   public groups: Group[] = [];
 
@@ -126,8 +126,8 @@ export class PromptTableComponent implements OnInit, AfterViewInit {
       }
     }
 
-    this.columns = columns;
-    this.displayedColumns = ["name", "description", "created_at", "updated_at", "actions"];
+    this.columns.set(columns);
+    this.displayedColumns.set(["name", "description", "created_at", "updated_at", "actions"]);
   }
 
   private getTableData(): void {
@@ -153,7 +153,7 @@ export class PromptTableComponent implements OnInit, AfterViewInit {
       map.set(prompt.id, [...relatedReceiptProcessingSettings, ...relatedGroups]);
     }
 
-    this.relatedPromptMap = map;
+    this.relatedPromptMap.set(map);
   }
 
 
@@ -245,7 +245,7 @@ export class PromptTableComponent implements OnInit, AfterViewInit {
   }
 
   public disabledDeleteButtonClicked(prompt: Prompt): void {
-    const mapData = this.relatedPromptMap.get(prompt.id);
+    const mapData = this.relatedPromptMap().get(prompt.id);
     const disabled = mapData && mapData.length > 0;
     if (disabled) {
       this.snackbarService.info(`Cannot delete ${prompt.name} as it is associated with the following receipt processing settings or groups: ` + mapData.map((m) => m.name).join(", "));
@@ -253,6 +253,6 @@ export class PromptTableComponent implements OnInit, AfterViewInit {
   }
 
   private setDefaultPromptExists(): void {
-    this.defaultPromptExists = this.dataSource().data.some((p) => p.name === "Default Prompt");
+    this.defaultPromptExists.set(this.dataSource().data.some((p) => p.name === "Default Prompt"));
   }
 }

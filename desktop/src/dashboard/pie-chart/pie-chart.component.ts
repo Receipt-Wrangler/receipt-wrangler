@@ -25,7 +25,7 @@ export class PieChartComponent implements OnInit, OnChanges {
   public readonly widget = input.required<Widget>();
   public readonly groupId = input<number>();
 
-  public pieChartData: ChartData<"pie", number[], string> = {
+  public pieChartData = signal<ChartData<"pie", number[], string>>({
     labels: [],
     datasets: [
       {
@@ -46,7 +46,7 @@ export class PieChartComponent implements OnInit, OnChanges {
         ],
       },
     ],
-  };
+  });
 
   public pieChartOptions: ChartConfiguration<"pie">["options"];
 
@@ -147,15 +147,15 @@ export class PieChartComponent implements OnInit, OnChanges {
     const labels = data.data.map((point) => point.label || "Unknown");
     const values = data.data.map((point) => point.value || 0);
 
-    this.pieChartData = {
+    this.pieChartData.set({
       labels: labels,
       datasets: [
         {
           data: values,
-          backgroundColor: this.pieChartData.datasets[0].backgroundColor,
+          backgroundColor: this.pieChartData().datasets[0].backgroundColor,
         },
       ],
-    };
+    });
   }
 
   public getChartGroupingLabel(): string {

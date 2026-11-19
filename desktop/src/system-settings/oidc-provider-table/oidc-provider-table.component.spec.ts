@@ -53,7 +53,7 @@ describe("OidcProviderTableComponent", () => {
     store.dispatch(new SetPermissions([Permission.AppOidcProvidersRead], {}));
     fixture.detectChanges(false);
 
-    expect(component.displayedColumns).not.toContain("actions");
+    expect(component.displayedColumns()).not.toContain("actions");
   });
 
   // Gating on delete alone would hide the whole column, and with it the edit
@@ -62,13 +62,13 @@ describe("OidcProviderTableComponent", () => {
     store.dispatch(new SetPermissions([Permission.AppOidcProvidersUpdate], {}));
     fixture.detectChanges(false);
 
-    expect(component.displayedColumns).toContain("actions");
+    expect(component.displayedColumns()).toContain("actions");
   });
 
   it("shows the actions column for a delete-only holder", () => {
     store.dispatch(new SetPermissions([Permission.AppOidcProvidersDelete], {}));
     fixture.detectChanges(false);
 
-    expect(component.displayedColumns).toContain("actions");
+    expect(component.displayedColumns()).toContain("actions");
   });
 });

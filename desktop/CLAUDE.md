@@ -1604,6 +1604,15 @@ Angular no longer uses zone.js. Change detection is triggered ONLY by:
     trigger CD so the reset repainted, while on **failure** nothing did and the spinner stuck
     forever. State only written on a failure path is the easiest kind to miss — check that a
     converted signal is exercised by a test on the *error* branch, not just the happy one.
+  - **Any incidental repaint masks it the same way.** An audit converted 17 components whose
+    async-written fields only repainted because something else in the same callback ran change
+    detection: a success snackbar opening (the API key dialog's new key, the system-settings restart
+    alert), a neighbouring signal write, or a dialog closing. Take that side effect away and the screen
+    stops updating, so convert the field rather than lean on its neighbour.
+  - **Table `columns` / `displayedColumns` are signals.** They are built in `ngAfterViewInit`, because
+    the cell templates are view queries, which is after the view was checked, so a plain field there
+    only renders on some later pass. `BaseTableComponent` declares them as signals; build the arrays
+    in locals, then `.set()` once (`role-list`, `category-table`).
 - `ChangeDetectorRef.detectChanges()` still works but is rarely needed — prefer signals.
 - `setTimeout` still works for delays but won't auto-trigger CD. The callback must write to a signal if the template needs updating.
 - All `@HostListener` handlers automatically trigger CD (same as template events).

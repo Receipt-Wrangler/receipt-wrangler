@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, Input, OnInit, signal } from "@angular/core";
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { take, tap } from "rxjs";
@@ -24,7 +24,7 @@ export class ApiKeyFormDialogComponent implements OnInit {
   @Input() public apiKey?: ApiKeyView;
 
   public form!: FormGroup;
-  public apiKeyResult?: ApiKeyResult;
+  public apiKeyResult = signal<ApiKeyResult | undefined>(undefined);
   public apiKeyScopes = API_KEY_SCOPE_OPTIONS;
 
   constructor(
@@ -65,7 +65,7 @@ export class ApiKeyFormDialogComponent implements OnInit {
           .pipe(
             take(1),
             tap((result: ApiKeyResult) => {
-              this.apiKeyResult = result;
+              this.apiKeyResult.set(result);
               this.snackbarService.success("API key created successfully");
             })
           )
@@ -81,8 +81,9 @@ export class ApiKeyFormDialogComponent implements OnInit {
   }
 
   public copyToClipboard(): void {
-    if (this.apiKeyResult?.key) {
-      navigator.clipboard.writeText(this.apiKeyResult.key).then(() => {
+    const key = this.apiKeyResult()?.key;
+    if (key) {
+      navigator.clipboard.writeText(key).then(() => {
         this.snackbarService.success("API key copied to clipboard");
       }).catch(() => {
         this.snackbarService.error("Failed to copy API key to clipboard");
@@ -91,6 +92,6 @@ export class ApiKeyFormDialogComponent implements OnInit {
   }
 
   public closeDialog(): void {
-    this.dialogRef.close(this.apiKey ? true : this.apiKeyResult);
+    this.dialogRef.close(this.apiKey ? true : this.apiKeyResult());
   }
 }

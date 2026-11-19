@@ -80,9 +80,9 @@ export class TaskTableComponent implements OnInit, AfterViewInit {
    */
   public readonly filterProvider = input<() => SystemTaskPagedRequestFilter | undefined>();
 
-  public displayedColumns: string[] = [];
+  public displayedColumns = signal<string[]>([]);
 
-  public columns: TableColumn[] = [];
+  public columns = signal<TableColumn[]>([]);
 
   public dataSource = signal(new MatTableDataSource<SystemTask>([]));
 
@@ -232,7 +232,7 @@ export class TaskTableComponent implements OnInit, AfterViewInit {
   }
 
   private setColumns(): void {
-    this.columns = [
+    const columns: TableColumn[] = [
       {
         columnHeader: "Type",
         matColumnDef: "type",
@@ -271,10 +271,10 @@ export class TaskTableComponent implements OnInit, AfterViewInit {
       }
     ];
 
-    this.displayedColumns = ["started_at", "ended_at", "type", "ran_by_user_id", "result_description", "status"];
+    const displayedColumns = ["started_at", "ended_at", "type", "ran_by_user_id", "result_description", "status"];
 
     if (this.showSourceFileActions()) {
-      this.columns.push({
+      columns.push({
         columnHeader: "Source File",
         matColumnDef: "source_file",
         template: this.sourceFileCell(),
@@ -282,12 +282,15 @@ export class TaskTableComponent implements OnInit, AfterViewInit {
       });
       // Before the expand push below: "expand" has to stay last, and mat-table
       // throws on a displayed id with no matching column definition.
-      this.displayedColumns.push("source_file");
+      displayedColumns.push("source_file");
     }
 
     if (this.expandedRowTemplate()) {
-      this.displayedColumns.push("expand");
+      displayedColumns.push("expand");
     }
+
+    this.columns.set(columns);
+    this.displayedColumns.set(displayedColumns);
   }
 
   public sorted(sort: Sort): void {
