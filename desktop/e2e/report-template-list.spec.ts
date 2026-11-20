@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { stubTokenRefresh } from './helpers/auth';
 import {
+  apiCreateCategory,
   apiCreateReportTemplate,
+  apiDeleteCategoryById,
   apiDeleteReportTemplateById,
-  apiFirstReportCategory,
   apiFirstReportGroupId,
   uniqueName,
   withAdminApi,
@@ -20,6 +21,7 @@ test.describe('Reports — templates list', () => {
   let seededId: number | undefined;
   let seededName: string;
   const extraIds: number[] = [];
+  const categoryIds: number[] = [];
 
   test.beforeEach(async ({ page }) => {
     await stubTokenRefresh(page);
@@ -32,8 +34,12 @@ test.describe('Reports — templates list', () => {
     const ids = [seededId, ...extraIds].filter((id): id is number => id !== undefined);
     try {
       await withAdminApi(async (api) => {
+        // Templates first: one may still reference a seeded category in its filter.
         for (const id of ids) {
           await apiDeleteReportTemplateById(api, id);
+        }
+        for (const id of categoryIds) {
+          await apiDeleteCategoryById(api, id);
         }
       });
     } catch {
@@ -41,6 +47,7 @@ test.describe('Reports — templates list', () => {
     }
     seededId = undefined;
     extraIds.length = 0;
+    categoryIds.length = 0;
   });
 
   test('lists a saved template and opens it in the builder', async ({ page }) => {
@@ -64,17 +71,21 @@ test.describe('Reports — templates list', () => {
   test('hydrates a saved category filter into the builder on open', async ({ page }) => {
     // Regression guard: opening a template that filters on a category used to render
     // no filter row at all (the visible-row set wasn't seeded from the hydrated form).
-    // Seed a template filtering on a real category, open it, and assert the row and the
-    // selected category's chip are present.
+    // Seed a template filtering on a category this test creates, open it, and assert the
+    // row and the selected category's chip are present. The category is seeded rather
+    // than borrowed: categories are global, and on a fresh database none may exist (or
+    // only another spec's, which it deletes in its own teardown).
     const filterName = uniqueName('report-template-catfilter');
-    const { groupId, categoryId, categoryName } = await withAdminApi((api) =>
-      apiFirstReportCategory(api),
+    const category = await withAdminApi((api) =>
+      apiCreateCategory(api, uniqueName('report-catfilter-cat')),
     );
+    categoryIds.push(category.id);
+    const groupId = await withAdminApi((api) => apiFirstReportGroupId(api));
     const filtered = await withAdminApi((api) =>
       apiCreateReportTemplate(api, {
         name: filterName,
         groupIds: [groupId],
-        filter: { categories: { operation: 'CONTAINS', value: [categoryId] } },
+        filter: { categories: { operation: 'CONTAINS', value: [category.id] } },
       }),
     );
     extraIds.push(filtered.id);
@@ -90,7 +101,7 @@ test.describe('Reports — templates list', () => {
     // resolves to its name chip — proving both the row-seeding fix and that the value
     // carried over.
     await expect(page.getByTestId('report-filter-remove')).toBeVisible();
-    await expect(page.getByText(categoryName, { exact: true })).toBeVisible();
+    await expect(page.getByText(category.name, { exact: true })).toBeVisible();
   });
 
   test('updates an opened template in place (same id, no new row)', async ({ page }) => {
