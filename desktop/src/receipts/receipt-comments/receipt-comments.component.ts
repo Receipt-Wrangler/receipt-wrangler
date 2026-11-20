@@ -1,6 +1,5 @@
 import { Component, OnInit, Signal, computed, input, output, signal } from "@angular/core";
 import { FormArray, FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
-import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
@@ -16,7 +15,6 @@ import { ButtonComponent } from "../../button/button/button.component";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { UserPipe } from "../../pipes/user.pipe";
 
-@UntilDestroy()
 @Component({
     selector: "app-receipt-comments",
     templateUrl: "./receipt-comments.component.html",

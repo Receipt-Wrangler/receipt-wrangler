@@ -1,6 +1,5 @@
 import { Component, OnChanges, SimpleChanges, ViewEncapsulation, input, output, viewChildren } from "@angular/core";
 import { ImageViewerComponent } from "src/shared-ui/image-viewer/image-viewer.component";
-import { UntilDestroy } from "@ngneat/until-destroy";
 import { FormMode } from "src/enums/form-mode.enum";
 import { ReceiptFileUploadCommand } from "../../interfaces";
 import { FileDataView } from "../../open-api";
@@ -9,7 +8,6 @@ import { NgTemplateOutlet } from "@angular/common";
 import { ButtonComponent } from "../../button/button/button.component";
 import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
-@UntilDestroy()
 @Component({
     selector: "app-carousel",
     templateUrl: "./carousel.component.html",

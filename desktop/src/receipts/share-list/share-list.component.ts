@@ -1,16 +1,4 @@
-import {
-  Component,
-  Input,
-  OnChanges,
-  OnInit,
-  Signal,
-  SimpleChanges,
-  ViewEncapsulation,
-  input,
-  output,
-  signal,
-  viewChildren
-} from "@angular/core";
+import { Component, OnChanges, OnInit, Signal, SimpleChanges, ViewEncapsulation, input, output, signal, viewChildren } from "@angular/core";
 import { AbstractControl, FormArray, FormGroup, } from "@angular/forms";
 import { MatExpansionPanel, MatAccordion, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from "@angular/material/expansion";
 import { ActivatedRoute } from "@angular/router";
@@ -64,7 +52,8 @@ export class ShareListComponent implements OnInit, OnChanges {
 
   public readonly form = input.required<FormGroup>();
 
-  @Input() public originalReceipt?: Receipt;
+  // Read from the route in ngOnInit; nothing binds it.
+  public originalReceipt?: Receipt;
 
   public readonly categories = input<Category[]>([]);
 

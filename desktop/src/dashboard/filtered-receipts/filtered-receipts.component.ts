@@ -1,5 +1,4 @@
 import { Component, OnInit, input, signal } from "@angular/core";
-import { UntilDestroy } from "@ngneat/until-destroy";
 import { take, tap } from "rxjs";
 import { ReceiptFilterService } from "src/services/receipt-filter.service";
 import { Receipt, ReceiptPagedRequestCommand, Widget } from "../../open-api";
@@ -13,7 +12,6 @@ import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import { UserPipe } from "../../pipes/user.pipe";
 
-@UntilDestroy()
 @Component({
   selector: "/app-filtered-receipts",
   templateUrl: "./filtered-receipts.component.html",

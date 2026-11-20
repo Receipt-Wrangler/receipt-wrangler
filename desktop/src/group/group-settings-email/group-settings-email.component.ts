@@ -1,9 +1,9 @@
-import { Component, Input, OnInit, input, viewChildren } from "@angular/core";
+import { Component, OnInit, input, output, viewChildren } from "@angular/core";
 import { FormArray, FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 import { startWith, tap } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
-import { BaseFormComponent, FormCommand } from "src/form";
+import { FormCommand } from "src/form";
 import { FormListComponent } from "src/shared-ui/form-list/form-list.component";
 import { FormConfig } from "../../interfaces";
 import { Group, GroupSettingsWhiteListEmail, SubjectLineRegex, SystemEmail } from "../../open-api";
@@ -21,14 +21,14 @@ import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
     styleUrls: ["./group-settings-email.component.scss"],
     imports: [CheckboxComponent, AutocomleteComponent, UserAutocompleteComponent, StatusSelectComponent, FormListComponent, InputComponent, FormGetPipe, InputReadonlyPipe]
 })
-export class GroupSettingsEmailComponent
-  extends BaseFormComponent
-  implements OnInit {
-  @Input() public override form: FormGroup = new FormGroup({});
+export class GroupSettingsEmailComponent implements OnInit {
+  public readonly form = input.required<FormGroup>();
 
   public readonly canEdit = input<boolean>(false);
 
-  @Input() public override formConfig!: FormConfig;
+  public readonly formConfig = input.required<FormConfig>();
+
+  public readonly formCommand = output<FormCommand>();
 
   public readonly formListComponents = viewChildren(FormListComponent);
 
@@ -40,15 +40,14 @@ export class GroupSettingsEmailComponent
     private activatedRoute: ActivatedRoute,
     private formBuilder: FormBuilder
   ) {
-    super();
   }
 
   public get subjectLineRegexes(): FormArray {
-    return this.form.get("subjectLineRegexes") as FormArray;
+    return this.form().get("subjectLineRegexes") as FormArray;
   }
 
   public get emailWhiteList(): FormArray {
-    return this.form.get("emailWhiteList") as FormArray;
+    return this.form().get("emailWhiteList") as FormArray;
   }
 
   public ngOnInit(): void {
@@ -64,13 +63,13 @@ export class GroupSettingsEmailComponent
     this.setInitialValues();
     this.addValidators();
     this.listenForEnableEmailIntegrationChanges();
-    if (this.formConfig.mode === FormMode.view) {
-      this.form.get("emailIntegrationEnabled")?.disable();
+    if (this.formConfig().mode === FormMode.view) {
+      this.form().get("emailIntegrationEnabled")?.disable();
     }
   }
 
   private listenForEnableEmailIntegrationChanges(): void {
-    const control = this.form.get("emailIntegrationEnabled");
+    const control = this.form().get("emailIntegrationEnabled");
 
     control?.valueChanges
       .pipe(
@@ -261,7 +260,7 @@ export class GroupSettingsEmailComponent
   }
 
   public itemDoneButtonClicked(index: number): void {
-    if (this.form.valid) {
+    if (this.form().valid) {
       this.formListComponents().at(index)?.resetEditingIndex();
     }
   }
@@ -310,6 +309,10 @@ export class GroupSettingsEmailComponent
       payload: index,
     };
     this.emitFormCommand(formCommand);
+  }
+
+  private emitFormCommand(formCommand: FormCommand): void {
+    this.formCommand.emit(formCommand);
   }
 
   public systemEmailDisplayWith(id: number): string {

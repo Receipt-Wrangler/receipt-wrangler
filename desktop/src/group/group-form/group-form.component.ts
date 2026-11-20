@@ -1,11 +1,10 @@
-import {AfterViewInit, Component, OnInit, Signal, signal, TemplateRef, inject, input, viewChild} from "@angular/core";
-import {toSignal} from "@angular/core/rxjs-interop";
+import { AfterViewInit, Component, OnInit, Signal, signal, TemplateRef, inject, input, viewChild, DestroyRef } from "@angular/core";
+import { toSignal, takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import {FormArray, FormBuilder, FormGroup, Validators} from "@angular/forms";
 import {MatDialog} from "@angular/material/dialog";
 import {Sort} from "@angular/material/sort";
 import {MatTableDataSource} from "@angular/material/table";
 import {ActivatedRoute, Router} from "@angular/router";
-import {UntilDestroy, untilDestroyed} from "@ngneat/until-destroy";
 import {Store} from "@ngxs/store";
 import {map, startWith, switchMap, take, tap} from "rxjs";
 import {DEFAULT_HOST_CLASS} from "src/constants";
@@ -35,7 +34,6 @@ import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 import { RoleNamePipe } from "../../pipes/role-name.pipe";
 import { UserPipe } from "../../pipes/user.pipe";
 
-@UntilDestroy()
 @Component({
     selector: "app-create-group-form",
     templateUrl: "./group-form.component.html",
@@ -44,6 +42,8 @@ import { UserPipe } from "../../pipes/user.pipe";
     imports: [FormComponent, AuditDetailSectionComponent, FormSectionComponent, InputComponent, SelectComponent, CheckboxComponent, TableComponent, ButtonComponent, EditButtonComponent, DeleteButtonComponent, FormGetPipe, InputReadonlyPipe, RoleNamePipe, UserPipe]
 })
 export class GroupFormComponent implements OnInit, AfterViewInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   protected readonly PermissionScope = PermissionScope;
 
   public readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");
@@ -139,7 +139,7 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
   private listenForGroupMemberChanges(): void {
     this.groupMembers.valueChanges
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((v) => {
           this.dataSource.set(new MatTableDataSource<GroupMember>(Array.from(v)));
         })
@@ -219,7 +219,7 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
 
     this.groupMembers.valueChanges
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         startWith(this.groupMembers.value),
         tap((v) => {
           this.disableDeleteButton.set(v.length === 1);

@@ -1,6 +1,5 @@
-import { Component, Input } from "@angular/core";
+import { Component, input } from "@angular/core";
 import { FormControl, ReactiveFormsModule } from "@angular/forms";
-import { BaseInputInterface } from "../../base-input";
 import { MatFormField, MatLabel, MatInput } from "@angular/material/input";
 
 @Component({
@@ -9,22 +8,20 @@ import { MatFormField, MatLabel, MatInput } from "@angular/material/input";
     styleUrls: ["./color-picker.component.scss"],
     imports: [MatFormField, MatLabel, MatInput, ReactiveFormsModule]
 })
-export class ColorPickerComponent implements BaseInputInterface {
-  @Input() public inputFormControl: FormControl<any> = new FormControl();
-  @Input() public label: string = "";
-  @Input() public additionalErrorMessages?:
-    | { [key: string]: string }
-    | undefined;
-  @Input() public readonly: boolean = false;
-  @Input() public placeholder?: string | undefined;
-  @Input() public helpText?: string | undefined;
+export class ColorPickerComponent {
+  public readonly inputFormControl = input<FormControl<any>>(new FormControl());
+  public readonly label = input<string>("");
+  public readonly additionalErrorMessages = input<{ [key: string]: string }>();
+  public readonly readonly = input<boolean>(false);
+  public readonly placeholder = input<string>();
+  public readonly helpText = input<string>();
 
   public colorSelected(event: any): void {
-    this.inputFormControl.patchValue(event?.target?.value);
+    this.inputFormControl().patchValue(event?.target?.value);
   }
 
   public handleClick(event: MouseEvent) {
-    if (this.readonly) {
+    if (this.readonly()) {
       event.preventDefault();
     }
   }

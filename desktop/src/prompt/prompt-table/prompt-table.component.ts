@@ -20,6 +20,7 @@ import { TableComponent } from "../../table/table/table.component";
 import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
     selector: "app-prompt-table",
@@ -176,8 +177,10 @@ export class PromptTableComponent implements OnInit, AfterViewInit {
   public deletePrompt(prompt: Prompt): void {
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
 
-    dialogRef.componentInstance.headerText = "Delete Prompt";
-    dialogRef.componentInstance.dialogContent = `Are you sure you want to delete the prompt: ${prompt.name}?`;
+    setDialogInputs(dialogRef, {
+      headerText: "Delete Prompt",
+      dialogContent: `Are you sure you want to delete the prompt: ${prompt.name}?`,
+    });
 
     const index = this.dataSource().data.indexOf(prompt);
 

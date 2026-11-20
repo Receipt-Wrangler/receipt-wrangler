@@ -44,8 +44,8 @@ describe("QuickActionsDialogComponent", () => {
   beforeEach(() => {
     fixture = TestBed.createComponent(QuickActionsDialogComponent);
     component = fixture.componentInstance;
-    component.originalReceipt = { id: 1 } as any;
-    component.amountToSplit = 100; // Set the amount to split
+    fixture.componentRef.setInput("originalReceipt", { id: 1 } as any);
+    fixture.componentRef.setInput("amountToSplit", 100); // Set the amount to split
     fixture.detectChanges();
 
     // Reset mocks
@@ -83,7 +83,7 @@ describe("QuickActionsDialogComponent", () => {
   });
 
   it("should add even split items", () => {
-    component.amountToSplit = 100;
+    fixture.componentRef.setInput("amountToSplit", 100);
     component.ngOnInit();
 
     const users = [
@@ -114,7 +114,7 @@ describe("QuickActionsDialogComponent", () => {
   });
 
   it("should split evenly with optional parts", () => {
-    component.amountToSplit = 100;
+    fixture.componentRef.setInput("amountToSplit", 100);
     component.ngOnInit();
 
     const formArray = component.localForm.get("usersToSplit") as FormArray;
@@ -504,7 +504,7 @@ describe("QuickActionsDialogComponent", () => {
 
     describe("Edge Cases", () => {
       it("should accept receipt amount of 0", () => {
-        component.amountToSplit = 0;
+        fixture.componentRef.setInput("amountToSplit", 0);
         component.localForm.patchValue({
           quickAction: component.radioValues[2].value,
         });
@@ -520,7 +520,7 @@ describe("QuickActionsDialogComponent", () => {
       });
 
       it("should accept a negative receipt amount (refund split)", () => {
-        component.amountToSplit = -100;
+        fixture.componentRef.setInput("amountToSplit", -100);
         component.localForm.patchValue({
           quickAction: component.radioValues[0].value,
         });
@@ -536,7 +536,7 @@ describe("QuickActionsDialogComponent", () => {
       });
 
       it("should handle invalid receipt amount", () => {
-        component.amountToSplit = NaN;
+        fixture.componentRef.setInput("amountToSplit", NaN);
         component.localForm.patchValue({
           quickAction: component.radioValues[2].value,
         });
@@ -549,6 +549,27 @@ describe("QuickActionsDialogComponent", () => {
         expect(mockSnackbarService.error).toHaveBeenCalledWith(
           "Amount to split does not exist or is invalid!"
         );
+      });
+
+      it("should report a missing amount rather than throw", () => {
+        // A fresh dialog whose opener never passed amountToSplit.
+        fixture = TestBed.createComponent(QuickActionsDialogComponent);
+        component = fixture.componentInstance;
+        fixture.componentRef.setInput("originalReceipt", { id: 1 } as any);
+        fixture.detectChanges();
+        jest.spyOn(component.itemsToAdd, "emit");
+        component.localForm.patchValue({
+          quickAction: component.radioValues[0].value,
+        });
+
+        setupUsersInForm(createTestUsers());
+
+        component.addSplits();
+
+        expect(mockSnackbarService.error).toHaveBeenCalledWith(
+          "Amount to split does not exist or is invalid!"
+        );
+        expect(component.itemsToAdd.emit).not.toHaveBeenCalled();
       });
 
       it("should handle percentage values with more than 2 decimal places", () => {

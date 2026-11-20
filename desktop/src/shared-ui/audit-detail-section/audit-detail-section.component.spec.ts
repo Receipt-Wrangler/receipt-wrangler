@@ -16,6 +16,8 @@ describe("AuditDetailSectionComponent", () => {
 
     fixture = TestBed.createComponent(AuditDetailSectionComponent);
     component = fixture.componentInstance;
+    // Every template that renders this section binds [data].
+    fixture.componentRef.setInput("data", {});
     fixture.detectChanges();
   });
 

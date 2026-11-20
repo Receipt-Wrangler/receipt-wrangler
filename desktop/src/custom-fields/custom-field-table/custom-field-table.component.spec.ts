@@ -17,6 +17,7 @@ import { SetPermissions } from "../../store/auth.state.actions";
 import { CustomFieldTableState } from "../../store/custom-field-table.state";
 
 import { CustomFieldTableComponent } from "./custom-field-table.component";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 describe("CustomFieldTableComponent", () => {
   let component: CustomFieldTableComponent;
@@ -121,17 +122,14 @@ describe("CustomFieldTableComponent", () => {
       field?: CustomField,
       mode?: FormMode
     ) => {
-      const componentInstance: any = {};
+      const dialogRef = mockDialogRef({ afterClosed: of(false) });
       const matDialog = TestBed.inject(MatDialog);
-      jest.spyOn(matDialog, "open").mockReturnValue({
-        componentInstance,
-        afterClosed: () => of(false),
-      } as any);
+      jest.spyOn(matDialog, "open").mockReturnValue(dialogRef as any);
 
       store.dispatch(new SetPermissions(appPermissions, {}));
       component.openCustomFieldDialog(field, mode);
 
-      return componentInstance;
+      return dialogRef.inputs;
     };
 
     it("opens in edit mode from the name link for an update holder", () => {
@@ -140,9 +138,9 @@ describe("CustomFieldTableComponent", () => {
         customField
       );
 
-      expect(instance.mode).toBe(FormMode.edit);
-      expect(instance.headerText).toBe("Edit Cost Centre");
-      expect(instance.customField).toBe(customField);
+      expect(instance["mode"]).toBe(FormMode.edit);
+      expect(instance["headerText"]).toBe("Edit Cost Centre");
+      expect(instance["customField"]).toBe(customField);
     });
 
     it("opens read-only from the name link without the update permission", () => {
@@ -151,15 +149,15 @@ describe("CustomFieldTableComponent", () => {
         customField
       );
 
-      expect(instance.mode).toBe(FormMode.view);
-      expect(instance.headerText).toBe("View Custom Field");
+      expect(instance["mode"]).toBe(FormMode.view);
+      expect(instance["headerText"]).toBe("View Custom Field");
     });
 
     it("opens in add mode when no custom field is passed", () => {
       const instance = openDialogAndReadInstance([Permission.AppCustomFieldsCreate]);
 
-      expect(instance.mode).toBe(FormMode.add);
-      expect(instance.headerText).toBe("Add Custom Field");
+      expect(instance["mode"]).toBe(FormMode.add);
+      expect(instance["headerText"]).toBe("Add Custom Field");
     });
 
     it("honors an explicitly requested mode", () => {
@@ -169,7 +167,7 @@ describe("CustomFieldTableComponent", () => {
         FormMode.edit
       );
 
-      expect(instance.mode).toBe(FormMode.edit);
+      expect(instance["mode"]).toBe(FormMode.edit);
     });
   });
 });

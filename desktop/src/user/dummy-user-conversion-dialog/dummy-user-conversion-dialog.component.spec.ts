@@ -43,7 +43,7 @@ describe("DummyUserConversionDialogComponent", () => {
     });
     fixture = TestBed.createComponent(DummyUserConversionDialogComponent);
     component = fixture.componentInstance;
-    component.user = {} as any;
+    fixture.componentRef.setInput("user", {} as any);
     fixture.detectChanges();
   });
 
@@ -83,9 +83,9 @@ describe("DummyUserConversionDialogComponent", () => {
       undefined
     );
 
-    component.user = {
+    fixture.componentRef.setInput("user", {
       id: 1,
-    } as any;
+    } as any);
 
     component.ngOnInit();
 

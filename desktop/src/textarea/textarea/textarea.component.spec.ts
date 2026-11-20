@@ -57,7 +57,7 @@ describe("TextareaComponent", () => {
 
   it("should set selection end to where word was inserted", () => {
     fixture.componentRef.setInput('trigger', "@");
-    component.inputFormControl = new FormControl("hello @trigger world");
+    fixture.componentRef.setInput("inputFormControl", new FormControl("hello @trigger world"));
     component.lastKnownSelection = 6;
     fixture.detectChanges();
 

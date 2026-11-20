@@ -1,6 +1,6 @@
-import { Component, OnInit, signal } from "@angular/core";
+import { Component, OnInit, signal, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute } from "@angular/router";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { tap } from "rxjs";
 import { DEFAULT_HOST_CLASS } from "src/constants";
@@ -13,7 +13,6 @@ import { ActivityComponent } from "../activity/activity.component";
 import { PieChartComponent } from "../pie-chart/pie-chart.component";
 import { ReportWidgetComponent } from "../report-widget/report-widget.component";
 
-@UntilDestroy()
 @Component({
     selector: "app-dashboard",
     templateUrl: "./dashboard.component.html",
@@ -22,6 +21,8 @@ import { ReportWidgetComponent } from "../report-widget/report-widget.component"
     imports: [SummaryCardComponent, FilteredReceiptsComponent, ActivityComponent, PieChartComponent, ReportWidgetComponent]
 })
 export class DashboardComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);
 
   public dashboards = signal<Dashboard[]>([]);
@@ -54,7 +55,7 @@ export class DashboardComponent implements OnInit {
     this.store
       .select(DashboardState.dashboards)
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap(() => {
           const groupId = this.store.selectSnapshot(GroupState.selectedGroupId);
           this.dashboards.set(this.store.selectSnapshot(

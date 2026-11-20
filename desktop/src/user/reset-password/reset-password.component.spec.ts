@@ -28,7 +28,7 @@ describe("ResetPasswordComponent", () => {
 
     fixture = TestBed.createComponent(ResetPasswordComponent);
     component = fixture.componentInstance;
-    component.user = { id: "" } as any;
+    fixture.componentRef.setInput("user", { id: "" } as any);
     fixture.detectChanges();
   });
 

@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, signal } from "@angular/core";
+import { Component, OnInit, signal, input } from "@angular/core";
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { take, tap } from "rxjs";
@@ -20,8 +20,8 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
   imports: [DialogComponent, ReactiveFormsModule, InputComponent, SelectComponent, DialogFooterComponent, MatIcon, ButtonComponent, FormGetPipe]
 })
 export class ApiKeyFormDialogComponent implements OnInit {
-  @Input() public headerText: string = "";
-  @Input() public apiKey?: ApiKeyView;
+  public readonly headerText = input<string>("");
+  public readonly apiKey = input<ApiKeyView>();
 
   public form!: FormGroup;
   public apiKeyResult = signal<ApiKeyResult | undefined>(undefined);
@@ -40,18 +40,19 @@ export class ApiKeyFormDialogComponent implements OnInit {
 
   private initForm(): void {
     this.form = this.formBuilder.group({
-      name: [this.apiKey?.name ?? "", Validators.required],
-      description: [this.apiKey?.description ?? ""],
-      scope: [this.apiKey?.scope ?? ApiKeyScope.R, Validators.required]
+      name: [this.apiKey()?.name ?? "", Validators.required],
+      description: [this.apiKey()?.description ?? ""],
+      scope: [this.apiKey()?.scope ?? ApiKeyScope.R, Validators.required]
     });
   }
 
   public submitButtonClicked(): void {
     if (this.form.valid) {
       const command: UpsertApiKeyCommand = this.form.value;
+      const apiKey = this.apiKey();
 
-      if (this.apiKey && this.apiKey.id) {
-        this.apiKeyService.updateApiKey(this.apiKey.id, command)
+      if (apiKey && apiKey.id) {
+        this.apiKeyService.updateApiKey(apiKey.id, command)
           .pipe(
             take(1),
             tap(() => {
@@ -92,6 +93,6 @@ export class ApiKeyFormDialogComponent implements OnInit {
   }
 
   public closeDialog(): void {
-    this.dialogRef.close(this.apiKey ? true : this.apiKeyResult());
+    this.dialogRef.close(this.apiKey() ? true : this.apiKeyResult());
   }
 }

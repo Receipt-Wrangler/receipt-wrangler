@@ -94,7 +94,7 @@ describe("CustomFieldFormComponent", () => {
       options: []
     };
 
-    component.customField = customField;
+    fixture.componentRef.setInput("customField", customField);
     component.ngOnInit();
 
     expect(component.form.value).toEqual({
@@ -119,7 +119,7 @@ describe("CustomFieldFormComponent", () => {
       options: options
     };
 
-    component.customField = customField;
+    fixture.componentRef.setInput("customField", customField);
     component.ngOnInit();
 
     expect(component.form.get("options")?.value.length).toBe(2);
@@ -251,14 +251,14 @@ describe("CustomFieldFormComponent", () => {
     };
 
     it("should call updateCustomField with the field id when submitted", () => {
-      component.customField = {
+      fixture.componentRef.setInput("customField", {
         id: 7,
         name: "Test Field",
         type: CustomFieldType.Text,
         description: "This is a test field",
         options: []
-      } as any;
-      component.mode = FormMode.edit;
+      } as any);
+      fixture.componentRef.setInput("mode", FormMode.edit);
       component.ngOnInit();
 
       component.form.patchValue({ name: "Renamed Field", description: "Updated" });
@@ -276,8 +276,8 @@ describe("CustomFieldFormComponent", () => {
     });
 
     it("should carry real option ids so a rename cannot orphan a stored value", () => {
-      component.customField = selectCustomField;
-      component.mode = FormMode.edit;
+      fixture.componentRef.setInput("customField", selectCustomField);
+      fixture.componentRef.setInput("mode", FormMode.edit);
       component.ngOnInit();
 
       (component.form.get("options") as any).at(0).patchValue({ value: "Renamed Option" });
@@ -295,8 +295,8 @@ describe("CustomFieldFormComponent", () => {
     });
 
     it("should send a newly added option without an id so the server appends it", () => {
-      component.customField = selectCustomField;
-      component.mode = FormMode.edit;
+      fixture.componentRef.setInput("customField", selectCustomField);
+      fixture.componentRef.setInput("mode", FormMode.edit);
       component.ngOnInit();
 
       component.addOption();
@@ -308,8 +308,8 @@ describe("CustomFieldFormComponent", () => {
     });
 
     it("should not allow deleting a persisted option", () => {
-      component.customField = selectCustomField;
-      component.mode = FormMode.edit;
+      fixture.componentRef.setInput("customField", selectCustomField);
+      fixture.componentRef.setInput("mode", FormMode.edit);
       component.ngOnInit();
 
       expect(component.canDeleteOption(0)).toBe(false);
@@ -317,8 +317,8 @@ describe("CustomFieldFormComponent", () => {
     });
 
     it("should allow deleting an option added in this session", () => {
-      component.customField = selectCustomField;
-      component.mode = FormMode.edit;
+      fixture.componentRef.setInput("customField", selectCustomField);
+      fixture.componentRef.setInput("mode", FormMode.edit);
       component.ngOnInit();
 
       component.addOption();
@@ -327,8 +327,8 @@ describe("CustomFieldFormComponent", () => {
     });
 
     it("should lock the type", () => {
-      component.customField = selectCustomField;
-      component.mode = FormMode.edit;
+      fixture.componentRef.setInput("customField", selectCustomField);
+      fixture.componentRef.setInput("mode", FormMode.edit);
       component.ngOnInit();
 
       expect(component.typeReadonly).toBe(true);
@@ -337,7 +337,7 @@ describe("CustomFieldFormComponent", () => {
 
   describe("view mode", () => {
     it("should lock the type and allow no option deletion", () => {
-      component.customField = {
+      fixture.componentRef.setInput("customField", {
         id: 7,
         name: "Test Field",
         type: CustomFieldType.Select,
@@ -346,8 +346,8 @@ describe("CustomFieldFormComponent", () => {
           { id: 1, value: "Option 1", customFieldId: 7 },
           { id: 2, value: "Option 2", customFieldId: 7 }
         ]
-      } as any;
-      component.mode = FormMode.view;
+      } as any);
+      fixture.componentRef.setInput("mode", FormMode.view);
       component.ngOnInit();
 
       expect(component.typeReadonly).toBe(true);
@@ -355,14 +355,14 @@ describe("CustomFieldFormComponent", () => {
     });
 
     it("should not render the dialog footer", () => {
-      component.customField = {
+      fixture.componentRef.setInput("customField", {
         id: 7,
         name: "Test Field",
         type: CustomFieldType.Text,
         description: "",
         options: []
-      } as any;
-      component.mode = FormMode.view;
+      } as any);
+      fixture.componentRef.setInput("mode", FormMode.view);
       fixture.detectChanges();
 
       expect(
@@ -424,7 +424,7 @@ describe("CustomFieldFormComponent", () => {
     });
 
     it("blocks an edit that blanks an existing option", () => {
-      component.customField = {
+      fixture.componentRef.setInput("customField", {
         id: 7,
         name: "Test Field",
         type: CustomFieldType.Select,
@@ -433,8 +433,8 @@ describe("CustomFieldFormComponent", () => {
           { id: 1, value: "Option 1", customFieldId: 7 },
           { id: 2, value: "Option 2", customFieldId: 7 }
         ]
-      } as any;
-      component.mode = FormMode.edit;
+      } as any);
+      fixture.componentRef.setInput("mode", FormMode.edit);
       component.ngOnInit();
 
       (component.form.get("options") as any).at(0).patchValue({ value: "" });

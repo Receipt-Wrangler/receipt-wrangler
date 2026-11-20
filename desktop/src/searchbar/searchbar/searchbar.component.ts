@@ -1,7 +1,7 @@
-import { Component, signal, ViewEncapsulation } from "@angular/core";
+import { Component, signal, ViewEncapsulation, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl, ReactiveFormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { of, switchMap, take, tap } from "rxjs";
 import { SearchResult, SearchService } from "../../open-api";
 import { MatFormField, MatPrefix, MatInput } from "@angular/material/input";
@@ -9,7 +9,6 @@ import { MatIcon } from "@angular/material/icon";
 import { MatAutocompleteTrigger, MatAutocomplete, MatOption } from "@angular/material/autocomplete";
 import { SearchResultPipe } from "../pipes/search-result.pipe";
 
-@UntilDestroy()
 @Component({
     selector: "app-searchbar",
     templateUrl: "./searchbar.component.html",
@@ -18,6 +17,8 @@ import { SearchResultPipe } from "../pipes/search-result.pipe";
     imports: [ReactiveFormsModule, MatFormField, MatPrefix, MatIcon, MatInput, MatAutocompleteTrigger, MatAutocomplete, MatOption, SearchResultPipe]
 })
 export class SearchbarComponent {
+  private readonly destroyRef = inject(DestroyRef);
+
   public results = signal<SearchResult[]>([]);
 
   public searchFormControl = new FormControl("");
@@ -31,7 +32,7 @@ export class SearchbarComponent {
   public ngOnInit(): void {
     this.searchFormControl.valueChanges
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         switchMap((value) =>
           value
             ? this.searchService.receiptSearch(value ?? "").pipe(take(1))

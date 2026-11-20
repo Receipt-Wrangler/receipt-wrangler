@@ -1,8 +1,8 @@
 <mat-list>
   @for (row of listData(); let i = $index; track row?.[trackByKey()]) {
-    @if (rowOpen() === i && editTemplate) {
+    @if (rowOpen() === i && editTemplate()) {
       <ng-template
-        [ngTemplateOutlet]="editTemplate"
+        [ngTemplateOutlet]="editTemplate()"
         [ngTemplateOutletContext]="{ i: i }"
       ></ng-template>
     } @else {

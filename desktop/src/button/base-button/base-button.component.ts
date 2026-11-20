@@ -1,4 +1,4 @@
-import { Component, Input, input, output } from "@angular/core";
+import { Component, input, output } from "@angular/core";
 import { ThemePalette } from "@angular/material/core";
 
 @Component({
@@ -17,9 +17,9 @@ export class BaseButtonComponent {
 
   public readonly matButtonType = input<"matRaisedButton" | "iconButton" | "basic">("matRaisedButton");
 
-  @Input() public icon: string = "";
+  public readonly icon = input<string>("");
 
-  @Input() public customIcon: string = "";
+  public readonly customIcon = input<string>("");
 
   public readonly disabled = input<boolean>(false);
 

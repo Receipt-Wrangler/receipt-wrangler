@@ -5,6 +5,6 @@
   buttonText="Back"
   [buttonRouterLink]="buttonRouterLink()"
   [disabled]="disabled()"
-  [tooltip]="tooltip ?? 'Back'"
+  [tooltip]="tooltip() ?? 'Back'"
   (clicked)="clicked.emit()"
 ></app-button>

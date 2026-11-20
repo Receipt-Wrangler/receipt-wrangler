@@ -1,4 +1,4 @@
-import { Component, effect, ElementRef, inject, Input, OnInit, signal, TemplateRef, input, viewChild } from "@angular/core";
+import { Component, computed, effect, ElementRef, inject, OnInit, signal, TemplateRef, input, viewChild } from "@angular/core";
 import { FormArray, FormControl, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatAutocompleteSelectedEvent, MatAutocompleteTrigger, MatAutocomplete, MatOption } from "@angular/material/autocomplete";
 import { Store } from "@ngxs/store";
@@ -21,21 +21,26 @@ import { OptionDisplayPipe } from "./option-display.pipe";
 export class AutocomleteComponent
   extends BaseInputComponent
   implements OnInit {
-  @Input() public inputId: string = "";
+  public readonly inputId = input<string>("");
+
+  /** The native input's id: the bound one, else derived from the label. */
+  protected readonly resolvedInputId = computed(
+    () => this.inputId() || this.label().replace(/ /g, "_").toLowerCase()
+  );
 
   public readonly options = input<any[]>([]);
 
-  @Input() public optionTemplate!: TemplateRef<any>;
+  public readonly optionTemplate = input<TemplateRef<any>>();
 
-  @Input() public optionChipTemplate!: TemplateRef<any>;
+  public readonly optionChipTemplate = input<TemplateRef<any>>();
 
   public readonly optionFilterKey = input<string>("");
 
-  @Input() public optionValueKey: string = "";
+  public readonly optionValueKey = input<string>("");
 
   public readonly optionDisplayKey = input<string>("");
 
-  @Input() public multiple: boolean = false;
+  public readonly multiple = input<boolean>(false);
 
   public readonly displayWith = input<(value: any) => string>(() => '');
 
@@ -88,21 +93,18 @@ export class AutocomleteComponent
 
   public override ngOnInit(): void {
     super.ngOnInit();
-    if (!this.inputId) {
-      this.inputId = this.label.replace(/ /g, "_").toLowerCase();
-    }
-    this.isRequired = this.inputFormControl.hasValidator(Validators.required);
+    this.isRequired = this.inputFormControl().hasValidator(Validators.required);
     this.setSingleOptionSelected();
 
-    if (!this.multiple) {
+    if (!this.multiple()) {
       this.initSingleAutocomplete();
     }
   }
 
   private setSingleOptionSelected(): void {
-    if (!this.multiple) {
-      this.inputFormControl.valueChanges
-        .pipe(startWith(this.inputFormControl.value))
+    if (!this.multiple()) {
+      this.inputFormControl().valueChanges
+        .pipe(startWith(this.inputFormControl().value))
         .subscribe((v) => {
           this.singleOptionSelected.set(!!v);
         });
@@ -110,7 +112,7 @@ export class AutocomleteComponent
   }
 
   private initSingleAutocomplete(): void {
-    this.filterFormControl.setValue(this.inputFormControl.value);
+    this.filterFormControl.setValue(this.inputFormControl().value);
   }
 
   // Re-seeds the single-select display from the current inputFormControl value.
@@ -120,7 +122,7 @@ export class AutocomleteComponent
   // Callers invoke this after such a change to refresh the display. No-op in
   // multiple mode, which renders selections as chips from inputFormControl.
   public syncSingleDisplay(): void {
-    if (!this.multiple) {
+    if (!this.multiple()) {
       this.initSingleAutocomplete();
     }
   }
@@ -129,8 +131,8 @@ export class AutocomleteComponent
     value = value ?? "";
     const filterValue = value.toString()?.toLowerCase();
 
-    if (this.multiple) {
-      const formArray = this.inputFormControl as any as FormArray;
+    if (this.multiple()) {
+      const formArray = this.inputFormControl() as any as FormArray;
       const selectedValues = (formArray.value as any[]) ?? [];
       // TODO: Restrict the user form adding an already added value
 
@@ -158,21 +160,21 @@ export class AutocomleteComponent
   }
 
   public optionSelected(event: MatAutocompleteSelectedEvent): void {
-    if (this.multiple) {
+    if (this.multiple()) {
       const customOptionSelected = event.option.id === this.creatableOptionId;
-      const formArray = this.inputFormControl as any as FormArray;
+      const formArray = this.inputFormControl() as any as FormArray;
 
-      if (customOptionSelected && !this.optionValueKey) {
+      if (customOptionSelected && !this.optionValueKey()) {
         formArray.push(
           new FormControl({
             ...this.defaultCreatableObject(),
             [this.creatableValueKey()]: this.filterFormControl.value,
           })
         );
-      } else if (customOptionSelected && this.optionValueKey) {
+      } else if (customOptionSelected && this.optionValueKey()) {
         formArray.push(new FormControl(this.filterFormControl.value));
       } else {
-        (this.inputFormControl as any as FormArray).push(
+        (this.inputFormControl() as any as FormArray).push(
           new FormControl(event.option.value)
         );
       }
@@ -184,13 +186,13 @@ export class AutocomleteComponent
         }
       }, 0);
     } else {
-      this.inputFormControl.setValue(event.option.value);
+      this.inputFormControl().setValue(event.option.value);
     }
   }
 
   private clearFilterInput(): void {
-    if (this.inputId) {
-      const input = document.getElementById(this.inputId) as HTMLInputElement | null;
+    if (this.resolvedInputId()) {
+      const input = document.getElementById(this.resolvedInputId()) as HTMLInputElement | null;
       if (input) {
         input.value = "";
       }
@@ -213,8 +215,8 @@ export class AutocomleteComponent
   }
 
   public removeOption(index: number) {
-    if (this.multiple) {
-      const formArray = this.inputFormControl as any as FormArray;
+    if (this.multiple()) {
+      const formArray = this.inputFormControl() as any as FormArray;
       formArray.removeAt(index);
       this.filterFormControl.setValue(null);
       this.inputMultiple().nativeElement.focus();
@@ -226,10 +228,10 @@ export class AutocomleteComponent
   }
 
   public clearFilter(): void {
-    if (this.multiple) {
-      this.inputFormControl.setValue([]);
+    if (this.multiple()) {
+      this.inputFormControl().setValue([]);
     } else {
-      this.inputFormControl.setValue(null);
+      this.inputFormControl().setValue(null);
     }
     this.filterFormControl.setValue("");
   }

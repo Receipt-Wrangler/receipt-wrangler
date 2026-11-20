@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, OnInit, input } from "@angular/core";
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { take, tap } from "rxjs";
@@ -16,7 +16,7 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
     imports: [ReactiveFormsModule, InputComponent, SubmitButtonComponent, CancelButtonComponent, FormGetPipe]
 })
 export class ResetPasswordComponent implements OnInit {
-  @Input() public user!: User;
+  public readonly user = input.required<User>();
 
   public form: FormGroup = new FormGroup({});
 
@@ -40,7 +40,7 @@ export class ResetPasswordComponent implements OnInit {
   public submit(): void {
     if (this.form.valid) {
       this.userService
-        .resetPasswordById(this.user.id, this.form.value,)
+        .resetPasswordById(this.user().id, this.form.value,)
         .pipe(
           take(1),
           tap(() => {

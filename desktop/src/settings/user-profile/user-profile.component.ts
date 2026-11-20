@@ -25,6 +25,7 @@ import { ButtonComponent } from "../../button/button/button.component";
 import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
 import { FormGetPipe } from "../../pipes/form-get.pipe";
 import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
     selector: "app-user-profile",
@@ -129,9 +130,10 @@ export class UserProfileComponent implements OnInit {
       DEFAULT_DIALOG_CONFIG,
     );
 
-    dialogRef.componentInstance.headerText = `Disconnect ${connection.providerDisplayName}`;
-    dialogRef.componentInstance.dialogContent =
-      `Are you sure you want to disconnect ${connection.providerDisplayName}? You will no longer be able to sign in with it.`;
+    setDialogInputs(dialogRef, {
+      headerText: `Disconnect ${connection.providerDisplayName}`,
+      dialogContent: `Are you sure you want to disconnect ${connection.providerDisplayName}? You will no longer be able to sign in with it.`,
+    });
 
     dialogRef
       .afterClosed()

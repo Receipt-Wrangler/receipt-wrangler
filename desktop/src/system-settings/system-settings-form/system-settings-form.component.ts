@@ -1,7 +1,7 @@
-import { AfterViewInit, Component, ElementRef, OnInit, viewChild, signal } from "@angular/core";
+import { AfterViewInit, Component, ElementRef, OnInit, viewChild, signal, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormGroup, ValidatorFn, Validators, ReactiveFormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { startWith, switchMap, take, tap } from "rxjs";
 import { fadeInOut } from "../../animations/index";
@@ -45,7 +45,6 @@ interface QueueData extends FormOption {
   description: string;
 }
 
-@UntilDestroy()
 @Component({
   selector: "app-system-settings-form",
   templateUrl: "./system-settings-form.component.html",
@@ -55,6 +54,8 @@ interface QueueData extends FormOption {
   imports: [FormHeaderComponent, AlertComponent, AuditDetailSectionComponent, ReactiveFormsModule, FormSectionComponent, CheckboxComponent, AutocomleteComponent, InputComponent, NgTemplateOutlet, SelectComponent, FormButtonBarComponent, SubmitButtonComponent, EditButtonComponent, CardComponent, ButtonComponent, CustomCurrencyPipe, FormGetPipe, InputReadonlyPipe, TaskQueueFormControlPipe]
 })
 export class SystemSettingsFormComponent extends BaseFormComponent implements OnInit, AfterViewInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   public readonly fallbackReceiptProcessingSettings = viewChild.required<AutocomleteComponent>("fallbackReceiptProcessingSettings");
 
   public readonly alert = viewChild.required("alert", { read: ElementRef });
@@ -295,7 +296,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
     this.form.get(unitControlName)?.valueChanges
       .pipe(
         startWith(this.form.get(unitControlName)?.value),
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((unit: DurationUnit) => {
           valueControl?.setValidators([
             Validators.required,
@@ -321,7 +322,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
     this.form.get("receiptProcessingSettingsId")?.valueChanges
       .pipe(
         startWith(this.form.get("receiptProcessingSettingsId")?.value),
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((value: number) => {
           this.filteredReceiptProcessingSettings = this.allReceiptProcessingSettings.filter((rps) => rps.id !== value);
 
@@ -337,7 +338,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
     this.form.get("currencyHideDecimalPlaces")?.valueChanges
       .pipe(
         startWith(this.form.get("currencyHideDecimalPlaces")?.value),
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((hide: boolean) => {
           if (hide) {
             this.form.get("currencyDecimalSeparator")?.disable();
@@ -359,7 +360,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
     this.form.get("mcpEnabled")?.valueChanges
       .pipe(
         startWith(this.form.get("mcpEnabled")?.value),
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((enabled: boolean) => {
           mcpPublicUrl?.setValidators(this.urlValidators(enabled));
           mcpPublicUrl?.updateValueAndValidity({ emitEvent: false });
@@ -376,7 +377,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
     this.form.get("showLoginQr")?.valueChanges
       .pipe(
         startWith(this.form.get("showLoginQr")?.value),
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((enabled: boolean) => {
           mobileServerUrl?.setValidators(this.urlValidators(enabled));
           mobileServerUrl?.updateValueAndValidity({ emitEvent: false });

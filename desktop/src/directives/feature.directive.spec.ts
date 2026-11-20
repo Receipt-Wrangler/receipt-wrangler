@@ -1,33 +1,64 @@
-import { TemplateRef, ViewContainerRef } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { Component, signal } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NgxsModule, Store } from '@ngxs/store';
 import { FeatureConfigState } from '../store/feature-config.state';
 import { FeatureDirective } from './feature.directive';
 
+@Component({
+  imports: [FeatureDirective],
+  template: `<span class="gated" *appFeature="feature()">gated</span>`,
+})
+class HostComponent {
+  public readonly feature = signal('enabledOne');
+}
+
 describe('FeatureDirective', () => {
-  let store: Store;
-  let templateRef: jest.Mocked<TemplateRef<any>>;
-  let viewContainer: jest.Mocked<ViewContainerRef>;
+  let fixture: ComponentFixture<HostComponent>;
 
-  beforeEach(() => {
-    const templateSpy = { createEmbeddedView: jest.fn() };
-    const viewContainerSpy = { createEmbeddedView: jest.fn(), clear: jest.fn() };
+  function renderedCount(): number {
+    return fixture.nativeElement.querySelectorAll('.gated').length;
+  }
 
+  async function setFeature(feature: string): Promise<void> {
+    fixture.componentInstance.feature.set(feature);
+    await fixture.whenStable();
+  }
+
+  beforeEach(async () => {
     TestBed.configureTestingModule({
-      imports: [NgxsModule.forRoot([FeatureConfigState])],
-      providers: [
-        { provide: TemplateRef, useValue: templateSpy },
-        { provide: ViewContainerRef, useValue: viewContainerSpy }
-      ]
+      imports: [NgxsModule.forRoot([FeatureConfigState]), HostComponent],
     });
 
-    store = TestBed.inject(Store);
-    templateRef = TestBed.inject(TemplateRef) as jest.Mocked<TemplateRef<any>>;
-    viewContainer = TestBed.inject(ViewContainerRef) as jest.Mocked<ViewContainerRef>;
+    const store = TestBed.inject(Store);
+    store.reset({
+      ...store.snapshot(),
+      featureConfig: { enabledOne: true, enabledTwo: true, disabled: false },
+    });
+
+    fixture = TestBed.createComponent(HostComponent);
+    await fixture.whenStable();
   });
 
-  it('should create an instance', () => {
-    const directive = new FeatureDirective(templateRef, viewContainer, store);
-    expect(directive).toBeTruthy();
+  it('renders the content when the feature is enabled', () => {
+    expect(renderedCount()).toEqual(1);
+  });
+
+  it('does not render the content when the feature is disabled', async () => {
+    await setFeature('disabled');
+
+    expect(renderedCount()).toEqual(0);
+  });
+
+  it('renders the content again when the feature changes back to an enabled one', async () => {
+    await setFeature('disabled');
+    await setFeature('enabledOne');
+
+    expect(renderedCount()).toEqual(1);
+  });
+
+  it('keeps a single view when switching between two enabled features', async () => {
+    await setFeature('enabledTwo');
+
+    expect(renderedCount()).toEqual(1);
   });
 });

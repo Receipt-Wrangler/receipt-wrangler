@@ -41,7 +41,7 @@ describe("AutocomleteComponent", () => {
     ]);
     fixture.componentRef.setInput('optionFilterKey', "name");
 
-    component.multiple = false;
+    fixture.componentRef.setInput("multiple", false);
     const result = component._filter("Option 1");
     expect(result).toEqual([{ id: 1, name: "Option 1" }]);
   });
@@ -55,13 +55,13 @@ describe("AutocomleteComponent", () => {
   //   ];
   //   component.optionFilterKey = 'name';
 
-  //   component.multiple = true;
-  //   component.inputFormControl = new FormArray([
+  //   fixture.componentRef.setInput("multiple", true);
+  //   fixture.componentRef.setInput("inputFormControl", new FormArray([
   //     new FormGroup({
   //       id: new FormControl(2),
   //       name: new FormControl('Option 2'),
   //     }),
-  //   ]) as any;
+  //   ]) as any);
 
   //   const result = component._filter('Option');
   //   console.log(result);
@@ -79,14 +79,14 @@ describe("AutocomleteComponent", () => {
     ]);
     fixture.componentRef.setInput('optionFilterKey', "name");
 
-    component.multiple = false;
+    fixture.componentRef.setInput("multiple", false);
     const result = component._filter("Non-existing option");
     expect(result).toEqual([]);
   });
 
   it("re-seeds the single-select display from inputFormControl on syncSingleDisplay", () => {
-    component.multiple = false;
-    component.inputFormControl.setValue(42);
+    fixture.componentRef.setInput("multiple", false);
+    component.inputFormControl().setValue(42);
     component.filterFormControl.setValue("");
 
     component.syncSingleDisplay();
@@ -95,8 +95,8 @@ describe("AutocomleteComponent", () => {
   });
 
   it("leaves the display untouched on syncSingleDisplay in multiple mode", () => {
-    component.multiple = true;
-    component.inputFormControl = new FormArray([new FormControl(1)]) as any;
+    fixture.componentRef.setInput("multiple", true);
+    fixture.componentRef.setInput("inputFormControl", new FormArray([new FormControl(1)]) as any);
     component.filterFormControl.setValue("stale");
 
     component.syncSingleDisplay();
@@ -105,8 +105,8 @@ describe("AutocomleteComponent", () => {
   });
 
   it("should set the selected option value to the inputFormControl in single mode", () => {
-    component.multiple = false;
-    component.optionValueKey = "value";
+    fixture.componentRef.setInput("multiple", false);
+    fixture.componentRef.setInput("optionValueKey", "value");
 
     const event = {
       option: {
@@ -117,11 +117,11 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect(component.inputFormControl.value).toEqual("value");
+    expect(component.inputFormControl().value).toEqual("value");
   });
 
   it("should set the selected option value to the inputFormControl in single mode with full object as value", () => {
-    component.multiple = false;
+    fixture.componentRef.setInput("multiple", false);
 
     const event = {
       option: {
@@ -132,18 +132,18 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect(component.inputFormControl.value).toEqual({
+    expect(component.inputFormControl().value).toEqual({
       id: "id1",
       name: "Groceries",
     });
   });
 
   it("should add the selected option value to the inputFormControl as a FormControl instance in multiple mode", () => {
-    component.multiple = true;
-    component.optionValueKey = "value";
-    component.inputFormControl = new FormArray([
+    fixture.componentRef.setInput("multiple", true);
+    fixture.componentRef.setInput("optionValueKey", "value");
+    fixture.componentRef.setInput("inputFormControl", new FormArray([
       new FormControl("value 1"),
-    ]) as any;
+    ]) as any);
 
     const event = {
       option: {
@@ -154,21 +154,21 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect((component.inputFormControl as any as FormArray).value).toEqual([
+    expect((component.inputFormControl() as any as FormArray).value).toEqual([
       "value 1",
       "value 2",
     ]);
   });
 
   it("should add the selected option value to the inputFormControl as a FormControl instance in multiple mode with full object", () => {
-    component.multiple = true;
-    component.optionValueKey = "value";
-    component.inputFormControl = new FormArray([
+    fixture.componentRef.setInput("multiple", true);
+    fixture.componentRef.setInput("optionValueKey", "value");
+    fixture.componentRef.setInput("inputFormControl", new FormArray([
       new FormGroup({
         id: new FormControl("id0"),
         name: new FormControl("Utilities"),
       }),
-    ]) as any;
+    ]) as any);
 
     const event = {
       option: {
@@ -182,7 +182,7 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect((component.inputFormControl as any as FormArray).value).toEqual([
+    expect((component.inputFormControl() as any as FormArray).value).toEqual([
       {
         id: "id0",
         name: "Utilities",
@@ -198,10 +198,10 @@ describe("AutocomleteComponent", () => {
     component.creatableOptionId = "create-option";
     fixture.componentRef.setInput('defaultCreatableObject', { name: "Custom Option" });
     fixture.componentRef.setInput('creatableValueKey', "name");
-    component.multiple = true;
-    component.inputFormControl = new FormArray([
+    fixture.componentRef.setInput("multiple", true);
+    fixture.componentRef.setInput("inputFormControl", new FormArray([
       new FormControl("value 1"),
-    ]) as any;
+    ]) as any);
 
     const event = {
       option: {
@@ -214,7 +214,7 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect((component.inputFormControl as any as FormArray).value).toEqual([
+    expect((component.inputFormControl() as any as FormArray).value).toEqual([
       "value 1",
       {
         name: "new value",
@@ -224,11 +224,11 @@ describe("AutocomleteComponent", () => {
 
   it("should add a custom option value to the inputFormControl as a FormControl instance in multiple mode with option value key", () => {
     component.creatableOptionId = "create-option";
-    component.optionValueKey = "name";
-    component.multiple = true;
-    component.inputFormControl = new FormArray([
+    fixture.componentRef.setInput("optionValueKey", "name");
+    fixture.componentRef.setInput("multiple", true);
+    fixture.componentRef.setInput("inputFormControl", new FormArray([
       new FormControl("value 1"),
-    ]) as any;
+    ]) as any);
 
     const event = {
       option: {
@@ -241,7 +241,7 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect((component.inputFormControl as any as FormArray).value).toEqual([
+    expect((component.inputFormControl() as any as FormArray).value).toEqual([
       "value 1",
       "new value",
     ]);
@@ -263,8 +263,8 @@ describe("AutocomleteComponent", () => {
       const closePanel = jest.fn();
       const blur = jest.fn();
 
-      component.multiple = true;
-      component.inputFormControl = new FormArray([]) as any;
+      fixture.componentRef.setInput("multiple", true);
+      fixture.componentRef.setInput("inputFormControl", new FormArray([]) as any);
       (component as any).matAutocompleteTrigger = () => ({ openPanel, closePanel });
       (component as any).inputMultiple = () => ({ nativeElement: { blur } });
 

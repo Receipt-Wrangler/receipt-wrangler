@@ -1,4 +1,4 @@
-<app-dialog [headerText]="headerText">
+<app-dialog [headerText]="headerText()">
   <app-filter-field
     label="Type"
     fieldName="type"
@@ -6,7 +6,7 @@
     optionFilterKey="displayValue"
     optionDisplayKey="displayValue"
     optionValueKey="value"
-    [parentForm]="parentForm"
+    [parentForm]="parentForm()"
     [options]="systemTaskTypeOptions"
     [multiple]="true"
   ></app-filter-field>
@@ -18,7 +18,7 @@
     optionFilterKey="displayName"
     optionDisplayKey="displayName"
     optionValueKey="id"
-    [parentForm]="parentForm"
+    [parentForm]="parentForm()"
     [options]="ranByOptions()"
     [multiple]="true"
   ></app-filter-field>
@@ -27,14 +27,14 @@
     label="Started At"
     fieldName="startedAt"
     type="date"
-    [parentForm]="parentForm"
+    [parentForm]="parentForm()"
   ></app-filter-field>
 
   <app-filter-field
     label="Ended At"
     fieldName="endedAt"
     type="date"
-    [parentForm]="parentForm"
+    [parentForm]="parentForm()"
   ></app-filter-field>
 
   <app-dialog-footer

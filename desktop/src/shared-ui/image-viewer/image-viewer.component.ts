@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, OnDestroy, SimpleChanges, input, signal, viewChild } from "@angular/core";
+import { Component, OnChanges, OnDestroy, SimpleChanges, input, signal, viewChild } from "@angular/core";
 import { ImageCanvasComponent } from "../image-canvas/image-canvas.component";
 
 @Component({
@@ -7,7 +7,7 @@ import { ImageCanvasComponent } from "../image-canvas/image-canvas.component";
     imports: [ImageCanvasComponent]
 })
 export class ImageViewerComponent implements OnChanges, OnDestroy {
-  @Input() public imageBase64?: string = "";
+  public readonly imageBase64 = input<string | undefined>("");
 
   public readonly imageFile = input<File>();
 

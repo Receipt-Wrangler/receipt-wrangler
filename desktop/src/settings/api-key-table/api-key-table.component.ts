@@ -1,6 +1,6 @@
-import { AfterViewInit, Component, OnInit, signal, TemplateRef, viewChild } from "@angular/core";
+import { AfterViewInit, Component, OnInit, signal, TemplateRef, viewChild, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { TableComponent } from "src/table/table/table.component";
@@ -23,9 +23,9 @@ import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-butt
 import { AsyncPipe } from "@angular/common";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { UserPipe } from "../../pipes/user.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 
-@UntilDestroy()
 @Component({
   selector: "app-api-key-table",
   templateUrl: "./api-key-table.component.html",
@@ -40,6 +40,8 @@ import { UserPipe } from "../../pipes/user.pipe";
   imports: [TableHeaderComponent, AddButtonComponent, ButtonComponent, TableComponent, EditButtonComponent, DeleteButtonComponent, AsyncPipe, AppDatePipe, UserPipe]
 })
 export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> implements OnInit, AfterViewInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   private readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");
 
   private readonly descriptionCell = viewChild.required<TemplateRef<any>>("descriptionCell");
@@ -95,7 +97,7 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
   private listenForFilterChanges(): void {
     this.store.select(ApiKeyTableState.filter)
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((filter) => {
             this.getTableData();
             if (filter.associatedApiKeys === AssociatedApiKeys.All) {
@@ -194,7 +196,7 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
   public openCreateApiKeyDialog(): void {
     const ref = this.matDialog.open(ApiKeyFormDialogComponent, DEFAULT_DIALOG_CONFIG);
 
-    ref.componentInstance.headerText = "Create API Key";
+    setDialogInputs(ref, { headerText: "Create API Key" });
 
     ref.afterClosed().subscribe((result) => {
       if (result) {
@@ -206,8 +208,10 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
   public openEditDialog(apiKeyView: ApiKeyView): void {
     const ref = this.matDialog.open(ApiKeyFormDialogComponent, DEFAULT_DIALOG_CONFIG);
 
-    ref.componentInstance.apiKey = apiKeyView;
-    ref.componentInstance.headerText = `Edit ${apiKeyView.name}`;
+    setDialogInputs(ref, {
+      apiKey: apiKeyView,
+      headerText: `Edit ${apiKeyView.name}`,
+    });
 
     ref.afterClosed().subscribe((result) => {
       if (result) {
@@ -227,8 +231,10 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
       DEFAULT_DIALOG_CONFIG
     );
 
-    dialogRef.componentInstance.headerText = "Delete API Key";
-    dialogRef.componentInstance.dialogContent = `Are you sure you would like to delete the API key "${apiKeyView.name}"? This action is irreversible and the API key will no longer be usable.`;
+    setDialogInputs(dialogRef, {
+      headerText: "Delete API Key",
+      dialogContent: `Are you sure you would like to delete the API key "${apiKeyView.name}"? This action is irreversible and the API key will no longer be usable.`,
+    });
 
     dialogRef.afterClosed().subscribe((confirmed) => {
       if (confirmed && apiKeyView.id) {

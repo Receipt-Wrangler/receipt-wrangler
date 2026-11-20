@@ -7,3 +7,4 @@ export * from "./status.utils";
 export * from "./app-data.utill";
 export * from "./duration.utils";
 export * from "./receipt-table-columns";
+export * from "./dialog-inputs";

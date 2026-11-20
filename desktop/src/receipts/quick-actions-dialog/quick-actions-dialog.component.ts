@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, output } from "@angular/core";
+import { Component, OnInit, output, input } from "@angular/core";
 import { FormArray, FormBuilder, FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { RadioButtonData } from "src/radio-group/models";
@@ -25,13 +25,13 @@ enum QuickActions {
   imports: [DialogComponent, RadioGroupComponent, ReactiveFormsModule, UserAutocompleteComponent, InputComponent, CheckboxComponent, DialogFooterComponent, FormGetPipe]
 })
 export class QuickActionsDialogComponent implements OnInit {
-  @Input() public originalReceipt?: Receipt;
+  public readonly originalReceipt = input<Receipt>();
 
-  @Input() public usersToOmit: string[] = [];
+  public readonly usersToOmit = input<string[]>([]);
 
-  @Input() public amountToSplit!: number;
+  public readonly amountToSplit = input<number>();
 
-  @Input() public itemIndex?: number;
+  public readonly itemIndex = input<number>();
 
   public readonly itemsToAdd = output<{
     items: Item[];
@@ -160,7 +160,8 @@ export class QuickActionsDialogComponent implements OnInit {
   }
 
   public addSplits(): void {
-    if (this.amountToSplit === null || this.amountToSplit === undefined || Number.isNaN(this.amountToSplit)) {
+    const amountToSplit = this.amountToSplit();
+    if (amountToSplit === null || amountToSplit === undefined || Number.isNaN(amountToSplit)) {
       this.snackbarService.error("Amount to split does not exist or is invalid!");
       return;
     }
@@ -177,24 +178,24 @@ export class QuickActionsDialogComponent implements OnInit {
       if (
         this.localForm.get("quickAction")?.value === this.radioValues[0].value
       ) {
-        items = this.addEvenSplitItems();
+        items = this.addEvenSplitItems(amountToSplit);
       } else if (
         this.localForm.get("quickAction")?.value === this.radioValues[1].value
       ) {
-        items = this.splitEvenlyWithOptionalParts();
+        items = this.splitEvenlyWithOptionalParts(amountToSplit);
       } else if (
         this.localForm.get("quickAction")?.value === this.radioValues[2].value
       ) {
-        items = this.splitByPercentage();
+        items = this.splitByPercentage(amountToSplit);
       }
 
       // Emit the items to be added
-      this.itemsToAdd.emit({ items, itemIndex: this.itemIndex });
+      this.itemsToAdd.emit({ items, itemIndex: this.itemIndex() });
       this.dialogRef.close(true);
     }
   }
 
-  private addEvenSplitItems(): Item[] {
+  private addEvenSplitItems(amountToSplit: number): Item[] {
     const users: User[] = this.usersFormArray.controls.map((c) => c.value);
     const items: Item[] = [];
 
@@ -202,7 +203,7 @@ export class QuickActionsDialogComponent implements OnInit {
       const item = this.buildSplitItem(
         u,
         `${u.displayName}'s Even Portion`,
-        Number.parseFloat((this.amountToSplit / users.length).toFixed(2))
+        Number.parseFloat((amountToSplit / users.length).toFixed(2))
       );
       items.push(item);
     });
@@ -210,8 +211,8 @@ export class QuickActionsDialogComponent implements OnInit {
     return items;
   }
 
-  private splitEvenlyWithOptionalParts(): Item[] {
-    let amount = this.amountToSplit;
+  private splitEvenlyWithOptionalParts(amountToSplit: number): Item[] {
+    let amount = amountToSplit;
     const users: User[] = this.usersFormArray.value;
     const items: Item[] = [];
 
@@ -249,7 +250,7 @@ export class QuickActionsDialogComponent implements OnInit {
     return {
       name: name,
       chargedToUserId: u.id,
-      receiptId: this.originalReceipt?.id,
+      receiptId: this.originalReceipt()?.id,
       amount: amount,
       categories: [],
       tags: []
@@ -296,9 +297,9 @@ export class QuickActionsDialogComponent implements OnInit {
     return true;
   }
 
-  private splitByPercentage(): Item[] {
+  private splitByPercentage(amountToSplit: number): Item[] {
     const users: User[] = this.usersFormArray.value;
-    const receiptAmount = this.amountToSplit;
+    const receiptAmount = amountToSplit;
     const items: Item[] = [];
 
     users.forEach((user) => {

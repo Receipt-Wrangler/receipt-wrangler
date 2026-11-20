@@ -1,12 +1,12 @@
 <mat-form-field class="w-100" appearance="fill">
-  <mat-label>{{ label }}</mat-label>
+  <mat-label>{{ label() }}</mat-label>
   <input
     matInput
-    [readonly]="readonly"
-    [formControl]="inputFormControl"
+    [readonly]="readonly()"
+    [formControl]="inputFormControl()"
     [matDatepicker]="picker"
   />
-  @if (!readonly) {
+  @if (!readonly()) {
     <mat-datepicker-toggle
       matIconSuffix
       [for]="picker"

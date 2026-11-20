@@ -1,4 +1,4 @@
-import { Component, Input, input } from "@angular/core";
+import { Component, input } from "@angular/core";
 import { ReceiptStatus } from "../../open-api";
 import { MatChip } from "@angular/material/chips";
 import { NgClass } from "@angular/common";
@@ -11,9 +11,9 @@ import { StatusPipe } from "../../pipes/status.pipe";
     imports: [MatChip, NgClass, StatusPipe]
 })
 export class StatusChipComponent {
-  @Input() public status: string = "";
+  public readonly status = input<string>("");
 
-  @Input() public customStatus: string = "";
+  public readonly customStatus = input<string>("");
 
   public readonly customStatusColor = input<"red" | "green" | "gray" | "yellow">();
 

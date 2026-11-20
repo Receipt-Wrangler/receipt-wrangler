@@ -9,9 +9,10 @@ import { MatInputModule } from "@angular/material/input";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { By } from "@angular/platform-browser";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
-import { NgxsModule } from "@ngxs/store";
+import { NgxsModule, Store } from "@ngxs/store";
 import { NgxMaskDirective, provideNgxMask } from "ngx-mask";
 import { PasswordGeneratorService } from "../../services/password-generator.service";
+import { CurrencySeparator, CurrencySymbolPosition } from "../../open-api";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { InputComponent } from "./input.component";
 
@@ -119,20 +120,20 @@ describe("InputComponent", () => {
       fixture.componentRef.setInput("showGeneratePassword", true);
       await fixture.whenStable();
 
-      expect(component.type).toEqual("password");
+      expect(component.inputType()).toEqual("password");
     });
 
     it("masks the field when the generate button is enabled later", async () => {
       fixture.componentRef.setInput("showGeneratePassword", false);
       await fixture.whenStable();
-      expect(component.type).toEqual("text");
+      expect(component.inputType()).toEqual("text");
 
       // A parent flipping the flag on after init still turns this into a
       // password field — otherwise typed passwords would sit in plain text.
       fixture.componentRef.setInput("showGeneratePassword", true);
       await fixture.whenStable();
 
-      expect(component.type).toEqual("password");
+      expect(component.inputType()).toEqual("password");
     });
 
     it("does not re-mask a revealed password when an unrelated input changes", async () => {
@@ -140,12 +141,12 @@ describe("InputComponent", () => {
       await fixture.whenStable();
 
       component.generatePassword();
-      expect(component.type).toEqual("text");
+      expect(component.inputType()).toEqual("text");
 
       fixture.componentRef.setInput("label", "New Password");
       await fixture.whenStable();
 
-      expect(component.type).toEqual("text");
+      expect(component.inputType()).toEqual("text");
     });
 
     it("fills the control with a generated password and reveals it", async () => {
@@ -157,22 +158,22 @@ describe("InputComponent", () => {
       await fixture.whenStable();
 
       expect(passwordGeneratorService.generateAndCopy).toHaveBeenCalled();
-      expect(component.inputFormControl.value).toEqual(GENERATED_PASSWORD);
-      expect(component.inputFormControl.dirty).toEqual(true);
-      expect(component.type).toEqual("text");
+      expect(component.inputFormControl().value).toEqual(GENERATED_PASSWORD);
+      expect(component.inputFormControl().dirty).toEqual(true);
+      expect(component.inputType()).toEqual("text");
       expect(
         fixture.nativeElement.querySelector("input").getAttribute("type")
       ).toEqual("text");
     });
 
     it("can be re-masked with the visibility eye after generating", () => {
-      component.type = "password";
+      component.inputType.set("password");
 
       component.generatePassword();
-      expect(component.type).toEqual("text");
+      expect(component.inputType()).toEqual("text");
 
       component.toggleVisibility();
-      expect(component.type).toEqual("password");
+      expect(component.inputType()).toEqual("password");
     });
 
     it("does nothing for a disabled control", async () => {
@@ -188,7 +189,7 @@ describe("InputComponent", () => {
       component.generatePassword();
 
       expect(passwordGeneratorService.generateAndCopy).not.toHaveBeenCalled();
-      expect(component.inputFormControl.value).toEqual("");
+      expect(component.inputFormControl().value).toEqual("");
     });
 
     it("does nothing for a readonly field", () => {
@@ -197,6 +198,106 @@ describe("InputComponent", () => {
       component.generatePassword();
 
       expect(passwordGeneratorService.generateAndCopy).not.toHaveBeenCalled();
+    });
+
+    it("follows a changed type binding even after the user revealed the field", async () => {
+      fixture.componentRef.setInput("showVisibilityEye", true);
+      await fixture.whenStable();
+      component.toggleVisibility();
+      expect(component.inputType()).toEqual("text");
+
+      fixture.componentRef.setInput("type", "number");
+      await fixture.whenStable();
+
+      expect(component.inputType()).toEqual("number");
+    });
+
+    it("does not re-mask when a password affordance is switched off", async () => {
+      fixture.componentRef.setInput("showVisibilityEye", true);
+      await fixture.whenStable();
+      component.toggleVisibility();
+
+      fixture.componentRef.setInput("showVisibilityEye", false);
+      await fixture.whenStable();
+
+      expect(component.inputType()).toEqual("text");
+    });
+  });
+
+  describe("mask", () => {
+    function maskConfig() {
+      return (component as any).maskConfig();
+    }
+
+    function setCurrencySettings(settings: {
+      currencyDisplay: string;
+      currencySymbolPosition: CurrencySymbolPosition;
+      currencyHideDecimalPlaces: boolean;
+    }): void {
+      const store = TestBed.inject(Store);
+      store.reset({
+        ...store.snapshot(),
+        systemSettings: {
+          ...store.snapshot().systemSettings,
+          currencyDecimalSeparator: CurrencySeparator.Comma,
+          currencyThousandthsSeparator: CurrencySeparator.Period,
+          ...settings,
+        },
+      });
+    }
+
+    it("is unmasked by default", () => {
+      expect(maskConfig()).toEqual({
+        mask: "",
+        prefix: "",
+        suffix: "",
+        thousandSeparator: "",
+        decimalMarker: CurrencySeparator.Period,
+      });
+    });
+
+    it("uses a non-currency field's own mask inputs", () => {
+      fixture.componentRef.setInput("mask", "percent.2");
+      fixture.componentRef.setInput("maskSuffix", "%");
+
+      expect(maskConfig()).toEqual(
+        expect.objectContaining({ mask: "percent.2", prefix: "", suffix: "%" })
+      );
+    });
+
+    it("takes a currency field's mask from the currency settings", () => {
+      setCurrencySettings({
+        currencyDisplay: "€",
+        currencySymbolPosition: CurrencySymbolPosition.End,
+        currencyHideDecimalPlaces: false,
+      });
+      fixture.componentRef.setInput("isCurrency", true);
+
+      expect(maskConfig()).toEqual({
+        mask: "separator.2",
+        prefix: "",
+        suffix: "€",
+        thousandSeparator: CurrencySeparator.Period,
+        decimalMarker: CurrencySeparator.Comma,
+      });
+    });
+
+    it("drops the decimals when the settings hide them", () => {
+      setCurrencySettings({
+        currencyDisplay: "$",
+        currencySymbolPosition: CurrencySymbolPosition.Start,
+        currencyHideDecimalPlaces: true,
+      });
+      fixture.componentRef.setInput("isCurrency", true);
+
+      expect(maskConfig()).toEqual(
+        expect.objectContaining({
+          mask: "separator.0",
+          prefix: "$",
+          suffix: "",
+          decimalMarker: CurrencySeparator.Period,
+        })
+      );
     });
   });
 });

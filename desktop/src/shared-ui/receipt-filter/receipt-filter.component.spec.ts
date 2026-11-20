@@ -1,11 +1,10 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
-import { Component, CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, DestroyRef } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef, } from "@angular/material/dialog";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
-import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { SetReceiptFilter } from "src/store/receipt-table.actions";
@@ -18,13 +17,6 @@ import { OperationsPipe } from "./operations.pipe";
 import { ReceiptFilterComponent } from "./receipt-filter.component";
 import { provideRouter } from "@angular/router";
 import { provideNgxMask } from "ngx-mask";
-
-@UntilDestroy()
-@Component({
-  selector: "app-noop",
-  template: ""
-})
-class NoopComponent {}
 
 describe("ReceiptFilterComponent", () => {
   let component: ReceiptFilterComponent;
@@ -110,21 +102,21 @@ describe("ReceiptFilterComponent", () => {
     const categories = [{ id: 2, name: "Groceries" }] as Category[];
     const tags = [{ id: 3, name: "Reimbursable" }] as Tag[];
 
-    component.categories = categories;
-    component.tags = tags;
+    fixture.componentRef.setInput("categories", categories);
+    fixture.componentRef.setInput("tags", tags);
     component.ngOnInit();
 
-    expect(component.categories).toBe(categories);
-    expect(component.tags).toBe(tags);
+    expect(component.categories()).toBe(categories);
+    expect(component.tags()).toBe(tags);
   });
 
   it("should init form with no default initial data", () => {
-    const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
+    const destroyRef = TestBed.inject(DestroyRef);
 
-    component.parentForm = buildReceiptFilterForm({}, noopComponent);
+    fixture.componentRef.setInput("parentForm", buildReceiptFilterForm({}, destroyRef));
     component.ngOnInit();
 
-    expect(component.parentForm.value).toEqual(defaultReceiptFilter);
+    expect(component.parentForm().value).toEqual(defaultReceiptFilter);
   });
 
   it("should init form with initial data", () => {
@@ -134,12 +126,12 @@ describe("ReceiptFilterComponent", () => {
       },
     });
 
-    const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
+    const destroyRef = TestBed.inject(DestroyRef);
 
-    component.parentForm = buildReceiptFilterForm(filledFilter, noopComponent);
+    fixture.componentRef.setInput("parentForm", buildReceiptFilterForm(filledFilter, destroyRef));
     component.ngOnInit();
 
-    expect(component.parentForm.value).toEqual(filledFilter);
+    expect(component.parentForm().value).toEqual(filledFilter);
   });
 
   it("should reset form", () => {
@@ -150,18 +142,18 @@ describe("ReceiptFilterComponent", () => {
     });
 
     component.formCommand.subscribe((formCommand) => {
-      applyFormCommand(component.parentForm, formCommand);
+      applyFormCommand(component.parentForm(), formCommand);
     });
 
-    const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
+    const destroyRef = TestBed.inject(DestroyRef);
 
-    component.parentForm = buildReceiptFilterForm(filledFilter, noopComponent);
+    fixture.componentRef.setInput("parentForm", buildReceiptFilterForm(filledFilter, destroyRef));
     component.ngOnInit();
 
-    expect(component.parentForm.value).toEqual(filledFilter);
+    expect(component.parentForm().value).toEqual(filledFilter);
 
     component.resetFilter();
-    expect(component.parentForm.value).toEqual(defaultReceiptFilter);
+    expect(component.parentForm().value).toEqual(defaultReceiptFilter);
   });
 
   it("should set form in state and close dialog", () => {
@@ -174,18 +166,18 @@ describe("ReceiptFilterComponent", () => {
     component.submitButtonClicked();
 
     expect(storeRefSpy).toHaveBeenCalledWith(
-      new SetReceiptFilter(component.parentForm.value)
+      new SetReceiptFilter(component.parentForm().value)
     );
     expect(dialogRefSpy).toHaveBeenCalledWith(true);
   });
 
   it("renders the group field only when showGroupFilter is true", () => {
-    const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
+    const destroyRef = TestBed.inject(DestroyRef);
 
     const countListRows = (showGroupFilter: boolean): number => {
       const localFixture = TestBed.createComponent(ReceiptFilterComponent);
-      localFixture.componentInstance.parentForm = buildReceiptFilterForm({}, noopComponent);
-      localFixture.componentInstance.showGroupFilter = showGroupFilter;
+      localFixture.componentRef.setInput("parentForm", buildReceiptFilterForm({}, destroyRef));
+      localFixture.componentRef.setInput("showGroupFilter", showGroupFilter);
       localFixture.detectChanges();
       // The rows are the shared app-filter-field; CUSTOM_ELEMENTS_SCHEMA keeps
       // it unrendered here, so the inner controls it projects are not in the DOM.
@@ -197,7 +189,7 @@ describe("ReceiptFilterComponent", () => {
   });
 
   it("defaults showGroupFilter to false", () => {
-    expect(component.showGroupFilter).toBe(false);
+    expect(component.showGroupFilter()).toBe(false);
   });
 
   it("should close dialog on cancel", () => {

@@ -14,6 +14,7 @@ import { AuthState } from "../../store";
 import { UserTableState } from "../../store/user-table.state";
 import { UserListComponent } from "./user-list.component";
 import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 describe("UserListComponent", () => {
   let component: UserListComponent;
@@ -105,7 +106,7 @@ describe("UserListComponent", () => {
 
     jest
       .spyOn(TestBed.inject(MatDialog), "open")
-      .mockReturnValue({ afterClosed: () => of(true), componentInstance: {} } as any);
+      .mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
     component.deleteUser(0);
 

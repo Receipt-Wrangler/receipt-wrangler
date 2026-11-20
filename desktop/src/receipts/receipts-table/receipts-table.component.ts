@@ -1,11 +1,11 @@
 import { CurrencyPipe, DatePipe, NgTemplateOutlet } from "@angular/common";
-import { AfterViewInit, Component, computed, OnInit, signal, TemplateRef, ViewEncapsulation, viewChild } from "@angular/core";
+import { AfterViewInit, Component, computed, OnInit, signal, TemplateRef, ViewEncapsulation, viewChild, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
 import { PageEvent } from "@angular/material/paginator";
 import { Sort } from "@angular/material/sort";
 import { MatTableDataSource } from "@angular/material/table";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { catchError, EMPTY, filter, map, Subject, switchMap, take, tap } from "rxjs";
 import { fadeInOut } from "src/animations";
@@ -75,6 +75,7 @@ import { HasGroupPermissionDirective } from "../../directives/has-group-permissi
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { NamePipe } from "../../pipes/name.pipe";
 import { UserPipe } from "../../pipes/user.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 /**
  * A receipts-table column, carrying the custom field definition when the column
@@ -89,7 +90,6 @@ function receiptNoun(count: number): string {
   return count === 1 ? "receipt" : "receipts";
 }
 
-@UntilDestroy()
 @Component({
   selector: "app-receipts-table",
   templateUrl: "./receipts-table.component.html",
@@ -104,6 +104,8 @@ function receiptNoun(count: number): string {
   imports: [TableHeaderComponent, AddButtonComponent, MonthStepperComponent, ButtonComponent, MatMenuTrigger, MatMenu, MatMenuItem, MatIcon, QueueStartMenuComponent, FeatureDirective, NgTemplateOutlet, SummaryCardComponent, MatChipSet, MatChip, MatChipRemove, TableComponent, ReceiptTotalsComponent, RouterLink, StatusChipComponent, MatTooltip, CustomFieldCellComponent, EditButtonComponent, HasGroupPermissionDirective, AppDatePipe, CustomCurrencyPipe, NamePipe, UserPipe]
 })
 export class ReceiptsTableComponent implements OnInit, AfterViewInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private groupsService: GroupsService,
@@ -486,7 +488,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   private setSelectedReceiptIdsObservable(): void {
     this.table()?.selection?.changed
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         map((event) => event.source.selected as Receipt[]),
         tap((receipts) => {
           this.selectedReceiptIds.set(receipts.map((r) => r.id));
@@ -649,15 +651,17 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
       maxWidth: "100%",
     });
 
-    dialogRef.componentInstance.categories = this.categories();
-    dialogRef.componentInstance.tags = this.tags();
-    dialogRef.componentInstance.parentForm = buildReceiptFilterForm(filter, this);
-    dialogRef.componentInstance.headerText = "Filter Receipts";
-    // The group filter is only meaningful on the "All groups" view; a
-    // single-group view is already scoped to one group.
-    dialogRef.componentInstance.showGroupFilter = this.group?.isAllGroup ?? false;
+    setDialogInputs(dialogRef, {
+      categories: this.categories(),
+      tags: this.tags(),
+      parentForm: buildReceiptFilterForm(filter, this.destroyRef),
+      headerText: "Filter Receipts",
+      // The group filter is only meaningful on the "All groups" view; a
+      // single-group view is already scoped to one group.
+      showGroupFilter: this.group?.isAllGroup ?? false,
+    });
     const formCommandSubscription = dialogRef.componentInstance.formCommand.subscribe((formCommand) => {
-      applyFormCommand(dialogRef.componentInstance.parentForm, formCommand);
+      applyFormCommand(dialogRef.componentInstance.parentForm(), formCommand);
     });
 
     dialogRef
@@ -789,7 +793,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   private listenForRefreshRequests(): void {
     this.refreshRequested
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         switchMap(() =>
           this.receiptFilterService.getPagedReceiptsForGroups(this.groupId.toString()).pipe(
             // Keeps the outer subscription alive. An error surfacing through
@@ -814,7 +818,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   private listenForSummaryRequests(): void {
     this.summaryRequested
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         switchMap(() => {
           const configGroupId = this.summaryConfigGroupId();
           if (!configGroupId) {
@@ -848,8 +852,10 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   public deleteReceipt(row: Receipt): void {
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
 
-    dialogRef.componentInstance.headerText = "Delete Receipt";
-    dialogRef.componentInstance.dialogContent = `Are you sure you would like to delete the receipt ${row.name}? This action is irreversible.`;
+    setDialogInputs(dialogRef, {
+      headerText: "Delete Receipt",
+      dialogContent: `Are you sure you would like to delete the receipt ${row.name}? This action is irreversible.`,
+    });
 
     dialogRef
       .afterClosed()
@@ -888,8 +894,10 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     const count = selected.length;
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent, DEFAULT_DIALOG_CONFIG);
 
-    dialogRef.componentInstance.headerText = "Delete Receipts";
-    dialogRef.componentInstance.dialogContent = `Are you sure you would like to delete ${count} selected ${receiptNoun(count)}? This action is irreversible.`;
+    setDialogInputs(dialogRef, {
+      headerText: "Delete Receipts",
+      dialogContent: `Are you sure you would like to delete ${count} selected ${receiptNoun(count)}? This action is irreversible.`,
+    });
 
     dialogRef
       .afterClosed()
@@ -933,8 +941,10 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   public duplicateReceipt(row: Receipt): void {
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
 
-    dialogRef.componentInstance.headerText = "Duplicate Receipt";
-    dialogRef.componentInstance.dialogContent = `Are you sure you would like to duplicate the receipt ${row.name}?`;
+    setDialogInputs(dialogRef, {
+      headerText: "Duplicate Receipt",
+      dialogContent: `Are you sure you would like to duplicate the receipt ${row.name}?`,
+    });
 
     dialogRef
       .afterClosed()

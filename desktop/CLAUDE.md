@@ -362,7 +362,7 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
 - **Form fields:** `app-input`, `app-textarea`, `app-select`, `app-checkbox`, grouped with
   `app-form-section`; bind via the `formGet` pipe.
 - **Field hints:** `app-input` and `app-textarea` bind
-  `[subscriptSizing]="hint ? 'dynamic' : 'fixed'"`, and that conditional is load-bearing both ways.
+  `[subscriptSizing]="hint() ? 'dynamic' : 'fixed'"`, and that conditional is load-bearing both ways.
   Material's default `fixed` reserves a **single line** for the subscript and positions the hint
   wrapper **absolutely**, so a hint that wraps to two or more lines escapes its box and paints over
   whatever follows the field — which is exactly what a long hint in a narrow column does (the MCP
@@ -389,8 +389,13 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   (`src/services/password-generator.service.ts`). It is deliberately **admin-sets-someone-else's-
   password only** — the user form, Set Password, and Convert Dummy User dialogs — not sign-up or the
   fields that hold an existing external secret (system email, receipt-processing settings). The
-  generate handler is synchronous by design: `type` is a plain `@Input`, so under zoneless CD only
-  the click event's CD pass renders the reveal (the clipboard write is a detached side effect).
+  rendered type is `inputType`, a `linkedSignal` over the `type` input and both flags: the eye and
+  Generate override it locally, a later change to the `type` binding wins again, and turning a flag
+  *off* never re-masks a field the user revealed (the clipboard write is a detached side effect).
+- **Currency and mask inputs:** with `[isCurrency]="true"`, `app-input`'s `maskConfig` computed
+  takes the mask, separators and symbol from the currency System Settings live, ignoring the mask
+  inputs except the prefix/suffix on the side the symbol is not on; otherwise the mask inputs apply
+  as bound (`quick-actions-dialog`'s `mask="percent.2"`).
 - **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`. A dialog with nothing to
   submit (one that only reports a result) still uses the footer, with `[showSubmitButton]="false"`
   and `cancelButtonTooltip="Close"`, so its cancel button is the dismiss action — see
@@ -399,8 +404,8 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   an icon-only `app-button` has no accessible name without one, since `mat-icon` is `aria-hidden`.
 - **Confirming an action:** the shared **`ConfirmationDialogComponent`**
   (`src/shared-ui/confirmation-dialog/`). Open it with `matDialog.open(ConfirmationDialogComponent)`,
-  set `componentInstance.headerText` / `componentInstance.dialogContent` (two plain `@Input()`s — it
-  does **not** take `MAT_DIALOG_DATA`), then act on a truthy `afterClosed()`. Check truthiness, not
+  call `setDialogInputs(dialogRef, { headerText, dialogContent })` (two signal inputs — it does
+  **not** take `MAT_DIALOG_DATA`), then act on a truthy `afterClosed()`. Check truthiness, not
   `=== true`: a backdrop click or ESC closes with `undefined`. Every action that writes a record the
   user can't trivially undo gates on it — deletes, and the receipt **Duplicate** in both the
   receipts-table row action and the receipt view header (each creates a real receipt, and the table's
@@ -435,7 +440,7 @@ that per user; the default is **off**, i.e. the panel stays open exactly as befo
 Three things about it are load-bearing:
 
 - **The component reads the preference itself**, from `AuthState.closeChipSelectOnSelect`, rather
-  than taking an `@Input`. It is global by design — the setting says "all of these pickers" — and
+  than taking an input. It is global by design — the setting says "all of these pickers" — and
   threading a flag through the twenty-odd call sites would only create a way for one of them to
   disagree with the rest. The default (`?? false`) lives in the selector, not at the reader.
 - **`closePanel()` alone does not close it.** `MatAutocompleteTrigger` opens on `focus`, and
@@ -813,7 +818,7 @@ The Manage Custom Fields page (`src/custom-fields/`) is a paged `app-table` plus
 dialog, table refetches on a truthy `afterClosed()`), with the differences a custom field's data model
 forces:
 
-- **The dialog is `FormMode`-driven** (`@Input() mode`, defaulting to `FormMode.add`), not the old
+- **The dialog is `FormMode`-driven** (a `mode` input, defaulting to `FormMode.add`), not the old
   binary `readonly` flag — passing a `customField` used to make it permanently read-only, so there was
   no way to reach an editable state. Fields bind `[readonly]="mode | inputReadonly"`, and the footer
   renders for every mode but `view`.
@@ -1012,7 +1017,7 @@ Custom Fields** `app-form-section` on `src/group/group-receipt-settings/` (betwe
   object instances** as the resolved catalog (`buildDefaultCustomFieldsArray`), because
   `app-autocomlete` filters already-selected options by **reference equality**; rebuilt literals leave
   a selected field in the dropdown and let it be added twice. `[readonly]` is bound **explicitly** —
-  `readonly` is a plain `@Input` and is not derived from `inputFormControl.disabled`, so the page's
+  `readonly` is its own input and is not derived from `inputFormControl.disabled`, so the page's
   view-mode `form.disable()` alone would still let a viewer remove chips. A second `app-checkbox`
   binds `applyDefaultCustomFieldsOnIngest` (quick scan / email-created receipts).
 - **Both controls exist only for holders of `app.custom-fields.read`** (added in `initForm()`, the
@@ -1498,6 +1503,17 @@ effect(() => {
 - Signal inputs are read-only (`InputSignal`). Template binding syntax `[prop]="value"` is unchanged.
 - Use `computed()` to derive values from inputs. Use `effect()` only for imperative side effects triggered by input changes.
 - Use `model()` for two-way binding (component modifies a value based on user interaction, e.g., custom form controls).
+- **There are no `@Input()`s left in `src/`.** Read an input as `x()`: an uninvoked `if (this.x)` or
+  `@if (x)` still compiles and is always truthy. Specs set inputs with
+  `fixture.componentRef.setInput("x", v)`; `component.x = v` replaces the signal at runtime.
+- **Dialog components take inputs through `setDialogInputs(dialogRef, { ... })`**
+  (`src/utils/dialog-inputs.ts`), since `MatDialog` creates them without bindings. Its keys and values
+  are type-checked against the component's `input()`s. Call it right after `open()`: the dialog's
+  first change detection runs later, so `input.required` works for a dialog too. The type can't tell a
+  required input from a defaulted one, though, so nothing makes an opener pass a required key; one
+  left out throws NG0950 when the dialog reads it. A dialog opened from
+  a `TemplateRef` binds its inputs in the template instead. Specs that stub `MatDialog.open` return
+  `mockDialogRef()` (`src/testing/dialog-ref.testing.ts`); its `inputs` records what the opener set.
 
 ```typescript
 // Required input — no undefined in type
@@ -1558,7 +1574,7 @@ items = viewChildren(ItemComponent);
   - Provide `initialValue` for Observables that don't emit synchronously.
   - Use `requireSync: true` for BehaviorSubject or other synchronous sources.
 - **`toObservable(signal)`**: Converts Signal to Observable. Only emits the latest stabilized value.
-- **`takeUntilDestroyed()`**: Replaces `@UntilDestroy()` / `untilDestroyed(this)`. Use in constructor or pass `DestroyRef`.
+- **`takeUntilDestroyed()`**: The app's only subscription teardown (`@ngneat/until-destroy` is gone). Call it bare in an injection context (constructor, field initializer); anywhere else pass a `DestroyRef`, declared as `private readonly destroyRef = inject(DestroyRef)` on the component itself, never on a shared base class, where it would clash with subclasses that declare their own.
 - **`outputFromObservable()`**: Declares an output from an Observable source.
 
 ```typescript
@@ -1656,23 +1672,27 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
    is pre-installed and `e2e:install` is blocked — apply the `chromium-1217` /
    `chromium_headless_shell-1217` symlinks from "Running in the Claude Code Web/Cloud Sandbox" above
    instead.)
-2. **One-time:** create the two e2e accounts against your local DB with
-   `../api/dev/seed-e2e-users.sh` (idempotent; it logs in as the auto-created `admin`/`admin` and
-   creates both below; it finds its own files, so it runs without leaving `desktop/`). By hand
-   instead: on a fresh DB, public sign-up is
-   **off** (`enableLocalSignUp` defaults false) and the API has already auto-created `admin`/`admin`,
-   so create them as `admin` (Users screen, or `POST /api/user/` with `appRoleId`):
+2. **Every run:** source the dev env script so the `E2E_*` vars are exported:
+   ```bash
+   cd ../api/dev && source switch-to-sqlite.sh && cd -
+   ```
+   (`switch-to-mariadb.sh` / `switch-to-postgresql.sh` work the same — all three export the same `E2E_*` defaults.)
+3. **Start the Go API** in its own terminal, from `api/` with the same env script sourced there:
+   `go run main.go`. For a local Redis, override `REDIS_HOST=127.0.0.1` (the script exports the
+   docker-compose name `redis`; see `api/CLAUDE.md`). It is ready when it logs
+   `Listening on port 8081`. Playwright auto-starts the Angular dev server via its `webServer`
+   config, but it cannot launch the API.
+4. **One-time:** create the two e2e accounts against your local DB with
+   `../api/dev/seed-e2e-users.sh`. It is idempotent and needs the API from step 3, which creates
+   `admin`/`admin` on its first start; the script logs in as that user to create both below, and
+   finds its own files, so it runs without leaving `desktop/`. By hand instead: on a fresh DB,
+   public sign-up is **off** (`enableLocalSignUp` defaults false), so create them as `admin`
+   (Users screen, or `POST /api/user/` with `appRoleId`):
    - username `e2e-admin`, password `e2e-admin-password`, display name `E2E Admin`, role Legacy Admin
    - username `e2e-user`, password `e2e-user-password`, display name **`E2E User`**, role Legacy User
 
    The display name matters: the provisioning fixtures pick the member by the option text
    `E2E User`, so any other name times out every spec that builds a group in `beforeAll`.
-3. **Every run:** source the dev env script so the `E2E_*` vars are exported:
-   ```bash
-   cd ../api/dev && source switch-to-sqlite.sh && cd -
-   ```
-   (`switch-to-mariadb.sh` / `switch-to-postgresql.sh` work the same — all three export the same `E2E_*` defaults.)
-4. Start the Go API separately (`cd ../api && go run main.go`). Playwright auto-starts the Angular dev server via its `webServer` config, but it cannot launch the API.
 5. Run the tests: `npm run e2e` (or `npm run e2e:ui` for watch-style debugging).
 
 ### CI
@@ -1924,9 +1944,10 @@ four pieces rather than copying a row template:
   for list/users fields, because the multi-select autocompletes `push()` onto the control),
   `listenForBetweenOperation` (swaps the value control between a scalar and a two-slot range as the
   operation flips) and `setupAutoOperationSelection` (picks the first operation for a field's type as
-  soon as it gains a value, and clears it when the value empties). Every entry point takes a
-  `thisContext` for `untilDestroyed`, so **the calling component must carry `@UntilDestroy()`**.
-  `buildReceiptFilterForm` and `buildSystemTaskFilterForm` are thin field lists over these.
+  soon as it gains a value, and clears it when the value empties). The two builders take the calling
+  component's **`DestroyRef`** and tear their subscriptions down with it, so pass
+  `this.destroyRef`; `setupAutoOperationSelection` takes none. `buildReceiptFilterForm` and
+  `buildSystemTaskFilterForm` are thin field lists over these.
 - **`src/utils/filter-chips.ts`** builds the chip labels (`"<Field> <operation> <value>"`,
   `WITHIN_CURRENT_MONTH` stopping at the operation, `BETWEEN` joined with `" – "`). It is pure: the
   caller injects `formatDate` / `formatCurrency` / `resolveOptionName`. `receipt-filter-chips.ts` and

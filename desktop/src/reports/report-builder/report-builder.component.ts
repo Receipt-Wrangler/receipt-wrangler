@@ -9,7 +9,6 @@ import {
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
-import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { EMPTY, catchError, debounceTime, finalize, startWith, switchMap, take, tap } from "rxjs";
 import { Permission, ReportPeriod, ReportRequestCommand, ReportTemplate } from "../../open-api";
@@ -34,10 +33,9 @@ import { ReportGenerateBarComponent } from "../report-generate-bar/report-genera
  * The Report Builder screen: owns the report form, drives the debounced live
  * preview, and runs the synchronous generate-and-download. The config panel,
  * preview panel, and generate bar are presentational children bound to this form.
- * It is @UntilDestroy()-decorated because the shared receipt-filter form builder
- * (reused inside buildReportForm) registers untilDestroyed subscriptions.
+ * It passes its destroyRef to buildReportForm because the shared receipt-filter
+ * form builder (reused inside it) registers subscriptions torn down with it.
  */
-@UntilDestroy()
 @Component({
   selector: "app-report-builder",
   templateUrl: "./report-builder.component.html",
@@ -95,8 +93,8 @@ export class ReportBuilderComponent {
   );
 
   public readonly form: FormGroup = this.loadedTemplate
-    ? buildReportFormFromCommand(this.formBuilder, this, this.loadedTemplate.configuration)
-    : buildReportForm(this.formBuilder, this);
+    ? buildReportFormFromCommand(this.formBuilder, this.destroyRef, this.loadedTemplate.configuration)
+    : buildReportForm(this.formBuilder, this.destroyRef);
 
   public readonly previewHtml = signal<string>("");
   public readonly receiptCount = signal<number>(0);

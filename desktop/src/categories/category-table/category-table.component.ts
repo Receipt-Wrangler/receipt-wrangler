@@ -19,6 +19,7 @@ import { HasAppPermissionDirective } from "../../directives/has-app-permission.d
 import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
 import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
     selector: "app-category-table",
@@ -157,8 +158,10 @@ export class CategoryTableComponent implements OnInit, AfterViewInit {
   public openEditDialog(categoryView: CategoryView): void {
     const dialogRef = this.matDialog.open(CategoryForm, DEFAULT_DIALOG_CONFIG);
 
-    dialogRef.componentInstance.category = categoryView;
-    dialogRef.componentInstance.headerText = `Edit ${categoryView.name}`;
+    setDialogInputs(dialogRef, {
+      category: categoryView,
+      headerText: `Edit ${categoryView.name}`,
+    });
 
     dialogRef
       .afterClosed()
@@ -176,7 +179,7 @@ export class CategoryTableComponent implements OnInit, AfterViewInit {
   public openAddDialog(): void {
     const dialogRef = this.matDialog.open(CategoryForm, DEFAULT_DIALOG_CONFIG);
 
-    dialogRef.componentInstance.headerText = `Add category`;
+    setDialogInputs(dialogRef, { headerText: `Add category` });
 
     dialogRef
       .afterClosed()
@@ -197,8 +200,10 @@ export class CategoryTableComponent implements OnInit, AfterViewInit {
       DEFAULT_DIALOG_CONFIG
     );
 
-    dialogRef.componentInstance.headerText = `Delete ${categoryView.name}`;
-    dialogRef.componentInstance.dialogContent = `Are you sure you want to delete ${categoryView.name}? This action is irreversiable and will remove this category from the receipts it is associated with.`;
+    setDialogInputs(dialogRef, {
+      headerText: `Delete ${categoryView.name}`,
+      dialogContent: `Are you sure you want to delete ${categoryView.name}? This action is irreversiable and will remove this category from the receipts it is associated with.`,
+    });
 
     dialogRef
       .afterClosed()

@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, TemplateRef, input } from "@angular/core";
+import { Component, OnInit, TemplateRef, input } from "@angular/core";
 import { NgClass, NgTemplateOutlet } from "@angular/common";
 import { MatIcon } from "@angular/material/icon";
 
@@ -11,11 +11,11 @@ import { MatIcon } from "@angular/material/icon";
 export class FormSectionComponent implements OnInit {
   public readonly headerText = input<string>("");
 
-  @Input() public headerButtonsTemplate?: TemplateRef<any>;
+  public readonly headerButtonsTemplate = input<TemplateRef<any>>();
 
   public readonly indent = input<boolean>(true);
 
-  @Input() public subtitle: string = "";
+  public readonly subtitle = input<string>("");
 
   public readonly collapsed = input<boolean>(false);
 

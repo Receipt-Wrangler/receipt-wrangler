@@ -15,9 +15,9 @@
   }
   <div class="d-flex align-items-center">
     <h2>{{ headerText() }}</h2>
-    @if (headerButtonsTemplate) {
+    @if (headerButtonsTemplate()) {
       <ng-container
-        [ngTemplateOutlet]="headerButtonsTemplate"
+        [ngTemplateOutlet]="headerButtonsTemplate()"
       ></ng-container>
     }
   </div>

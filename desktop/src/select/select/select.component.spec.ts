@@ -36,8 +36,8 @@ describe('SelectComponent', () => {
   // --- optionBadgeKey -----------------------------------------------------
 
   function configure(optionBadgeKey: string, value: string | null): void {
-    component.inputFormControl = new FormControl(value);
-    component.optionValueKey = 'value';
+    fixture.componentRef.setInput("inputFormControl", new FormControl(value));
+    fixture.componentRef.setInput("optionValueKey", 'value');
     fixture.componentRef.setInput('options', options);
     fixture.componentRef.setInput('optionDisplayKey', 'displayValue');
     fixture.componentRef.setInput('optionBadgeKey', optionBadgeKey);
@@ -58,15 +58,15 @@ describe('SelectComponent', () => {
     configure('badge', 'custom_7');
     expect(component.selectedIndex()).toBe(1);
 
-    component.inputFormControl.setValue('nope');
+    component.inputFormControl().setValue('nope');
     expect(component.selectedIndex()).toBe(-1);
   });
 
   // Without an optionValueKey the control holds the option OBJECT itself, so the
   // match is by reference — the other half of selectedIndex()'s branch.
   it('resolves the selection by identity when there is no value key', () => {
-    component.inputFormControl = new FormControl(options[1]);
-    component.optionValueKey = '';
+    fixture.componentRef.setInput("inputFormControl", new FormControl(options[1]));
+    fixture.componentRef.setInput("optionValueKey", '');
     fixture.componentRef.setInput('options', options);
     fixture.componentRef.setInput('optionDisplayKey', 'displayValue');
     fixture.componentRef.setInput('optionBadgeKey', 'badge');
@@ -75,10 +75,10 @@ describe('SelectComponent', () => {
 
     // An equal-looking copy is a different reference, so it does not match —
     // which is the same rule mat-select itself applies without a compareWith.
-    component.inputFormControl.setValue({ ...options[1] });
+    component.inputFormControl().setValue({ ...options[1] });
     expect(component.selectedIndex()).toBe(-1);
 
-    component.inputFormControl.setValue('nope');
+    component.inputFormControl().setValue('nope');
     expect(component.selectedIndex()).toBe(-1);
   });
 

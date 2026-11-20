@@ -1,5 +1,5 @@
 @if (inDialog()) {
-  <app-dialog [headerText]="headerText">
+  <app-dialog [headerText]="headerText()">
     <ng-template [ngTemplateOutlet]="formTemplate"></ng-template>
   </app-dialog>
 } @else {
@@ -12,27 +12,27 @@
       label="Receipt Date"
       fieldName="date"
       type="date"
-      [parentForm]="parentForm"
-      [basePath]="basePath"
+      [parentForm]="parentForm()"
+      [basePath]="basePath()"
     ></app-filter-field>
 
     <app-filter-field
       label="Name"
       fieldName="name"
       type="text"
-      [parentForm]="parentForm"
-      [basePath]="basePath"
+      [parentForm]="parentForm()"
+      [basePath]="basePath()"
     ></app-filter-field>
 
     <app-filter-field
       label="Paid by"
       fieldName="paidBy"
       type="users"
-      [parentForm]="parentForm"
-      [basePath]="basePath"
+      [parentForm]="parentForm()"
+      [basePath]="basePath()"
     ></app-filter-field>
 
-    @if (showGroupFilter) {
+    @if (showGroupFilter()) {
       <app-filter-field
         label="Group"
         fieldName="group"
@@ -40,8 +40,8 @@
         optionFilterKey="name"
         optionDisplayKey="name"
         optionValueKey="id"
-        [parentForm]="parentForm"
-        [basePath]="basePath"
+        [parentForm]="parentForm()"
+        [basePath]="basePath()"
         [options]="groups() ?? []"
         [multiple]="true"
       ></app-filter-field>
@@ -51,8 +51,8 @@
       label="Amount"
       fieldName="amount"
       type="number"
-      [parentForm]="parentForm"
-      [basePath]="basePath"
+      [parentForm]="parentForm()"
+      [basePath]="basePath()"
       [isCurrency]="true"
     ></app-filter-field>
 
@@ -63,9 +63,9 @@
       optionFilterKey="name"
       optionDisplayKey="name"
       optionValueKey="id"
-      [parentForm]="parentForm"
-      [basePath]="basePath"
-      [options]="categories"
+      [parentForm]="parentForm()"
+      [basePath]="basePath()"
+      [options]="categories()"
       [multiple]="true"
     ></app-filter-field>
 
@@ -76,9 +76,9 @@
       optionFilterKey="name"
       optionDisplayKey="name"
       optionValueKey="id"
-      [parentForm]="parentForm"
-      [basePath]="basePath"
-      [options]="tags"
+      [parentForm]="parentForm()"
+      [basePath]="basePath()"
+      [options]="tags()"
       [multiple]="true"
     ></app-filter-field>
 
@@ -89,8 +89,8 @@
       optionFilterKey="value"
       optionDisplayKey="displayValue"
       optionValueKey="value"
-      [parentForm]="parentForm"
-      [basePath]="basePath"
+      [parentForm]="parentForm()"
+      [basePath]="basePath()"
       [options]="receiptStatusOptions"
       [multiple]="true"
     ></app-filter-field>
@@ -99,31 +99,20 @@
       label="Resolved Date"
       fieldName="resolvedDate"
       type="date"
-      [parentForm]="parentForm"
-      [basePath]="basePath"
+      [parentForm]="parentForm()"
+      [basePath]="basePath()"
     ></app-filter-field>
 
     <app-filter-field
       label="Added At"
       fieldName="createdAt"
       type="date"
-      [parentForm]="parentForm"
-      [basePath]="basePath"
+      [parentForm]="parentForm()"
+      [basePath]="basePath()"
     ></app-filter-field>
 
     <ng-template
       [ngTemplateOutlet]="footerTemplate() ?? defaultFooter"
-    ></ng-template>
-  } @else {
-    <ng-container [ngTemplateOutlet]="preview"></ng-container>
-  }
-</ng-template>
-
-<ng-template #preview>
-  @if (previewTemplate) {
-    <ng-template
-      [ngTemplateOutlet]="previewTemplate"
-      [ngTemplateOutletContext]="previewTemplateContext()"
     ></ng-template>
   }
 </ng-template>

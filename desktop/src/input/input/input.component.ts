@@ -1,10 +1,9 @@
-import { Component, Input, OnChanges, SimpleChanges, input, viewChild } from "@angular/core";
+import { Component, computed, input, linkedSignal, viewChild } from "@angular/core";
 import { Store } from "@ngxs/store";
 import { BaseInputComponent } from "../../base-input";
 import { CurrencySeparator, CurrencySymbolPosition } from "../../open-api/index";
 import { PasswordGeneratorService } from "../../services/password-generator.service";
 import { SystemSettingsState } from "../../store/system-settings.state";
-import { InputInterface } from "../input.interface";
 import { MatFormField, MatLabel, MatInput, MatError, MatSuffix, MatHint } from "@angular/material/input";
 import { ReactiveFormsModule } from "@angular/forms";
 import { NgxMaskDirective } from "ngx-mask";
@@ -19,9 +18,7 @@ import { AsyncPipe } from "@angular/common";
   styleUrls: ["./input.component.scss"],
   imports: [MatFormField, MatLabel, MatInput, ReactiveFormsModule, NgxMaskDirective, MatError, MatSuffix, MatIconButton, MatTooltip, MatIcon, MatHint, AsyncPipe]
 })
-export class InputComponent
-  extends BaseInputComponent
-  implements InputInterface, OnChanges {
+export class InputComponent extends BaseInputComponent {
   public readonly nativeInput = viewChild.required<{
     nativeElement: HTMLElement;
 }>("nativeInput");
@@ -34,25 +31,86 @@ export class InputComponent
 
   public currencySymbolPosition = this.store.selectSignal(SystemSettingsState.currencySymbolPosition);
 
+  private readonly currencyHideDecimalPlaces = this.store.selectSignal(SystemSettingsState.currencyHideDecimalPlaces);
+
   public readonly inputId = input<string>("");
 
-  @Input() public type: string = "text";
+  public readonly type = input<string>("text");
 
-  @Input() public showVisibilityEye = false;
+  public readonly showVisibilityEye = input<boolean>(false);
 
-  @Input() public showGeneratePassword = false;
+  public readonly showGeneratePassword = input<boolean>(false);
 
   public readonly isCurrency = input<boolean>(false);
 
-  @Input() public mask: string = "";
+  public readonly mask = input<string>("");
 
-  @Input() public maskPrefix: string = "";
+  public readonly maskPrefix = input<string>("");
 
-  @Input() public maskSuffix: string = "";
+  public readonly maskSuffix = input<string>("");
 
-  @Input() public thousandSeparator: string = "";
+  public readonly thousandSeparator = input<string>("");
 
-  @Input() public decimalMarker: CurrencySeparator = CurrencySeparator.Period;
+  public readonly decimalMarker = input<CurrencySeparator>(CurrencySeparator.Period);
+
+  /**
+   * The type the native input renders with. It follows the `type` input, except
+   * that either password affordance implies a password field: switching one on
+   * masks the field, on the initial binding and on a later false -> true flip.
+   * The eye and the generate button override it locally, and turning a flag off
+   * or changing an unrelated input never re-masks a field the user revealed.
+   */
+  public readonly inputType = linkedSignal<
+    { type: string; eye: boolean; generate: boolean },
+    string
+  >({
+    source: () => ({
+      type: this.type(),
+      eye: this.showVisibilityEye(),
+      generate: this.showGeneratePassword(),
+    }),
+    computation: (current, previous) => {
+      const becamePasswordField = previous
+        ? (current.eye && !previous.source.eye) ||
+          (current.generate && !previous.source.generate)
+        : current.eye || current.generate;
+      if (becamePasswordField) {
+        return "password";
+      }
+      if (!previous || current.type !== previous.source.type) {
+        return current.type;
+      }
+      return previous.value;
+    },
+  });
+
+  /**
+   * What the ngx-mask directive is bound to. A currency field takes its mask
+   * from the system's currency settings; any other field from its own inputs,
+   * with the separators reset when it has no mask at all.
+   */
+  protected readonly maskConfig = computed(() => {
+    if (this.isCurrency()) {
+      const hideDecimalPlaces = this.currencyHideDecimalPlaces();
+      const symbolPosition = this.currencySymbolPosition();
+      return {
+        mask: hideDecimalPlaces ? "separator.0" : "separator.2",
+        prefix: symbolPosition === CurrencySymbolPosition.Start ? this.currencyDisplay() : this.maskPrefix(),
+        suffix: symbolPosition === CurrencySymbolPosition.End ? this.currencyDisplay() : this.maskSuffix(),
+        thousandSeparator: this.currencyThousandthsSeparator(),
+        decimalMarker: hideDecimalPlaces ? CurrencySeparator.Period : this.currencyDecimalSeparator(),
+      };
+    }
+
+    const unmasked = !this.mask() && !this.maskPrefix() && !this.maskSuffix();
+    return {
+      mask: this.mask(),
+      prefix: this.maskPrefix(),
+      suffix: this.maskSuffix(),
+      thousandSeparator: unmasked ? "" : this.thousandSeparator(),
+      decimalMarker: unmasked ? CurrencySeparator.Period : this.decimalMarker(),
+    };
+  });
 
   constructor(
     private store: Store,
@@ -62,47 +120,6 @@ export class InputComponent
   }
 
 
-  public ngOnChanges(changes: SimpleChanges): void {
-    // Either password affordance implies a password field, so mask it whenever
-    // one is switched on — `changes` only carries a key that actually changed,
-    // so this fires on the initial binding and on a later false -> true flip,
-    // and never re-masks a field the user has revealed.
-    const becamePasswordField =
-      changes["showVisibilityEye"]?.currentValue ||
-      changes["showGeneratePassword"]?.currentValue;
-    if (becamePasswordField) {
-      this.type = "password";
-    }
-
-    this.initCurrencyField();
-  }
-
-  private initCurrencyField(): void {
-    if (this.isCurrency()) {
-      if (this.store.selectSnapshot(SystemSettingsState.currencyHideDecimalPlaces)) {
-        this.decimalMarker = CurrencySeparator.Period;
-        this.mask = "separator.0";
-      } else {
-        this.decimalMarker = this.store.selectSnapshot(SystemSettingsState.currencyDecimalSeparator);
-        this.mask = "separator.2";
-      }
-
-      this.thousandSeparator = this.store.selectSnapshot(SystemSettingsState.currencyThousandthsSeparator);
-      if (this.store.selectSnapshot(SystemSettingsState.currencySymbolPosition) === CurrencySymbolPosition.Start) {
-        this.maskPrefix = this.store.selectSnapshot(SystemSettingsState.currencyDisplay);
-      }
-      if (this.store.selectSnapshot(SystemSettingsState.currencySymbolPosition) === CurrencySymbolPosition.End) {
-        this.maskSuffix = this.store.selectSnapshot(SystemSettingsState.currencyDisplay);
-      }
-    } else if (!this.mask && !this.maskPrefix && !this.maskSuffix) {
-      // Only clear mask if it wasn't manually set
-      this.maskPrefix = "";
-      this.maskSuffix = "";
-      this.thousandSeparator = "";
-      this.decimalMarker = CurrencySeparator.Period;
-    }
-  }
-
   /**
    * Fills the field with a freshly generated password and reveals it so the
    * user can see what landed on their clipboard. Everything that affects the
@@ -110,26 +127,22 @@ export class InputComponent
    * event's change-detection pass will render it.
    */
   public generatePassword(): void {
-    if (this.inputFormControl.disabled || this.readonly) {
+    if (this.inputFormControl().disabled || this.readonly()) {
       return;
     }
 
-    this.inputFormControl.setValue(this.passwordGeneratorService.generateAndCopy());
-    this.inputFormControl.markAsDirty();
-    this.type = "text";
+    this.inputFormControl().setValue(this.passwordGeneratorService.generateAndCopy());
+    this.inputFormControl().markAsDirty();
+    this.inputType.set("text");
   }
 
   public toggleVisibility(): void {
-    if (this.type !== "password") {
-      this.type = "password";
-    } else {
-      this.type = "text";
-    }
+    this.inputType.set(this.inputType() !== "password" ? "password" : "text");
   }
 
   // TODO: Figure this out as apart of validation issues
   // private getMinValue(): string {
-  //   const err = this.inputFormControl.errors as any;
+  //   const err = this.inputFormControl().errors as any;
   //   return err['min']['min'] ?? '0';
   // }
 }

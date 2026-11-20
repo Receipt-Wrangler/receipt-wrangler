@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, computed, output } from "@angular/core";
+import { Component, OnInit, computed, output, input } from "@angular/core";
 import { FormGroup } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
@@ -31,9 +31,9 @@ import { ButtonComponent } from "../../button/button/button.component";
   imports: [DialogComponent, FilterFieldComponent, DialogFooterComponent, ButtonComponent]
 })
 export class SystemTaskFilterComponent implements OnInit {
-  @Input() public headerText: string = "";
+  public readonly headerText = input<string>("");
 
-  @Input() public parentForm: FormGroup = new FormGroup({});
+  public readonly parentForm = input<FormGroup>(new FormGroup({}));
 
   public readonly formCommand = output<FormCommand>();
 
@@ -57,7 +57,7 @@ export class SystemTaskFilterComponent implements OnInit {
   ) {}
 
   public ngOnInit(): void {
-    setupAutoOperationSelection(this.parentForm, "", SYSTEM_TASK_FILTER_FIELDS);
+    setupAutoOperationSelection(this.parentForm(), "", SYSTEM_TASK_FILTER_FIELDS);
   }
 
   public resetFilter(): void {
@@ -77,13 +77,13 @@ export class SystemTaskFilterComponent implements OnInit {
   }
 
   public submitButtonClicked(): void {
-    if (!this.parentForm.valid) {
-      this.parentForm.markAllAsTouched();
+    if (!this.parentForm().valid) {
+      this.parentForm().markAllAsTouched();
       return;
     }
 
     this.store
-      .dispatch(new SetSystemTaskFilter(this.parentForm.value))
+      .dispatch(new SetSystemTaskFilter(this.parentForm().value))
       .pipe(
         take(1),
         tap(() => {

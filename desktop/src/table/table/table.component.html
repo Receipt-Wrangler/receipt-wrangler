@@ -93,7 +93,7 @@
     [pageIndex]="page()"
     [pageSizeOptions]="[5, 15, 25, 50, 100]"
     [pageSize]="pageSize()"
-    [length]="length ? length : null"
+    [length]="length() ? length() : null"
     (page)="pageChanged($event)"
   ></mat-paginator>
 }

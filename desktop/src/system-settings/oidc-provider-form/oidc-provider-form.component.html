@@ -1,4 +1,4 @@
-<app-dialog [headerText]="headerText">
+<app-dialog [headerText]="headerText()">
   <form [formGroup]="form">
     <div class="d-flex flex-column">
       <app-form-section headerText="Details" [indent]="false">
@@ -13,13 +13,13 @@
           label="Display Name"
           hint="Shown to users as &quot;Log in with ...&quot;."
           data-testid="oidc-provider-display-name"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'displayName'"
         ></app-input>
         <app-input
           label="Client ID"
           data-testid="oidc-provider-client-id"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'clientId'"
         ></app-input>
         <app-input
@@ -28,21 +28,21 @@
           data-testid="oidc-provider-client-secret"
           [hint]="clientSecretHint"
           [showVisibilityEye]="true"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'clientSecret'"
         ></app-input>
         <app-input
           label="Issuer URL"
           hint="The provider's discovery base, e.g. https://accounts.google.com"
           data-testid="oidc-provider-issuer-url"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'issuerUrl'"
         ></app-input>
         <app-input
           label="Scope"
           hint="Space-separated OIDC scopes. Must include openid."
           data-testid="oidc-provider-scope"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'scope'"
         ></app-input>
 
@@ -71,13 +71,13 @@
         <app-checkbox
           label="Enabled"
           data-testid="oidc-provider-enabled"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'enabled'"
         ></app-checkbox>
         <app-checkbox
           label="Create accounts for new users"
           data-testid="oidc-provider-allow-provisioning"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'allowProvisioning'"
         ></app-checkbox>
         <div class="oidc-hint">
@@ -88,7 +88,7 @@
         <app-checkbox
           label="Link to existing accounts by username"
           data-testid="oidc-provider-link-by-username"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'linkByUsername'"
         ></app-checkbox>
         <div class="oidc-hint oidc-hint--warning">
@@ -103,7 +103,7 @@
       </app-form-section>
     </div>
 
-    @if (mode !== FormMode.view) {
+    @if (mode() !== FormMode.view) {
       <app-dialog-footer
         (cancelClicked)="closeDialog()"
         (submitClicked)="submit()"

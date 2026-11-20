@@ -18,6 +18,7 @@ import { SystemEmailTaskTableState } from "../../store/system-email-task-table.s
 
 import { SystemEmailFormComponent } from "./system-email-form.component";
 import { provideNgxMask } from "ngx-mask";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 describe("SystemEmailFormComponent", () => {
   let component: SystemEmailFormComponent;
@@ -122,10 +123,7 @@ describe("SystemEmailFormComponent", () => {
       component.ngOnInit();
       component.originalSystemEmail = { id: 1 } as any;
       component.form.get("password")?.markAsDirty();
-      const matDialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue({
-        componentInstance: {},
-        afterClosed: () => of(result)
-      } as any);
+      const matDialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue(mockDialogRef({ afterClosed: of(result) }) as any);
       const updateSpy = jest.spyOn(TestBed.inject(SystemEmailService), "updateSystemEmailById").mockReturnValue(of({} as any));
       component.formConfig = { mode: FormMode.edit } as any;
       component.submit();

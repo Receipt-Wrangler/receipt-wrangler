@@ -19,6 +19,7 @@ import { SnackbarService } from "../../services";
 import { AuthState, GroupState } from "../../store";
 import { ReportRunnerService } from "../services/report-runner.service";
 import { ReportTemplateListComponent } from "./report-template-list.component";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 function makeTemplate(id: number, name: string): ReportTemplate {
   return {
@@ -55,7 +56,7 @@ describe("ReportTemplateListComponent", () => {
   let router: { navigate: jest.Mock };
   let snackbar: { success: jest.Mock; error: jest.Mock };
   let dialogResult: boolean;
-  let dialogInstance: { headerText: string; dialogContent: string };
+  let dialogInputs: Record<string, any>;
   // Drives the component's canEnterBuilder gate (the "New Report" button). The store mock
   // routes the AuthState.hasAnyAppPermission selectSignal to this controllable signal.
   let canEnterBuilder: WritableSignal<boolean>;
@@ -64,7 +65,7 @@ describe("ReportTemplateListComponent", () => {
 
   beforeEach(async () => {
     dialogResult = true;
-    dialogInstance = { headerText: "", dialogContent: "" };
+    dialogInputs = {};
     canEnterBuilder = signal(true);
     runner = {
       listTemplates: jest.fn(() => of({ data: templates, totalCount: templates.length })),
@@ -89,10 +90,11 @@ describe("ReportTemplateListComponent", () => {
       dispatch: jest.fn(),
     };
     const matDialog = {
-      open: jest.fn(() => ({
-        componentInstance: dialogInstance,
-        afterClosed: () => of(dialogResult),
-      })),
+      open: jest.fn(() => {
+        const dialogRef = mockDialogRef({ afterClosed: of(dialogResult) });
+        dialogInputs = dialogRef.inputs;
+        return dialogRef;
+      }),
     };
 
     await TestBed.configureTestingModule({
@@ -249,7 +251,7 @@ describe("ReportTemplateListComponent", () => {
     dialogResult = true;
     runner.listTemplates.mockClear();
     component.delete(templates[0]);
-    expect(dialogInstance.headerText).toBe("Delete Report Template");
+    expect(dialogInputs["headerText"]).toBe("Delete Report Template");
     expect(runner.deleteTemplate).toHaveBeenCalledWith(1);
     expect(snackbar.success).toHaveBeenCalledWith("Template deleted");
     expect(runner.listTemplates).toHaveBeenCalled();

@@ -41,6 +41,7 @@ import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.com
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 import { AsyncPipe } from "@angular/common";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 /**
  * The Reports landing page: a paged table of saved report templates. Each row
@@ -251,8 +252,10 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
 
   public delete(template: ReportTemplate): void {
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent, DEFAULT_DIALOG_CONFIG);
-    dialogRef.componentInstance.headerText = "Delete Report Template";
-    dialogRef.componentInstance.dialogContent = `Are you sure you want to delete "${template.name}"? This action is irreversible.`;
+    setDialogInputs(dialogRef, {
+      headerText: "Delete Report Template",
+      dialogContent: `Are you sure you want to delete "${template.name}"? This action is irreversible.`,
+    });
 
     dialogRef
       .afterClosed()

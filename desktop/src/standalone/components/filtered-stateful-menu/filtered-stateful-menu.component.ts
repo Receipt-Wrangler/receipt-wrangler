@@ -1,5 +1,5 @@
 import { CdkMenu, CdkMenuTrigger } from "@angular/cdk/menu";
-import { Component, Input, computed, input, output } from "@angular/core";
+import { Component, computed, input, output } from "@angular/core";
 import { FormControl } from "@angular/forms";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { MatCheckbox } from "@angular/material/checkbox";
@@ -26,7 +26,7 @@ export class FilteredStatefulMenuComponent extends BaseButtonComponent {
 
   public readonly filterLabel = input("Filter options");
 
-  @Input() public headerText = "";
+  public readonly headerText = input("");
 
   public readonly readonly = input(false);
 

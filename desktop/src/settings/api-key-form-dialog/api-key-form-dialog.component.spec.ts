@@ -107,7 +107,7 @@ describe('ApiKeyFormDialogComponent', () => {
       description: 'Existing description',
       scope: ApiKeyScope.R
     };
-    component.apiKey = mockApiKey;
+    fixture.componentRef.setInput("apiKey", mockApiKey);
     component.ngOnInit(); // Re-initialize form with existing data
 
     mockApiKeyService.updateApiKey.mockReturnValue(of({}) as any);
@@ -136,7 +136,7 @@ describe('ApiKeyFormDialogComponent', () => {
       description: 'Existing description',
       scope: ApiKeyScope.Rw
     };
-    component.apiKey = mockApiKey;
+    fixture.componentRef.setInput("apiKey", mockApiKey);
     component.ngOnInit(); // Re-initialize form
 
     expect(component.form.get('name')?.value).toBe('Existing API Key');
@@ -182,7 +182,7 @@ describe('ApiKeyFormDialogComponent', () => {
 
   it('should close dialog with true when editing existing API key', () => {
     const mockApiKey: ApiKeyView = { id: '123', name: 'Test API Key' };
-    component.apiKey = mockApiKey;
+    fixture.componentRef.setInput("apiKey", mockApiKey);
 
     component.closeDialog();
 
@@ -265,7 +265,7 @@ describe('ApiKeyFormDialogComponent', () => {
         description: 'Existing description',
         scope: ApiKeyScope.R
       };
-      component.apiKey = mockApiKey;
+      fixture.componentRef.setInput("apiKey", mockApiKey);
       component.ngOnInit();
 
       const error = { message: 'Update Error', status: 500 };
@@ -318,7 +318,7 @@ describe('ApiKeyFormDialogComponent', () => {
     });
 
     it('renders the scope select when editing', () => {
-      component.apiKey = { id: '123', name: 'Existing API Key', scope: ApiKeyScope.W };
+      fixture.componentRef.setInput("apiKey", { id: '123', name: 'Existing API Key', scope: ApiKeyScope.W });
       component.ngOnInit();
       fixture.detectChanges();
 
@@ -343,9 +343,9 @@ describe('ApiKeyFormDialogComponent', () => {
 
     it('should set header text from input property', () => {
       const headerText = 'Create New API Key';
-      component.headerText = headerText;
+      fixture.componentRef.setInput("headerText", headerText);
 
-      expect(component.headerText).toBe(headerText);
+      expect(component.headerText()).toBe(headerText);
     });
 
     it('should reset form when apiKey input changes', () => {
@@ -360,7 +360,7 @@ describe('ApiKeyFormDialogComponent', () => {
         description: 'Edit description',
         scope: ApiKeyScope.Rw
       };
-      component.apiKey = mockApiKey;
+      fixture.componentRef.setInput("apiKey", mockApiKey);
       component.ngOnInit();
 
       expect(component.form.get('name')?.value).toBe('Edit API Key');
@@ -372,7 +372,7 @@ describe('ApiKeyFormDialogComponent', () => {
       component.apiKeyResult.set({ key: 'test-key' });
 
       const mockApiKey: ApiKeyView = { id: '123', name: 'Test' };
-      component.apiKey = mockApiKey;
+      fixture.componentRef.setInput("apiKey", mockApiKey);
       component.ngOnInit();
 
       // apiKeyResult should be cleared when switching to edit mode
@@ -382,7 +382,7 @@ describe('ApiKeyFormDialogComponent', () => {
 
   describe('Edge Cases', () => {
     it('should handle null API key input', () => {
-      component.apiKey = null as any;
+      fixture.componentRef.setInput("apiKey", null as any);
       component.ngOnInit();
 
       expect(component.form.get('name')?.value).toBe('');
@@ -391,7 +391,7 @@ describe('ApiKeyFormDialogComponent', () => {
     });
 
     it('should handle undefined API key input', () => {
-      component.apiKey = undefined;
+      fixture.componentRef.setInput("apiKey", undefined);
       component.ngOnInit();
 
       expect(component.form.get('name')?.value).toBe('');
@@ -405,7 +405,7 @@ describe('ApiKeyFormDialogComponent', () => {
         name: 'Incomplete API Key'
         // Missing description and scope
       };
-      component.apiKey = incompleteApiKey as ApiKeyView;
+      fixture.componentRef.setInput("apiKey", incompleteApiKey as ApiKeyView);
       component.ngOnInit();
 
       expect(component.form.get('name')?.value).toBe('Incomplete API Key');
@@ -433,7 +433,7 @@ describe('ApiKeyFormDialogComponent', () => {
     });
 
     it('should handle closeDialog when no API key and no result', () => {
-      component.apiKey = undefined;
+      fixture.componentRef.setInput("apiKey", undefined);
       component.apiKeyResult.set(undefined);
 
       component.closeDialog();
@@ -523,7 +523,7 @@ describe('ApiKeyFormDialogComponent', () => {
         scope: ApiKeyScope.R
       };
 
-      component.apiKey = mockApiKey;
+      fixture.componentRef.setInput("apiKey", mockApiKey);
       component.ngOnInit();
 
       mockApiKeyService.updateApiKey.mockReturnValue(of({}) as any);

@@ -1,4 +1,4 @@
-import { Component, Input, TemplateRef } from '@angular/core';
+import { Component, TemplateRef, input } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { DialogComponent } from '../dialog/dialog.component';
 import { DialogFooterComponent } from '../dialog-footer/dialog-footer.component';
@@ -12,9 +12,9 @@ import { DialogFooterComponent } from '../dialog-footer/dialog-footer.component'
 export class ConfirmationDialogComponent {
   constructor(private dialogRef: MatDialogRef<ConfirmationDialogComponent>) {}
 
-  @Input() public headerText: string = '';
+  public readonly headerText = input<string>('');
 
-  @Input() public dialogContent: string = '';
+  public readonly dialogContent = input<string>('');
 
   public submitButtonClicked(): void {
     this.dialogRef.close(true);

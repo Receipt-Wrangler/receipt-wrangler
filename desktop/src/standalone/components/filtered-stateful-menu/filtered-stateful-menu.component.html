@@ -4,8 +4,8 @@
   [buttonText]="buttonText()"
   [type]="type()"
   [matButtonType]="matButtonType()"
-  [icon]="icon"
-  [customIcon]="customIcon"
+  [icon]="icon()"
+  [customIcon]="customIcon()"
   [tooltip]="tooltip()"
   [matBadgeContent]="matBadgeContent()"
   [matBadgeColor]="matBadgeColor()"
@@ -16,9 +16,9 @@
 
 <ng-template #menu>
   <div class="mat-mdc-menu-panel" cdkMenu>
-    @if (headerText) {
+    @if (headerText()) {
       <h5 class="justify-content-center m-3">
-        {{ headerText }}
+        {{ headerText() }}
       </h5>
     }
     <app-input

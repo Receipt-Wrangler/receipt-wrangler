@@ -400,7 +400,7 @@ describe("GroupReceiptSettingsComponent", () => {
         By.css("[data-testid='group-default-custom-fields']")
       );
       expect(picker).toBeTruthy();
-      expect(picker.componentInstance.readonly).toBe(true);
+      expect(picker.componentInstance.readonly()).toBe(true);
     });
 
     it("should not mark the picker readonly in edit mode", async () => {
@@ -409,7 +409,7 @@ describe("GroupReceiptSettingsComponent", () => {
       const picker = fixture.debugElement.query(
         By.css("[data-testid='group-default-custom-fields']")
       );
-      expect(picker.componentInstance.readonly).toBe(false);
+      expect(picker.componentInstance.readonly()).toBe(false);
     });
   });
 

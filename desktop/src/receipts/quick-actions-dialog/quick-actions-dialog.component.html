@@ -11,7 +11,7 @@
       label="Users to Split Between"
       [inputFormControl]="localForm | formGet : 'usersToSplit'"
       [multiple]="true"
-      [usersToOmit]="usersToOmit"
+      [usersToOmit]="usersToOmit()"
     >
     </app-user-autocomplete>
     @switch ((localForm | formGet : 'quickAction')?.value) {
