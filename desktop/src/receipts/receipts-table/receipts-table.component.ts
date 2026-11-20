@@ -75,7 +75,7 @@ import { HasGroupPermissionDirective } from "../../directives/has-group-permissi
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { NamePipe } from "../../pipes/name.pipe";
 import { UserPipe } from "../../pipes/user.pipe";
-import { setDialogInputs } from "src/utils/dialog-inputs";
+import { getDialogDestroyRef, setDialogInputs } from "src/utils/dialog-inputs";
 
 /**
  * A receipts-table column, carrying the custom field definition when the column
@@ -654,7 +654,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     setDialogInputs(dialogRef, {
       categories: this.categories(),
       tags: this.tags(),
-      parentForm: buildReceiptFilterForm(filter, this.destroyRef),
+      parentForm: buildReceiptFilterForm(filter, getDialogDestroyRef(dialogRef)),
       headerText: "Filter Receipts",
       // The group filter is only meaningful on the "All groups" view; a
       // single-group view is already scoped to one group.

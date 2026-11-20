@@ -188,6 +188,24 @@ describe("ReceiptFilterComponent", () => {
     expect(countListRows(true)).toBe(countListRows(false) + 1);
   });
 
+  // The form can outlive the filter component (dashboard widgets, reports), so
+  // the auto-selection listener has to end with the component, not the form.
+  it("stops auto-selecting an operation once the component is destroyed", () => {
+    const form = buildReceiptFilterForm({}, TestBed.inject(DestroyRef));
+    const localFixture = TestBed.createComponent(ReceiptFilterComponent);
+    localFixture.componentRef.setInput("parentForm", form);
+    localFixture.detectChanges();
+
+    form.get("name.value")!.setValue("Coffee");
+    expect(form.get("name.operation")!.value).toBeTruthy();
+
+    localFixture.destroy();
+    form.get("name.operation")!.setValue(null);
+    form.get("name.value")!.setValue("Tea");
+
+    expect(form.get("name.operation")!.value).toBeNull();
+  });
+
   it("defaults showGroupFilter to false", () => {
     expect(component.showGroupFilter()).toBe(false);
   });

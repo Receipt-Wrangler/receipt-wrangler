@@ -1,7 +1,10 @@
+import { firstValueFrom } from "rxjs";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { FormGroup } from "@angular/forms";
+import { MatDialog } from "@angular/material/dialog";
 import { MatChipsModule } from "@angular/material/chips";
 import { MatIconModule } from "@angular/material/icon";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
@@ -17,6 +20,7 @@ import {
   SetSystemTaskFilterField
 } from "../../store/system-task-table.state.actions";
 
+import { SystemTaskFilterComponent } from "../system-task-filter/system-task-filter.component";
 import { SystemTaskTableComponent } from "./system-task-table.component";
 
 describe("SystemTaskTableComponent", () => {
@@ -89,5 +93,23 @@ describe("SystemTaskTableComponent", () => {
     expect(dispatchSpy).toHaveBeenCalledWith(new SetPage(1));
     expect(store.selectSnapshot(SystemTaskTableState.page)).toBe(1);
     expect(component.filterChips()).toEqual([]);
+  });
+
+  // #750: the filter form is built per open, so its subscriptions must end with
+  // the dialog, not live on until the table is destroyed.
+  it("ends the filter form's subscriptions when the dialog closes", async () => {
+    component.filterButtonClicked();
+    const dialogRef = TestBed.inject(MatDialog).openDialogs[0];
+    const form: FormGroup = (dialogRef.componentInstance as SystemTaskFilterComponent).parentForm();
+    const watched = [form.get("type.value")!, form.get("startedAt.operation")!];
+
+    expect(watched.every((control) => (control.valueChanges as any).observed)).toBe(true);
+
+    const closed = firstValueFrom(dialogRef.afterClosed());
+    dialogRef.close();
+    await closed;
+
+    expect(dialogRef.componentRef?.hostView.destroyed).toBe(true);
+    expect(watched.some((control) => (control.valueChanges as any).observed)).toBe(false);
   });
 });

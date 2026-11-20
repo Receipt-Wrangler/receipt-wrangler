@@ -11,8 +11,10 @@ import { FilterOperation } from "../open-api/index";
  * shared by `buildReceiptFilterForm` and `buildSystemTaskFilterForm` so the two
  * cannot drift on how a BETWEEN range or an auto-selected operation behaves.
  *
- * The builders take the calling component's `DestroyRef`, which their
- * subscriptions are torn down with.
+ * The builders take the `DestroyRef` their subscriptions are torn down with —
+ * that of whatever owns the form. A form built for a dialog takes the dialog's
+ * (`getDialogDestroyRef`), not the opener's, or every open leaves its
+ * subscriptions running until the opener itself is destroyed.
  */
 
 /**
@@ -124,11 +126,16 @@ function betweenValidator(control: AbstractControl): { [key: string]: any } | nu
  * Picks the first operation for a field's type as soon as it gains a value, and
  * clears the operation again when the value empties — so a user who types a
  * name never has to also pick "Contains".
+ *
+ * Takes the filter component's own `DestroyRef`: the form can outlive the
+ * component (a dashboard widget or report keeps its filter form while the
+ * filter UI comes and goes), and each new component sets this up again.
  */
 export function setupAutoOperationSelection(
   parentForm: FormGroup,
   basePath: string,
   fields: readonly FilterField[],
+  destroyRef: DestroyRef,
 ): void {
   const operationsPipe = new OperationsPipe();
 
@@ -140,7 +147,7 @@ export function setupAutoOperationSelection(
       return;
     }
 
-    valueControl.valueChanges.subscribe((value) => {
+    valueControl.valueChanges.pipe(takeUntilDestroyed(destroyRef)).subscribe((value) => {
       if (hasFieldValue(value, type)) {
         // Set first operation if none is selected
         if (!operationControl.value) {

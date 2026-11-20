@@ -1,4 +1,4 @@
-import { InputSignalWithTransform } from "@angular/core";
+import { ComponentRef, DestroyRef, InputSignalWithTransform } from "@angular/core";
 import { MatDialogRef } from "@angular/material/dialog";
 
 /** A component's signal inputs, keyed by name, typed by the value each accepts. */
@@ -23,14 +23,31 @@ export function setDialogInputs<T>(
   dialogRef: MatDialogRef<T>,
   inputs: DialogInputs<T>
 ): void {
-  const componentRef = dialogRef.componentRef;
-  if (!componentRef) {
-    throw new Error(
-      "setDialogInputs needs a dialog opened with a component, not a template."
-    );
-  }
+  const componentRef = getDialogComponentRef(dialogRef, "setDialogInputs");
 
   for (const [name, value] of Object.entries(inputs)) {
     componentRef.setInput(name, value);
   }
+}
+
+/**
+ * The `DestroyRef` of the component a dialog was opened with. It fires when
+ * MatDialog destroys that component on close, so anything an opener builds
+ * *for* the dialog — a filter form and its subscriptions, say — should end on
+ * this rather than on the opener's own `DestroyRef`, which can outlive many
+ * dialogs.
+ */
+export function getDialogDestroyRef<T>(dialogRef: MatDialogRef<T>): DestroyRef {
+  return getDialogComponentRef(dialogRef, "getDialogDestroyRef").injector.get(DestroyRef);
+}
+
+function getDialogComponentRef<T>(dialogRef: MatDialogRef<T>, caller: string): ComponentRef<T> {
+  const componentRef = dialogRef.componentRef;
+  if (!componentRef) {
+    throw new Error(
+      `${caller} needs a dialog opened with a component, not a template.`
+    );
+  }
+
+  return componentRef;
 }

@@ -1,5 +1,5 @@
 import { DatePipe } from "@angular/common";
-import { Component, OnInit, TemplateRef, computed, viewChild, DestroyRef, inject } from "@angular/core";
+import { Component, OnInit, TemplateRef, computed, viewChild } from "@angular/core";
 import { MatDialog } from "@angular/material/dialog";
 import { ActivatedRoute } from "@angular/router";
 import { Store } from "@ngxs/store";
@@ -27,7 +27,7 @@ import { MatChipSet, MatChip, MatChipRemove } from "@angular/material/chips";
 import { MatIcon } from "@angular/material/icon";
 import { SystemEmailChildSystemTaskComponent } from "../system-email-child-system-task/system-email-child-system-task.component";
 import { ReceiptProcessingSettingsChildSystemTaskAccordionComponent } from "../../receipt-processing-settings/receipt-processing-settings-child-system-task-accordion/receipt-processing-settings-child-system-task-accordion.component";
-import { setDialogInputs } from "src/utils/dialog-inputs";
+import { getDialogDestroyRef, setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
   selector: "app-system-task-table",
@@ -43,8 +43,6 @@ import { setDialogInputs } from "src/utils/dialog-inputs";
   imports: [TableHeaderComponent, ButtonComponent, MatChipSet, MatChip, MatChipRemove, MatIcon, TaskTableComponent, SystemEmailChildSystemTaskComponent, ReceiptProcessingSettingsChildSystemTaskAccordionComponent]
 })
 export class SystemTaskTableComponent implements OnInit {
-  private readonly destroyRef = inject(DestroyRef);
-
   public readonly expandedRowTemplate = viewChild.required<TemplateRef<any>>("expandedRowTemplate");
   public readonly taskTableComponent = viewChild.required(TaskTableComponent);
 
@@ -99,7 +97,7 @@ export class SystemTaskTableComponent implements OnInit {
     });
     setDialogInputs(dialogRef, {
       headerText: "Filter System Tasks",
-      parentForm: buildSystemTaskFilterForm(this.filter(), this.destroyRef),
+      parentForm: buildSystemTaskFilterForm(this.filter(), getDialogDestroyRef(dialogRef)),
     });
 
     const formCommandSubscription = dialogRef.componentInstance.formCommand.subscribe(

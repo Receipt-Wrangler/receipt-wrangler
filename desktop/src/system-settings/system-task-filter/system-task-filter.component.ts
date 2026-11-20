@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, output, input } from "@angular/core";
+import { Component, DestroyRef, OnInit, computed, inject, output, input } from "@angular/core";
 import { FormGroup } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
@@ -51,13 +51,15 @@ export class SystemTaskFilterComponent implements OnInit {
     ...this.users().map((user) => ({ id: user.id, displayName: user.displayName })),
   ]);
 
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
     private store: Store,
     private dialogRef: MatDialogRef<SystemTaskFilterComponent>
   ) {}
 
   public ngOnInit(): void {
-    setupAutoOperationSelection(this.parentForm(), "", SYSTEM_TASK_FILTER_FIELDS);
+    setupAutoOperationSelection(this.parentForm(), "", SYSTEM_TASK_FILTER_FIELDS, this.destroyRef);
   }
 
   public resetFilter(): void {
