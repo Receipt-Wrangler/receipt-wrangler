@@ -30,27 +30,26 @@ test.describe('Legacy User visibility', () => {
     });
   }
 
-  test('categories: can add, cannot edit or delete', async ({ page }) => {
-    await page.goto('/categories');
-    // Legacy User holds app.categories.create.
-    await expect(page.getByTestId('category-add')).toBeVisible();
-    // ...but not app.categories.update / .delete — those row actions never render.
-    await expect(page.getByTestId('category-edit')).toHaveCount(0);
-    await expect(page.getByTestId('category-delete')).toHaveCount(0);
-  });
-
-  test('tags: can add, cannot edit or delete', async ({ page }) => {
-    await page.goto('/tags');
-    await expect(page.getByTestId('tag-add')).toBeVisible();
-    await expect(page.getByTestId('tag-edit')).toHaveCount(0);
-    await expect(page.getByTestId('tag-delete')).toHaveCount(0);
-  });
+  // Categories and tags are NOT like custom fields below: Legacy User deliberately
+  // lacks app.categories.read / app.tags.read (the category/tag grant lock-down —
+  // those reads expose the whole global pool; see LegacyAppUserKeys in
+  // api/internal/permissions/legacy.go). So the management pages' route guards turn
+  // them away. app.categories.create / app.tags.create are still held, for inline
+  // creation from the receipt form.
+  for (const path of ['/categories', '/tags']) {
+    test(`is redirected to the dashboard from ${path} (no global read)`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/dashboard\/group\/\d+/);
+    });
+  }
 
   test('custom fields: can add, cannot edit or delete', async ({ page }) => {
     await page.goto('/custom-fields');
     // Legacy User holds custom-fields create + read, but editing a definition
     // changes it for every group's receipts, so update stays admin-only — the
-    // same shape as categories and tags above.
+    // same create-yes / update-no shape categories and tags have.
     await expect(page.getByTestId('custom-field-add')).toBeVisible();
     await expect(page.getByTestId('custom-field-edit')).toHaveCount(0);
     await expect(page.getByTestId('custom-field-delete')).toHaveCount(0);

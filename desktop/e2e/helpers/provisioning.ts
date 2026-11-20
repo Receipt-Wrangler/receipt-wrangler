@@ -529,33 +529,6 @@ export async function apiFirstReportGroupId(api: APIRequestContext): Promise<str
 }
 
 /**
- * Resolves a category the caller can both report on and see in the builder: a group
- * with group.reports.read whose appData catalog carries at least one category. Read
- * from the same appData.groupCategories the builder's picker unions, so a filter
- * seeded with the returned id resolves to its name chip on open-in-builder.
- */
-export async function apiFirstReportCategory(
-  api: APIRequestContext,
-): Promise<{ groupId: string; categoryId: number; categoryName: string }> {
-  const appData = (await (await api.get('/api/user/appData')).json()) as {
-    groupPermissions?: Record<string, string[]>;
-    groupCategories?: Record<string, { id?: number; name?: string }[]>;
-  };
-  const groupPermissions = appData.groupPermissions ?? {};
-  const groupCategories = appData.groupCategories ?? {};
-  for (const groupId of Object.keys(groupPermissions)) {
-    if (!(groupPermissions[groupId] ?? []).includes('group.reports.read')) {
-      continue;
-    }
-    const category = (groupCategories[groupId] ?? []).find((c) => c.id != null && !!c.name);
-    if (category) {
-      return { groupId, categoryId: category.id!, categoryName: category.name! };
-    }
-  }
-  throw new Error('no category in a group with group.reports.read for the caller');
-}
-
-/**
  * Creates a report template via the API and returns its id + name (requires
  * app.reports.create on the caller). The body is a complete, buildable
  * ReportRequestCommand — records mode over a group the caller can report on.

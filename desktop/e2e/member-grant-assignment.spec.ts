@@ -58,7 +58,11 @@ test.describe('Per-member grant assignment (UI)', () => {
     return scope.getByTestId(`grant-section-${groupId}`);
   }
 
-  /** Names currently selected in a picker (its chips). */
+  /**
+   * Names currently selected in a picker (its chips). A one-shot read: the picker
+   * seeds its chips asynchronously after the dialog opens, so assert on it through
+   * `expect.poll`, never a bare `expect(await ...)`.
+   */
   async function selectedNames(picker: Locator): Promise<string[]> {
     const text = await picker.getByTestId('grant-picker-categories').innerText();
     return [catA, catB, catC, catOutside]
@@ -213,7 +217,9 @@ test.describe('Per-member grant assignment (UI)', () => {
 
   test('re-opening pre-selects the saved assignment', async ({ page }) => {
     const dialog = await openUserForm(page);
-    expect(await selectedNames(grantSection(dialog, cappedGroupId))).toEqual([catB.name]);
+    await expect.poll(() => selectedNames(grantSection(dialog, cappedGroupId))).toEqual([
+      catB.name,
+    ]);
   });
 
   test('saving without touching the pickers writes no grants request', async ({ page }) => {
@@ -310,9 +316,9 @@ test.describe('Per-member grant assignment (UI)', () => {
       .toEqual([catB.id, catC.id].sort());
 
     const userDialog = await openUserForm(page);
-    expect(await selectedNames(grantSection(userDialog, cappedGroupId))).toEqual(
-      [catB.name, catC.name].sort(),
-    );
+    await expect
+      .poll(() => selectedNames(grantSection(userDialog, cappedGroupId)))
+      .toEqual([catB.name, catC.name].sort());
   });
 
   test('the Add Group Member form has no assignment section', async ({ page }) => {
