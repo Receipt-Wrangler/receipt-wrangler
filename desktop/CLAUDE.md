@@ -1955,10 +1955,18 @@ four pieces rather than copying a row template:
   for list/users fields, because the multi-select autocompletes `push()` onto the control),
   `listenForBetweenOperation` (swaps the value control between a scalar and a two-slot range as the
   operation flips) and `setupAutoOperationSelection` (picks the first operation for a field's type as
-  soon as it gains a value, and clears it when the value empties). The two builders take the calling
-  component's **`DestroyRef`** and tear their subscriptions down with it, so pass
-  `this.destroyRef`; `setupAutoOperationSelection` takes none. `buildReceiptFilterForm` and
-  `buildSystemTaskFilterForm` are thin field lists over these.
+  soon as it gains a value, and clears it when the value empties). Every one takes a **`DestroyRef`**
+  and tears its subscriptions down with it — the one belonging to **whatever owns the form**:
+  - **A form built for a dialog takes the dialog's**, via `getDialogDestroyRef(dialogRef)`
+    (`src/utils/dialog-inputs.ts`), called after `open()` and before `setDialogInputs`. Both filter
+    tables passed their own `this.destroyRef` until #750, so every open left ~14 subscriptions
+    running until the table was destroyed.
+  - **A form that is part of a page's own form** (dashboard widgets, the report builder) takes that
+    component's.
+  - `setupAutoOperationSelection` takes the **filter component's** own, because the form can outlive
+    it (a dashboard or report keeps its filter form while the filter UI comes and goes).
+
+  `buildReceiptFilterForm` and `buildSystemTaskFilterForm` are thin field lists over these.
 - **`src/utils/filter-chips.ts`** builds the chip labels (`"<Field> <operation> <value>"`,
   `WITHIN_CURRENT_MONTH` stopping at the operation, `BETWEEN` joined with `" – "`). It is pure: the
   caller injects `formatDate` / `formatCurrency` / `resolveOptionName`. `receipt-filter-chips.ts` and

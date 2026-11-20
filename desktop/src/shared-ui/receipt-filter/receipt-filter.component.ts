@@ -1,4 +1,4 @@
-import { Component, OnInit, TemplateRef, input, output } from "@angular/core";
+import { Component, DestroyRef, OnInit, TemplateRef, inject, input, output } from "@angular/core";
 import { FormGroup, } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
@@ -56,6 +56,8 @@ export class ReceiptFilterComponent implements OnInit {
   // set for the group filter.
   public groups = this.store.selectSignal(GroupState.groupsWithoutAll);
 
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
     private store: Store,
     private dialogRef: MatDialogRef<ReceiptFilterComponent>
@@ -65,7 +67,7 @@ export class ReceiptFilterComponent implements OnInit {
     // RECEIPT_FILTER_FIELDS is the shared definition of every filter field's
     // label and operation type, so these rows and the filter chips that describe
     // them cannot drift apart.
-    setupAutoOperationSelection(this.parentForm(), this.basePath(), RECEIPT_FILTER_FIELDS);
+    setupAutoOperationSelection(this.parentForm(), this.basePath(), RECEIPT_FILTER_FIELDS, this.destroyRef);
   }
 
   public resetFilter(): void {

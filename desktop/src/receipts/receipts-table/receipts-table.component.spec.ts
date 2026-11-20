@@ -1,7 +1,7 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
-import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { ReactiveFormsModule } from "@angular/forms";
+import { ComponentFixture, ComponentFixtureAutoDetect, TestBed } from "@angular/core/testing";
+import { FormGroup, ReactiveFormsModule } from "@angular/forms";
 import { MatChipsModule } from "@angular/material/chips";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatMenuModule } from "@angular/material/menu";
@@ -9,7 +9,7 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { ActivatedRoute, provideRouter, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
-import { of, Subject, throwError } from "rxjs";
+import { of, Subject, throwError, firstValueFrom } from "rxjs";
 import { DEFAULT_RECEIPT_TABLE_COLUMNS } from "src/interfaces";
 import { SetColumnConfig, SetReceiptFilterData } from "src/store/receipt-table.actions";
 import { ReceiptTableState } from "src/store/receipt-table.state";
@@ -24,9 +24,12 @@ import { AuthState, GroupState, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { SetGroups } from "../../store/group.state.actions";
 import { SetQuickDateField, SetReceiptFilter, SetSummaryConfigGroupId } from "../../store/receipt-table.actions";
+import { ReceiptFilterComponent } from "../../shared-ui/receipt-filter/receipt-filter.component";
 import { ReceiptsTableComponent } from "./receipts-table.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { mockDialogRef } from "../../testing/dialog-ref.testing";
+import { provideNgxMask } from "ngx-mask";
+import { provideTestStore } from "../../store/test-store";
 
 const customField_ = (id: number): CustomField =>
   ({ id, name: "Vendor", type: CustomFieldType.Text } as CustomField);
@@ -944,5 +947,56 @@ describe("ReceiptsTableComponent receipt summary", () => {
 
     expect(component.summaryConfigGroupOptions()).toEqual([]);
     expect(component.summaryConfigGroupId()).toEqual(1);
+  });
+});
+
+/**
+ * #750: the filter dialog's form is built per open, so its subscriptions must
+ * end with the dialog, not live on until the table is destroyed. The dialog
+ * renders for real here, while auto-detect stays off so the table itself (whose
+ * view children these specs never provide) is not rendered by the dialog's tick.
+ */
+describe("ReceiptsTableComponent filter dialog", () => {
+  let component: ReceiptsTableComponent;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [
+        ApiModule,
+        MatDialogModule,
+        ReceiptsTableComponent,
+      ],
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { data: { categories: [], tags: [] } } },
+        },
+        { provide: ComponentFixtureAutoDetect, useValue: false },
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting(),
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideNgxMask(),
+        provideTestStore(),
+      ],
+    }).compileComponents();
+
+    component = TestBed.createComponent(ReceiptsTableComponent).componentInstance;
+  });
+
+  it("ends the filter form's subscriptions when the dialog closes", async () => {
+    component.filterButtonClicked();
+    const dialogRef = TestBed.inject(MatDialog).openDialogs[0];
+    const form: FormGroup = (dialogRef.componentInstance as ReceiptFilterComponent).parentForm();
+    const watched = [form.get("name.value")!, form.get("amount.operation")!];
+
+    expect(watched.every((control) => (control.valueChanges as any).observed)).toBe(true);
+
+    const closed = firstValueFrom(dialogRef.afterClosed());
+    dialogRef.close();
+    await closed;
+
+    expect(dialogRef.componentRef?.hostView.destroyed).toBe(true);
+    expect(watched.some((control) => (control.valueChanges as any).observed)).toBe(false);
   });
 });

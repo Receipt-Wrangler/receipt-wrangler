@@ -85,6 +85,24 @@ describe("SystemTaskFilterComponent", () => {
     expect(localFixture.componentInstance.parentForm().value).toEqual(filledFilter);
   });
 
+  // The form can outlive the filter component, so the auto-selection listener
+  // has to end with the component, not the form.
+  it("stops auto-selecting an operation once the component is destroyed", () => {
+    const form = buildSystemTaskFilterForm({}, destroyRef);
+    const localFixture = TestBed.createComponent(SystemTaskFilterComponent);
+    localFixture.componentRef.setInput("parentForm", form);
+    localFixture.detectChanges();
+
+    form.get("startedAt.value")!.setValue(new Date(2026, 10, 1));
+    expect(form.get("startedAt.operation")!.value).toBeTruthy();
+
+    localFixture.destroy();
+    form.get("startedAt.operation")!.setValue(null);
+    form.get("startedAt.value")!.setValue(new Date(2026, 10, 2));
+
+    expect(form.get("startedAt.operation")!.value).toBeNull();
+  });
+
   it("pins System above the real users in the Ran By options", () => {
     expect(component.ranByOptions()[0]).toEqual({
       id: SYSTEM_RAN_BY_OPTION_ID,
