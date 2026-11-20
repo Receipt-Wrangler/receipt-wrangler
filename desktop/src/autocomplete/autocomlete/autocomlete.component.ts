@@ -1,4 +1,4 @@
-import { Component, effect, ElementRef, inject, Input, OnInit, signal, TemplateRef, input, viewChild } from "@angular/core";
+import { Component, computed, effect, ElementRef, inject, OnInit, signal, TemplateRef, input, viewChild } from "@angular/core";
 import { FormArray, FormControl, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatAutocompleteSelectedEvent, MatAutocompleteTrigger, MatAutocomplete, MatOption } from "@angular/material/autocomplete";
 import { Store } from "@ngxs/store";
@@ -21,7 +21,12 @@ import { OptionDisplayPipe } from "./option-display.pipe";
 export class AutocomleteComponent
   extends BaseInputComponent
   implements OnInit {
-  @Input() public inputId: string = "";
+  public readonly inputId = input<string>("");
+
+  /** The native input's id: the bound one, else derived from the label. */
+  protected readonly resolvedInputId = computed(
+    () => this.inputId() || this.label().replace(/ /g, "_").toLowerCase()
+  );
 
   public readonly options = input<any[]>([]);
 
@@ -88,9 +93,6 @@ export class AutocomleteComponent
 
   public override ngOnInit(): void {
     super.ngOnInit();
-    if (!this.inputId) {
-      this.inputId = this.label().replace(/ /g, "_").toLowerCase();
-    }
     this.isRequired = this.inputFormControl().hasValidator(Validators.required);
     this.setSingleOptionSelected();
 
@@ -189,8 +191,8 @@ export class AutocomleteComponent
   }
 
   private clearFilterInput(): void {
-    if (this.inputId) {
-      const input = document.getElementById(this.inputId) as HTMLInputElement | null;
+    if (this.resolvedInputId()) {
+      const input = document.getElementById(this.resolvedInputId()) as HTMLInputElement | null;
       if (input) {
         input.value = "";
       }

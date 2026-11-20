@@ -389,8 +389,13 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   (`src/services/password-generator.service.ts`). It is deliberately **admin-sets-someone-else's-
   password only** — the user form, Set Password, and Convert Dummy User dialogs — not sign-up or the
   fields that hold an existing external secret (system email, receipt-processing settings). The
-  generate handler is synchronous by design: `type` is a plain `@Input`, so under zoneless CD only
-  the click event's CD pass renders the reveal (the clipboard write is a detached side effect).
+  rendered type is `inputType`, a `linkedSignal` over the `type` input and both flags: the eye and
+  Generate override it locally, a later change to the `type` binding wins again, and turning a flag
+  *off* never re-masks a field the user revealed (the clipboard write is a detached side effect).
+- **Currency and mask inputs:** with `[isCurrency]="true"`, `app-input`'s `maskConfig` computed
+  takes the mask, separators and symbol from the currency System Settings live, ignoring the mask
+  inputs except the prefix/suffix on the side the symbol is not on; otherwise the mask inputs apply
+  as bound (`quick-actions-dialog`'s `mask="percent.2"`).
 - **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`. A dialog with nothing to
   submit (one that only reports a result) still uses the footer, with `[showSubmitButton]="false"`
   and `cancelButtonTooltip="Close"`, so its cancel button is the dismiss action — see

@@ -1,20 +1,4 @@
-import {
-  Component,
-  ElementRef,
-  HostListener,
-  Input,
-  OnChanges,
-  OnDestroy,
-  OnInit,
-  Signal,
-  SimpleChanges,
-  ViewEncapsulation,
-  input,
-  output,
-  signal,
-  viewChild,
-  viewChildren
-} from "@angular/core";
+import { Component, ElementRef, HostListener, OnChanges, OnDestroy, OnInit, Signal, SimpleChanges, ViewEncapsulation, input, output, signal, viewChild, viewChildren } from "@angular/core";
 import { FormArray, FormGroup } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { MatExpansionPanel, MatAccordion, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from "@angular/material/expansion";
@@ -60,7 +44,8 @@ export class ItemListComponent implements OnInit, OnChanges, OnDestroy {
 
   public readonly form = input.required<FormGroup>();
 
-  @Input() public originalReceipt?: Receipt;
+  // Read from the route in ngOnInit; nothing binds it.
+  public originalReceipt?: Receipt;
 
   public readonly categories = input<Category[]>([]);
 

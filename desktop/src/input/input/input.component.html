@@ -17,14 +17,14 @@
         #nativeInput
         matInput
         [id]="inputId()"
-        [type]="type"
+        [type]="inputType()"
         [readonly]="readonly()"
         [formControl]="inputFormControl()"
-        [prefix]="maskPrefix"
-        [suffix]="maskSuffix"
-        [mask]="mask"
-        [decimalMarker]="decimalMarker"
-        [thousandSeparator]="thousandSeparator"
+        [prefix]="maskConfig().prefix"
+        [suffix]="maskConfig().suffix"
+        [mask]="maskConfig().mask"
+        [decimalMarker]="maskConfig().decimalMarker"
+        [thousandSeparator]="maskConfig().thousandSeparator"
         [allowNegativeNumbers]="true"
         (blur)="inputBlur.emit($event)"
       />
@@ -35,9 +35,9 @@
         }}
       </mat-error>
     }
-    @if (showVisibilityEye || showGeneratePassword) {
+    @if (showVisibilityEye() || showGeneratePassword()) {
       <div matSuffix>
-        @if (showGeneratePassword) {
+        @if (showGeneratePassword()) {
           <button
             class="generate-password-button"
             mat-icon-button
@@ -51,16 +51,16 @@
             <mat-icon>autorenew</mat-icon>
           </button>
         }
-        @if (showVisibilityEye) {
+        @if (showVisibilityEye()) {
           <button
             class="visibility-eye-button"
             mat-icon-button
             type="button"
             data-testid="password-visibility-toggle"
-            [matTooltip]="type === 'password' ? 'Show ' + label() : 'Hide ' + label()"
+            [matTooltip]="inputType() === 'password' ? 'Show ' + label() : 'Hide ' + label()"
             (click)="toggleVisibility()"
           >
-            @if (type === 'password') {
+            @if (inputType() === 'password') {
               <mat-icon>visibility</mat-icon>
             } @else {
               <mat-icon>visibility_off</mat-icon>
