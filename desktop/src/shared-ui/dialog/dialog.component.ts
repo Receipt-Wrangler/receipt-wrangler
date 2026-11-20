@@ -1,4 +1,4 @@
-import { Component, Input, TemplateRef, input } from "@angular/core";
+import { Component, TemplateRef, input } from "@angular/core";
 import { NgTemplateOutlet } from "@angular/common";
 import { CdkScrollable } from "@angular/cdk/scrolling";
 import { MatDialogContent } from "@angular/material/dialog";
@@ -12,5 +12,5 @@ import { MatDialogContent } from "@angular/material/dialog";
 export class DialogComponent {
   public readonly headerText = input<string>("");
 
-  @Input() public actionsTemplate?: TemplateRef<any>;
+  public readonly actionsTemplate = input<TemplateRef<any>>();
 }

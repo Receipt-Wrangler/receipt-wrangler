@@ -11,15 +11,15 @@
     }
     <div class="d-flex flex-column">
       <strong> {{ headerText() }}</strong>
-      @if (subtitle) {
-        <small>{{ subtitle }}</small>
+      @if (subtitle()) {
+        <small>{{ subtitle() }}</small>
       }
     </div>
 
     <div class="ms-1">
-      @if (headerButtonsTemplate) {
+      @if (headerButtonsTemplate()) {
         <ng-container
-          [ngTemplateOutlet]="headerButtonsTemplate"
+          [ngTemplateOutlet]="headerButtonsTemplate()"
         >
         </ng-container>
       }

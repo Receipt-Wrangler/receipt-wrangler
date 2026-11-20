@@ -1,5 +1,5 @@
 import { Location, NgClass, NgTemplateOutlet } from "@angular/common";
-import { Component, Input, TemplateRef, input } from "@angular/core";
+import { Component, TemplateRef, input } from "@angular/core";
 import { BackButtonComponent } from "../back-button/back-button.component";
 
 @Component({
@@ -11,7 +11,7 @@ import { BackButtonComponent } from "../back-button/back-button.component";
 export class FormHeaderComponent {
   public readonly headerText = input<string>("");
 
-  @Input() public headerButtonsTemplate?: TemplateRef<any>;
+  public readonly headerButtonsTemplate = input<TemplateRef<any>>();
 
   public readonly bottomSpacing = input<boolean>(false);
 

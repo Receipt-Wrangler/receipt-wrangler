@@ -1,5 +1,5 @@
 import { CdkVirtualScrollViewport, CdkFixedSizeVirtualScroll, CdkVirtualForOf } from "@angular/cdk/scrolling";
-import { AfterViewInit, Component, Input, TemplateRef, ViewEncapsulation, input, output, viewChild, DestroyRef, inject } from "@angular/core";
+import { AfterViewInit, Component, TemplateRef, ViewEncapsulation, input, output, viewChild, DestroyRef, inject } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { tap } from "rxjs";
 import { MatList, MatListItem, MatListItemTitle, MatListItemLine, MatListItemAvatar, MatListItemMeta } from "@angular/material/list";
@@ -22,13 +22,13 @@ export class DashboardListComponent implements AfterViewInit {
 
   public readonly itemLineTemplate = input.required<TemplateRef<any>>();
 
-  @Input() public itemLineTemplate2!: TemplateRef<any>;
+  public readonly itemLineTemplate2 = input<TemplateRef<any>>();
 
-  @Input() public itemAvatarTemplate!: TemplateRef<any>;
+  public readonly itemAvatarTemplate = input.required<TemplateRef<any>>();
 
-  @Input() public itemMetaTemplate!: TemplateRef<any>;
+  public readonly itemMetaTemplate = input.required<TemplateRef<any>>();
 
-  @Input() public items: any[] = [];
+  public readonly items = input<any[]>([]);
 
   public readonly noItemFoundText = input("");
 
@@ -47,7 +47,7 @@ export class DashboardListComponent implements AfterViewInit {
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         tap((range) => {
-          if (range.end === this.items.length) {
+          if (range.end === this.items().length) {
 
             this.endOfListReached.emit();
           }

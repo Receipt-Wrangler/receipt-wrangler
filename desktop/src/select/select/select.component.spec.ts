@@ -37,7 +37,7 @@ describe('SelectComponent', () => {
 
   function configure(optionBadgeKey: string, value: string | null): void {
     component.inputFormControl = new FormControl(value);
-    component.optionValueKey = 'value';
+    fixture.componentRef.setInput("optionValueKey", 'value');
     fixture.componentRef.setInput('options', options);
     fixture.componentRef.setInput('optionDisplayKey', 'displayValue');
     fixture.componentRef.setInput('optionBadgeKey', optionBadgeKey);
@@ -66,7 +66,7 @@ describe('SelectComponent', () => {
   // match is by reference — the other half of selectedIndex()'s branch.
   it('resolves the selection by identity when there is no value key', () => {
     component.inputFormControl = new FormControl(options[1]);
-    component.optionValueKey = '';
+    fixture.componentRef.setInput("optionValueKey", '');
     fixture.componentRef.setInput('options', options);
     fixture.componentRef.setInput('optionDisplayKey', 'displayValue');
     fixture.componentRef.setInput('optionBadgeKey', 'badge');

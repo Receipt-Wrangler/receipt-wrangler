@@ -25,17 +25,17 @@ export class AutocomleteComponent
 
   public readonly options = input<any[]>([]);
 
-  @Input() public optionTemplate!: TemplateRef<any>;
+  public readonly optionTemplate = input<TemplateRef<any>>();
 
-  @Input() public optionChipTemplate!: TemplateRef<any>;
+  public readonly optionChipTemplate = input<TemplateRef<any>>();
 
   public readonly optionFilterKey = input<string>("");
 
-  @Input() public optionValueKey: string = "";
+  public readonly optionValueKey = input<string>("");
 
   public readonly optionDisplayKey = input<string>("");
 
-  @Input() public multiple: boolean = false;
+  public readonly multiple = input<boolean>(false);
 
   public readonly displayWith = input<(value: any) => string>(() => '');
 
@@ -94,13 +94,13 @@ export class AutocomleteComponent
     this.isRequired = this.inputFormControl.hasValidator(Validators.required);
     this.setSingleOptionSelected();
 
-    if (!this.multiple) {
+    if (!this.multiple()) {
       this.initSingleAutocomplete();
     }
   }
 
   private setSingleOptionSelected(): void {
-    if (!this.multiple) {
+    if (!this.multiple()) {
       this.inputFormControl.valueChanges
         .pipe(startWith(this.inputFormControl.value))
         .subscribe((v) => {
@@ -120,7 +120,7 @@ export class AutocomleteComponent
   // Callers invoke this after such a change to refresh the display. No-op in
   // multiple mode, which renders selections as chips from inputFormControl.
   public syncSingleDisplay(): void {
-    if (!this.multiple) {
+    if (!this.multiple()) {
       this.initSingleAutocomplete();
     }
   }
@@ -129,7 +129,7 @@ export class AutocomleteComponent
     value = value ?? "";
     const filterValue = value.toString()?.toLowerCase();
 
-    if (this.multiple) {
+    if (this.multiple()) {
       const formArray = this.inputFormControl as any as FormArray;
       const selectedValues = (formArray.value as any[]) ?? [];
       // TODO: Restrict the user form adding an already added value
@@ -158,18 +158,18 @@ export class AutocomleteComponent
   }
 
   public optionSelected(event: MatAutocompleteSelectedEvent): void {
-    if (this.multiple) {
+    if (this.multiple()) {
       const customOptionSelected = event.option.id === this.creatableOptionId;
       const formArray = this.inputFormControl as any as FormArray;
 
-      if (customOptionSelected && !this.optionValueKey) {
+      if (customOptionSelected && !this.optionValueKey()) {
         formArray.push(
           new FormControl({
             ...this.defaultCreatableObject(),
             [this.creatableValueKey()]: this.filterFormControl.value,
           })
         );
-      } else if (customOptionSelected && this.optionValueKey) {
+      } else if (customOptionSelected && this.optionValueKey()) {
         formArray.push(new FormControl(this.filterFormControl.value));
       } else {
         (this.inputFormControl as any as FormArray).push(
@@ -213,7 +213,7 @@ export class AutocomleteComponent
   }
 
   public removeOption(index: number) {
-    if (this.multiple) {
+    if (this.multiple()) {
       const formArray = this.inputFormControl as any as FormArray;
       formArray.removeAt(index);
       this.filterFormControl.setValue(null);
@@ -226,7 +226,7 @@ export class AutocomleteComponent
   }
 
   public clearFilter(): void {
-    if (this.multiple) {
+    if (this.multiple()) {
       this.inputFormControl.setValue([]);
     } else {
       this.inputFormControl.setValue(null);

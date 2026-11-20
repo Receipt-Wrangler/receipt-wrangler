@@ -1,7 +1,7 @@
 import { animate, state, style, transition, trigger } from "@angular/animations";
 import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { SelectionModel } from "@angular/cdk/collections";
-import { Component, Input, OnChanges, SimpleChanges, input, output, viewChild } from "@angular/core";
+import { Component, OnChanges, SimpleChanges, input, output, viewChild } from "@angular/core";
 import { MatPaginator, PageEvent } from "@angular/material/paginator";
 import { MatSort, Sort, MatSortHeader } from "@angular/material/sort";
 import { MatTableDataSource, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow } from "@angular/material/table";
@@ -35,7 +35,7 @@ export class TableComponent implements OnChanges {
   public readonly selectionCheckboxes = input<boolean>(false);
   public readonly page = input<number>(0);
   public readonly pageSize = input<number>(50);
-  @Input() public length: number = 0;
+  public readonly length = input<number>(0);
   public readonly expandedRowTemplate = input<any>();
   public readonly rowExpandable = input<(row: any) => boolean>(() => true);
 

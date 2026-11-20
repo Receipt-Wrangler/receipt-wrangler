@@ -4,15 +4,15 @@
   class="default-size scroll-container"
 >
   <mat-list>
-    @if (items.length === 0) {
-      @if (items?.length === 0) {
+    @if (items().length === 0) {
+      @if (items()?.length === 0) {
         <mat-list-item class="item-size">
           {{ noItemFoundText() }}
         </mat-list-item>
       }
     } @else {
       <mat-list-item
-        *cdkVirtualFor="let item of items; let i = index"
+        *cdkVirtualFor="let item of items(); let i = index"
         role="link"
         class="border-bottom border-gray-200"
         [ngClass]="{
@@ -35,28 +35,28 @@
           ></ng-template>
         </div>
 
-        @if (itemLineTemplate2) {
+        @if (itemLineTemplate2()) {
           <div matListItemLine>
             <ng-template
-              [ngTemplateOutlet]="itemLineTemplate2"
+              [ngTemplateOutlet]="itemLineTemplate2()"
               [ngTemplateOutletContext]="{ item: item }"
             ></ng-template>
           </div>
         }
 
-        @if (itemAvatarTemplate) {
+        @if (itemAvatarTemplate()) {
           <div matListItemAvatar>
             <ng-template
-              [ngTemplateOutlet]="itemAvatarTemplate"
+              [ngTemplateOutlet]="itemAvatarTemplate()"
               [ngTemplateOutletContext]="{ item: item }"
             ></ng-template>
           </div>
         }
 
-        @if (itemMetaTemplate) {
+        @if (itemMetaTemplate()) {
           <div matListItemMeta>
             <ng-template
-              [ngTemplateOutlet]="itemMetaTemplate"
+              [ngTemplateOutlet]="itemMetaTemplate()"
               [ngTemplateOutletContext]="{ item: item }"
             ></ng-template>
           </div>

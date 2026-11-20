@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 
@@ -9,5 +9,5 @@ import { MatTooltip } from '@angular/material/tooltip';
     imports: [MatIcon, MatTooltip]
 })
 export class HelpIconComponent {
-  @Input() public helpText?: string;
+  public readonly helpText = input<string>();
 }

@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, input } from "@angular/core";
+import { Component, OnInit, input } from "@angular/core";
 import { BadgeTone } from "src/shared-ui/badge/badge.component";
 import { BaseInputComponent } from "../../base-input";
 import { MatFormField, MatLabel, MatInput, MatError } from "@angular/material/input";
@@ -23,7 +23,7 @@ export class SelectComponent extends BaseInputComponent implements OnInit {
 
   public readonly optionsDisplayArray = input<any[]>([]);
 
-  @Input() public optionValueKey: string = "";
+  public readonly optionValueKey = input<string>("");
 
   public readonly optionDisplayKey = input<string>("");
 
@@ -69,7 +69,7 @@ export class SelectComponent extends BaseInputComponent implements OnInit {
   public selectedIndex(): number {
     const value = this.inputFormControl.value;
     return this.options().findIndex(
-      (option) => (this.optionValueKey ? option[this.optionValueKey] : option) === value
+      (option) => (this.optionValueKey() ? option[this.optionValueKey()] : option) === value
     );
   }
 }

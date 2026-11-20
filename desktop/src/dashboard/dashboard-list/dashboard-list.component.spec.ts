@@ -32,7 +32,7 @@ describe("DashboardListComponent", () => {
   });
 
   it("should initialize with default values", () => {
-    expect(component.items).toEqual([]);
+    expect(component.items()).toEqual([]);
     expect(component.noItemFoundText()).toBe("");
     expect(component.itemSize()).toBe(67);
     expect(component.buildRouterLinkString()({} as any)).toEqual("");
@@ -43,7 +43,7 @@ describe("DashboardListComponent", () => {
     const emitSpy = jest.spyOn(component.endOfListReached, "emit");
 
     // Mock items array
-    component.items = Array(10).fill({});
+    fixture.componentRef.setInput("items", Array(10).fill({}));
 
     // Simulate scroll viewport reaching end
     component.cdkVirtualScrollViewport().setRenderedRange({
@@ -57,7 +57,7 @@ describe("DashboardListComponent", () => {
   it("should not emit endOfListReached when not at end of list", () => {
     const emitSpy = jest.spyOn(component.endOfListReached, "emit");
 
-    component.items = Array(10).fill({});
+    fixture.componentRef.setInput("items", Array(10).fill({}));
 
     component.cdkVirtualScrollViewport().setRenderedRange({
       start: 0,

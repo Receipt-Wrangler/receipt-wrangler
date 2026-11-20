@@ -1,8 +1,8 @@
 <div class="p-4">
   <div class="d-flex align-items-center justify-content-between">
     <h2>{{ headerText() }}</h2>
-    @if (actionsTemplate) {
-      <ng-template [ngTemplateOutlet]="actionsTemplate"></ng-template>
+    @if (actionsTemplate()) {
+      <ng-template [ngTemplateOutlet]="actionsTemplate()"></ng-template>
     }
   </div>
   <mat-dialog-content>

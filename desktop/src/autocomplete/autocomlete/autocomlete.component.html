@@ -1,14 +1,14 @@
 <mat-form-field class="w-100" appearance="fill" [hintLabel]="hint ?? ''">
   <mat-label>{{ label }}</mat-label>
-  @if (multiple) {
+  @if (multiple()) {
     <mat-chip-grid #chipGrid>
       @for (option of inputFormControl.value; track option; let i = $index) {
         <mat-chip-row
           (removed)="removeOption(i)"
         >
-          @if (optionChipTemplate) {
+          @if (optionChipTemplate()) {
             <ng-template
-              [ngTemplateOutlet]="optionChipTemplate"
+              [ngTemplateOutlet]="optionChipTemplate()"
               [ngTemplateOutletContext]="{
                 option: option
               }"
@@ -16,7 +16,7 @@
           } @else {
             <div>
               {{
-                option | optionDisplay : options() : optionDisplayKey() : optionValueKey
+                option | optionDisplay : options() : optionDisplayKey() : optionValueKey()
               }}
             </div>
           }
@@ -42,7 +42,7 @@
     />
   }
   <div class="d-flex justify-content-between">
-    @if (!multiple) {
+    @if (!multiple()) {
       <input
         matInput
         type="text"
@@ -70,11 +70,11 @@
   >
     @for (option of filteredOptions | async; track option) {
       <mat-option
-        [value]="optionValueKey ? option[optionValueKey] : option"
+        [value]="optionValueKey() ? option[optionValueKey()] : option"
       >
-        @if (optionTemplate) {
+        @if (optionTemplate()) {
           <ng-template
-            [ngTemplateOutlet]="optionTemplate"
+            [ngTemplateOutlet]="optionTemplate()"
             [ngTemplateOutletContext]="{
               option: option
             }"
@@ -82,7 +82,7 @@
           </ng-template>
         } @else {
           {{
-            option | optionDisplay : options() : optionDisplayKey() : optionValueKey
+            option | optionDisplay : options() : optionDisplayKey() : optionValueKey()
           }}
         }
       </mat-option>

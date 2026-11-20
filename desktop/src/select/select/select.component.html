@@ -4,7 +4,7 @@
     <input
       matInput
       [readonly]="true"
-      [value]="inputFormControl.value | readonlyValue : options() : optionDisplayKey() : optionValueKey : optionsDisplayArray()"
+      [value]="inputFormControl.value | readonlyValue : options() : optionDisplayKey() : optionValueKey() : optionsDisplayArray()"
     />
   } @else {
     <mat-select
@@ -35,7 +35,7 @@
       }
       @for (option of options(); track option; let i = $index) {
         <mat-option
-          [value]="optionValueKey ? option[optionValueKey] : option"
+          [value]="optionValueKey() ? option[optionValueKey()] : option"
         >
           {{ i | optionDisplay : option : optionDisplayKey() : optionsDisplayArray() }}
           @let badge = badgeFor(option);

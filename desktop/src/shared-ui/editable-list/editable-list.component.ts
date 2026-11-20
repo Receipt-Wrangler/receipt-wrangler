@@ -1,4 +1,4 @@
-import { Component, Input, signal, TemplateRef, input, output } from "@angular/core";
+import { Component, signal, TemplateRef, input, output } from "@angular/core";
 import { MatList, MatListItem, MatListItemTitle, MatListItemLine, MatListItemMeta } from "@angular/material/list";
 import { NgTemplateOutlet } from "@angular/common";
 import { EditButtonComponent } from "../edit-button/edit-button.component";
@@ -19,7 +19,7 @@ export class EditableListComponent {
 
   public readonly trackByKey = input<string>("");
 
-  @Input() public editTemplate?: TemplateRef<any>;
+  public readonly editTemplate = input<TemplateRef<any>>();
 
   public readonly readonly = input<boolean>(false);
 

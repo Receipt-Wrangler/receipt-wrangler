@@ -1,4 +1,4 @@
-import { Component, Input, TemplateRef, input, output } from "@angular/core";
+import { Component, TemplateRef, input, output } from "@angular/core";
 import { Store } from "@ngxs/store";
 import { LayoutState } from "src/store/layout.state";
 import { SubmitButtonComponent } from "../submit-button/submit-button.component";
@@ -12,7 +12,7 @@ import { NgTemplateOutlet } from "@angular/common";
     imports: [SubmitButtonComponent, CancelButtonComponent, NgTemplateOutlet]
 })
 export class DialogFooterComponent {
-  @Input() public additionalButtonsTemplate?: TemplateRef<any>;
+  public readonly additionalButtonsTemplate = input<TemplateRef<any>>();
   public readonly submitButtonTooltip = input<string>("Save");
   public readonly submitButtonType = input<"button" | "submit">("submit");
   public readonly disableWhenProgressBarIsShown = input<boolean>(false);

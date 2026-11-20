@@ -1,8 +1,8 @@
-@if (helpText) {
+@if (helpText()) {
   <mat-icon
     class="ms-1"
     #tooltip="matTooltip"
-    [matTooltip]="helpText"
+    [matTooltip]="helpText()"
     (click)="tooltip.show()"
     >help</mat-icon
   >

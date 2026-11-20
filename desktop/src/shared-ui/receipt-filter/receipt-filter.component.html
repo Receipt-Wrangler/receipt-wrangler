@@ -13,7 +13,7 @@
       fieldName="date"
       type="date"
       [parentForm]="parentForm"
-      [basePath]="basePath"
+      [basePath]="basePath()"
     ></app-filter-field>
 
     <app-filter-field
@@ -21,7 +21,7 @@
       fieldName="name"
       type="text"
       [parentForm]="parentForm"
-      [basePath]="basePath"
+      [basePath]="basePath()"
     ></app-filter-field>
 
     <app-filter-field
@@ -29,7 +29,7 @@
       fieldName="paidBy"
       type="users"
       [parentForm]="parentForm"
-      [basePath]="basePath"
+      [basePath]="basePath()"
     ></app-filter-field>
 
     @if (showGroupFilter) {
@@ -41,7 +41,7 @@
         optionDisplayKey="name"
         optionValueKey="id"
         [parentForm]="parentForm"
-        [basePath]="basePath"
+        [basePath]="basePath()"
         [options]="groups() ?? []"
         [multiple]="true"
       ></app-filter-field>
@@ -52,7 +52,7 @@
       fieldName="amount"
       type="number"
       [parentForm]="parentForm"
-      [basePath]="basePath"
+      [basePath]="basePath()"
       [isCurrency]="true"
     ></app-filter-field>
 
@@ -64,7 +64,7 @@
       optionDisplayKey="name"
       optionValueKey="id"
       [parentForm]="parentForm"
-      [basePath]="basePath"
+      [basePath]="basePath()"
       [options]="categories"
       [multiple]="true"
     ></app-filter-field>
@@ -77,7 +77,7 @@
       optionDisplayKey="name"
       optionValueKey="id"
       [parentForm]="parentForm"
-      [basePath]="basePath"
+      [basePath]="basePath()"
       [options]="tags"
       [multiple]="true"
     ></app-filter-field>
@@ -90,7 +90,7 @@
       optionDisplayKey="displayValue"
       optionValueKey="value"
       [parentForm]="parentForm"
-      [basePath]="basePath"
+      [basePath]="basePath()"
       [options]="receiptStatusOptions"
       [multiple]="true"
     ></app-filter-field>
@@ -100,7 +100,7 @@
       fieldName="resolvedDate"
       type="date"
       [parentForm]="parentForm"
-      [basePath]="basePath"
+      [basePath]="basePath()"
     ></app-filter-field>
 
     <app-filter-field
@@ -108,22 +108,11 @@
       fieldName="createdAt"
       type="date"
       [parentForm]="parentForm"
-      [basePath]="basePath"
+      [basePath]="basePath()"
     ></app-filter-field>
 
     <ng-template
       [ngTemplateOutlet]="footerTemplate() ?? defaultFooter"
-    ></ng-template>
-  } @else {
-    <ng-container [ngTemplateOutlet]="preview"></ng-container>
-  }
-</ng-template>
-
-<ng-template #preview>
-  @if (previewTemplate) {
-    <ng-template
-      [ngTemplateOutlet]="previewTemplate"
-      [ngTemplateOutletContext]="previewTemplateContext()"
     ></ng-template>
   }
 </ng-template>

@@ -28,15 +28,11 @@ export class ReceiptFilterComponent implements OnInit {
 
   public readonly isOpen = input<boolean>(true);
 
-  @Input() public previewTemplate?: TemplateRef<any>;
-
-  public readonly previewTemplateContext = input<any>();
-
   public readonly inDialog = input<boolean>(true);
 
   @Input() public parentForm: FormGroup = new FormGroup({});
 
-  @Input() public basePath: string = "";
+  public readonly basePath = input<string>("");
 
   public readonly formCommand = output<FormCommand>();
 
@@ -69,32 +65,32 @@ export class ReceiptFilterComponent implements OnInit {
     // RECEIPT_FILTER_FIELDS is the shared definition of every filter field's
     // label and operation type, so these rows and the filter chips that describe
     // them cannot drift apart.
-    setupAutoOperationSelection(this.parentForm, this.basePath, RECEIPT_FILTER_FIELDS);
+    setupAutoOperationSelection(this.parentForm, this.basePath(), RECEIPT_FILTER_FIELDS);
   }
 
   public resetFilter(): void {
     this.formCommand.emit({
-      path: `${this.basePath}`,
+      path: `${this.basePath()}`,
       command: "reset",
     });
     this.formCommand.emit({
-      path: `${this.basePath}paidBy.value`,
+      path: `${this.basePath()}paidBy.value`,
       command: "clear",
     });
     this.formCommand.emit({
-      path: `${this.basePath}categories.value`,
+      path: `${this.basePath()}categories.value`,
       command: "clear",
     });
     this.formCommand.emit({
-      path: `${this.basePath}tags.value`,
+      path: `${this.basePath()}tags.value`,
       command: "clear",
     });
     this.formCommand.emit({
-      path: `${this.basePath}status.value`,
+      path: `${this.basePath()}status.value`,
       command: "clear",
     });
     this.formCommand.emit({
-      path: `${this.basePath}group.value`,
+      path: `${this.basePath()}group.value`,
       command: "clear",
     });
   }

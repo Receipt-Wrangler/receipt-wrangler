@@ -1,6 +1,6 @@
-@if (imageBase64 || imageFileUrl()) {
+@if (imageBase64() || imageFileUrl()) {
   <app-image-canvas
-    [src]="(imageBase64 || imageFileUrl()) ?? ''"
+    [src]="(imageBase64() || imageFileUrl()) ?? ''"
     [stageHeight]="stageHeight()"
   ></app-image-canvas>
 }
