@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, OnInit, input } from "@angular/core";
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
@@ -18,7 +18,7 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
     imports: [DialogComponent, ReactiveFormsModule, InputComponent, DialogFooterComponent, FormGetPipe]
 })
 export class DummyUserConversionDialogComponent implements OnInit {
-  @Input() public user!: User;
+  public readonly user = input.required<User>();
 
   public form: FormGroup = new FormGroup({});
 
@@ -42,19 +42,19 @@ export class DummyUserConversionDialogComponent implements OnInit {
 
   public submitButtonClicked(): void {
     if (this.form.valid) {
-      let userId: string = this.user?.id?.toString();
+      let userId: string = this.user()?.id?.toString();
       this.userService
         .convertDummyUserById( Number.parseInt(userId), this.form.value)
         .pipe(
           take(1),
           tap(() => {
             this.snackbarService.success(
-              `${this.user.displayName} sucessfully converted to normal user`
+              `${this.user().displayName} sucessfully converted to normal user`
             );
           }),
           switchMap(() =>
             this.store.dispatch(
-              new UpdateUser(userId, { ...this.user, isDummyUser: false })
+              new UpdateUser(userId, { ...this.user(), isDummyUser: false })
             )
           ),
           tap(() => this.matDialogRef.close(true))

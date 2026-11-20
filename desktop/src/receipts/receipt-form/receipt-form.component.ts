@@ -71,6 +71,7 @@ import { FilteredStatefulMenuComponent } from "../../standalone/components/filte
 import { ReceiptHistoryDrawerComponent } from "../receipt-history-drawer/receipt-history-drawer.component";
 import { FormGetPipe } from "../../pipes/form-get.pipe";
 import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
   selector: "app-receipt-form",
@@ -1184,8 +1185,10 @@ export class ReceiptFormComponent implements OnInit {
   public duplicateReceipt(): void {
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
 
-    dialogRef.componentInstance.headerText = "Duplicate Receipt";
-    dialogRef.componentInstance.dialogContent = `Are you sure you would like to duplicate the receipt ${this.originalReceipt()?.name}?`;
+    setDialogInputs(dialogRef, {
+      headerText: "Duplicate Receipt",
+      dialogContent: `Are you sure you would like to duplicate the receipt ${this.originalReceipt()?.name}?`,
+    });
 
     dialogRef
       .afterClosed()

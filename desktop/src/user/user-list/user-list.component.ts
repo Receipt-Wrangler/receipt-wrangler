@@ -27,6 +27,7 @@ import { AddButtonComponent } from "../../shared-ui/add-button/add-button.compon
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { RoleNamePipe } from "../../pipes/role-name.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
     selector: "app-user-list",
@@ -170,7 +171,7 @@ export class UserListComponent extends BaseTableComponent<User> implements After
       DEFAULT_DIALOG_CONFIG
     );
 
-    dialogRef.componentInstance.user = user;
+    setDialogInputs(dialogRef, { user });
 
     dialogRef.afterClosed().subscribe((refresh) => {
       if (refresh) {
@@ -185,7 +186,7 @@ export class UserListComponent extends BaseTableComponent<User> implements After
       DEFAULT_DIALOG_CONFIG
     );
 
-    dialogRef.componentInstance.user = user;
+    setDialogInputs(dialogRef, { user });
   }
 
   public openDummyUserConversionDialog(user: User): void {
@@ -194,7 +195,7 @@ export class UserListComponent extends BaseTableComponent<User> implements After
       DEFAULT_DIALOG_CONFIG
     );
 
-    dialogRef.componentInstance.user = user;
+    setDialogInputs(dialogRef, { user });
   }
 
   public deleteUser(index: number) {
@@ -208,8 +209,10 @@ export class UserListComponent extends BaseTableComponent<User> implements After
         DEFAULT_DIALOG_CONFIG
       );
 
-      dialogRef.componentInstance.headerText = "Delete User";
-      dialogRef.componentInstance.dialogContent = `Are you sure you would like to delete the user '${user.username}'? This will remove the user from the user from groups, the user's receipt items, groups where this user is the only member, and receipts where the user paid. This action is irreversible.`;
+      setDialogInputs(dialogRef, {
+        headerText: "Delete User",
+        dialogContent: `Are you sure you would like to delete the user '${user.username}'? This will remove the user from the user from groups, the user's receipt items, groups where this user is the only member, and receipts where the user paid. This action is irreversible.`,
+      });
 
       dialogRef.afterClosed().subscribe((r) => {
         if (r) {
@@ -246,8 +249,10 @@ export class UserListComponent extends BaseTableComponent<User> implements After
     );
 
     const usernames = usersToDelete.map(user => user.username).join(", ");
-    dialogRef.componentInstance.headerText = "Delete Users";
-    dialogRef.componentInstance.dialogContent = `Are you sure you would like to delete ${usersToDelete.length} user(s): ${usernames}? This will remove these users from groups, their receipt items, groups where they are the only member, and receipts where they paid. This action is irreversible.`;
+    setDialogInputs(dialogRef, {
+      headerText: "Delete Users",
+      dialogContent: `Are you sure you would like to delete ${usersToDelete.length} user(s): ${usernames}? This will remove these users from groups, their receipt items, groups where they are the only member, and receipts where they paid. This action is irreversible.`,
+    });
 
     dialogRef.afterClosed().subscribe((confirmed) => {
       if (confirmed) {

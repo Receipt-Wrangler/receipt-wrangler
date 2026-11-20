@@ -23,6 +23,7 @@ import { TagAutocompleteComponent } from "../../tag-autocomplete/tag-autocomplet
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import { FormGetPipe } from "../../pipes/form-get.pipe";
 import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 export interface ItemData {
   item: Item;
@@ -207,21 +208,14 @@ export class ItemListComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   public splitItem(itemData: ItemData): void {
-    const dialogRef = this.matDialog.open(QuickActionsDialogComponent, {
-      ...DEFAULT_DIALOG_CONFIG,
-      data: {
-        originalReceipt: this.originalReceipt,
-        amountToSplit: parseFloat(itemData.item.amount) || 0,
-        itemIndex: itemData.arrayIndex,
-        usersToOmit: []
-      }
-    });
+    const dialogRef = this.matDialog.open(QuickActionsDialogComponent, DEFAULT_DIALOG_CONFIG);
 
-    // Pass data directly to component since it uses @Input decorators
-    dialogRef.componentInstance.originalReceipt = this.originalReceipt;
-    dialogRef.componentInstance.amountToSplit = parseFloat(itemData.item.amount) || 0;
-    dialogRef.componentInstance.itemIndex = itemData.arrayIndex;
-    dialogRef.componentInstance.usersToOmit = [];
+    setDialogInputs(dialogRef, {
+      originalReceipt: this.originalReceipt,
+      amountToSplit: parseFloat(itemData.item.amount) || 0,
+      itemIndex: itemData.arrayIndex,
+      usersToOmit: [],
+    });
 
     // Subscribe to the component's itemsToAdd output
     dialogRef.componentInstance.itemsToAdd.subscribe((data: { items: Item[], itemIndex?: number }) => {

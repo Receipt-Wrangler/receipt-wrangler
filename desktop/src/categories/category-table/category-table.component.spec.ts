@@ -12,6 +12,7 @@ import { ApiModule, CategoryService } from "../../open-api";
 import { CategoryForm } from "../category-form/category-form.component";
 import { CategoryTableComponent } from "./category-table.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 describe("CategoriesListComponent", () => {
   let component: CategoryTableComponent;
@@ -141,13 +142,7 @@ describe("CategoriesListComponent", () => {
       TestBed.inject(CategoryService),
       "getPagedCategories"
     );
-    dialogSpy.mockReturnValue({
-      componentInstance: {
-        category: {},
-        headerText: "",
-      },
-      afterClosed: () => of(true),
-    } as any);
+    dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
     const categoryView: any = {};
     component.openEditDialog(categoryView);
@@ -165,13 +160,7 @@ describe("CategoriesListComponent", () => {
       TestBed.inject(CategoryService),
       "getPagedCategories"
     );
-    dialogSpy.mockReturnValue({
-      componentInstance: {
-        category: {},
-        headerText: "",
-      },
-      afterClosed: () => of(false),
-    } as any);
+    dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(false) }) as any);
 
     const categoryView: any = {};
     component.openEditDialog(categoryView);
@@ -191,13 +180,7 @@ describe("CategoriesListComponent", () => {
       TestBed.inject(CategoryService),
       "getPagedCategories"
     );
-    dialogSpy.mockReturnValue({
-      componentInstance: {
-        category: {},
-        headerText: "",
-      },
-      afterClosed: () => of(true),
-    } as any);
+    dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
     const categoryView: any = { id: 1 };
     component.openDeleteConfirmationDialog(categoryView);
@@ -215,13 +198,7 @@ describe("CategoriesListComponent", () => {
       TestBed.inject(CategoryService),
       "getPagedCategories"
     );
-    dialogSpy.mockReturnValue({
-      componentInstance: {
-        category: {},
-        headerText: "",
-      },
-      afterClosed: () => of(false),
-    } as any);
+    dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(false) }) as any);
 
     const categoryView: any = {};
     component.openDeleteConfirmationDialog(categoryView);
@@ -239,13 +216,7 @@ describe("CategoriesListComponent", () => {
       TestBed.inject(CategoryService),
       "getPagedCategories"
     );
-    dialogSpy.mockReturnValue({
-      componentInstance: {
-        category: {},
-        headerText: "",
-      },
-      afterClosed: () => of(true),
-    } as any);
+    dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
     component.openAddDialog();
 
@@ -262,13 +233,7 @@ describe("CategoriesListComponent", () => {
       TestBed.inject(CategoryService),
       "getPagedCategories"
     );
-    dialogSpy.mockReturnValue({
-      componentInstance: {
-        category: {},
-        headerText: "",
-      },
-      afterClosed: () => of(false),
-    } as any);
+    dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(false) }) as any);
 
     component.openAddDialog();
 

@@ -404,8 +404,8 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   an icon-only `app-button` has no accessible name without one, since `mat-icon` is `aria-hidden`.
 - **Confirming an action:** the shared **`ConfirmationDialogComponent`**
   (`src/shared-ui/confirmation-dialog/`). Open it with `matDialog.open(ConfirmationDialogComponent)`,
-  set `componentInstance.headerText` / `componentInstance.dialogContent` (two plain `@Input()`s — it
-  does **not** take `MAT_DIALOG_DATA`), then act on a truthy `afterClosed()`. Check truthiness, not
+  call `setDialogInputs(dialogRef, { headerText, dialogContent })` (two signal inputs — it does
+  **not** take `MAT_DIALOG_DATA`), then act on a truthy `afterClosed()`. Check truthiness, not
   `=== true`: a backdrop click or ESC closes with `undefined`. Every action that writes a record the
   user can't trivially undo gates on it — deletes, and the receipt **Duplicate** in both the
   receipts-table row action and the receipt view header (each creates a real receipt, and the table's
@@ -440,7 +440,7 @@ that per user; the default is **off**, i.e. the panel stays open exactly as befo
 Three things about it are load-bearing:
 
 - **The component reads the preference itself**, from `AuthState.closeChipSelectOnSelect`, rather
-  than taking an `@Input`. It is global by design — the setting says "all of these pickers" — and
+  than taking an input. It is global by design — the setting says "all of these pickers" — and
   threading a flag through the twenty-odd call sites would only create a way for one of them to
   disagree with the rest. The default (`?? false`) lives in the selector, not at the reader.
 - **`closePanel()` alone does not close it.** `MatAutocompleteTrigger` opens on `focus`, and
@@ -818,7 +818,7 @@ The Manage Custom Fields page (`src/custom-fields/`) is a paged `app-table` plus
 dialog, table refetches on a truthy `afterClosed()`), with the differences a custom field's data model
 forces:
 
-- **The dialog is `FormMode`-driven** (`@Input() mode`, defaulting to `FormMode.add`), not the old
+- **The dialog is `FormMode`-driven** (a `mode` input, defaulting to `FormMode.add`), not the old
   binary `readonly` flag — passing a `customField` used to make it permanently read-only, so there was
   no way to reach an editable state. Fields bind `[readonly]="mode | inputReadonly"`, and the footer
   renders for every mode but `view`.
@@ -1017,7 +1017,7 @@ Custom Fields** `app-form-section` on `src/group/group-receipt-settings/` (betwe
   object instances** as the resolved catalog (`buildDefaultCustomFieldsArray`), because
   `app-autocomlete` filters already-selected options by **reference equality**; rebuilt literals leave
   a selected field in the dropdown and let it be added twice. `[readonly]` is bound **explicitly** —
-  `readonly` is a plain `@Input` and is not derived from `inputFormControl.disabled`, so the page's
+  `readonly` is its own input and is not derived from `inputFormControl.disabled`, so the page's
   view-mode `form.disable()` alone would still let a viewer remove chips. A second `app-checkbox`
   binds `applyDefaultCustomFieldsOnIngest` (quick scan / email-created receipts).
 - **Both controls exist only for holders of `app.custom-fields.read`** (added in `initForm()`, the
@@ -1503,6 +1503,15 @@ effect(() => {
 - Signal inputs are read-only (`InputSignal`). Template binding syntax `[prop]="value"` is unchanged.
 - Use `computed()` to derive values from inputs. Use `effect()` only for imperative side effects triggered by input changes.
 - Use `model()` for two-way binding (component modifies a value based on user interaction, e.g., custom form controls).
+- **There are no `@Input()`s left in `src/`.** Read an input as `x()`: an uninvoked `if (this.x)` or
+  `@if (x)` still compiles and is always truthy. Specs set inputs with
+  `fixture.componentRef.setInput("x", v)`; `component.x = v` replaces the signal at runtime.
+- **Dialog components take inputs through `setDialogInputs(dialogRef, { ... })`**
+  (`src/utils/dialog-inputs.ts`), since `MatDialog` creates them without bindings. Its keys and values
+  are type-checked against the component's `input()`s. Call it right after `open()`: the dialog's
+  first change detection runs later, so `input.required` works for a dialog too. A dialog opened from
+  a `TemplateRef` binds its inputs in the template instead. Specs that stub `MatDialog.open` return
+  `mockDialogRef()` (`src/testing/dialog-ref.testing.ts`); its `inputs` records what the opener set.
 
 ```typescript
 // Required input — no undefined in type

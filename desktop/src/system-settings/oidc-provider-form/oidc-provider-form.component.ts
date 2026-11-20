@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, OnInit, input } from "@angular/core";
 import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, ValidatorFn, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { finalize, Observable, take, tap } from "rxjs";
@@ -90,11 +90,11 @@ function openidScopeValidator(): ValidatorFn {
   ],
 })
 export class OidcProviderFormComponent implements OnInit {
-  @Input() public headerText: string = "";
+  public readonly headerText = input<string>("");
 
-  @Input() public provider?: OidcProviderView;
+  public readonly provider = input<OidcProviderView>();
 
-  @Input() public mode: FormMode = FormMode.add;
+  public readonly mode = input<FormMode>(FormMode.add);
 
   public form!: FormGroup;
 
@@ -121,11 +121,11 @@ export class OidcProviderFormComponent implements OnInit {
    * raised at the provider rather than here. The server rejects it too.
    */
   public get nameReadonly(): boolean {
-    return this.mode !== FormMode.add;
+    return this.mode() !== FormMode.add;
   }
 
   public get redirectUri(): string {
-    return this.provider?.redirectUri ?? "";
+    return this.provider()?.redirectUri ?? "";
   }
 
   /**
@@ -133,11 +133,11 @@ export class OidcProviderFormComponent implements OnInit {
    * never sent to the browser, so a blank field means "keep it".
    */
   public get clientSecretHint(): string {
-    if (this.mode === FormMode.add) {
+    if (this.mode() === FormMode.add) {
       return "";
     }
 
-    return this.provider?.hasClientSecret
+    return this.provider()?.hasClientSecret
       ? "Leave blank to keep the current secret."
       : "No secret is currently stored.";
   }
@@ -161,14 +161,15 @@ export class OidcProviderFormComponent implements OnInit {
     }
 
     const command = this.buildCommand();
+    const provider = this.provider();
 
     const request$: Observable<OidcProviderView> =
-      this.mode === FormMode.edit && this.provider
-        ? this.oidcProviderService.updateOidcProvider(this.provider.id.toString(), command)
+      this.mode() === FormMode.edit && provider
+        ? this.oidcProviderService.updateOidcProvider(provider.id.toString(), command)
         : this.oidcProviderService.createOidcProvider(command);
 
     const successMessage =
-      this.mode === FormMode.edit ? "OIDC provider updated" : "OIDC provider created";
+      this.mode() === FormMode.edit ? "OIDC provider updated" : "OIDC provider created";
 
     this.isSubmitting = true;
 
@@ -242,31 +243,31 @@ export class OidcProviderFormComponent implements OnInit {
   private initForm(): void {
     this.form = this.formBuilder.group({
       name: [
-        this.provider?.name,
+        this.provider()?.name,
         [trimmedRequiredValidator(), providerNameValidator()],
       ],
-      displayName: [this.provider?.displayName, [trimmedRequiredValidator()]],
+      displayName: [this.provider()?.displayName, [trimmedRequiredValidator()]],
       issuerUrl: [
-        this.provider?.issuerUrl,
+        this.provider()?.issuerUrl,
         [trimmedRequiredValidator(), absoluteUrlValidator()],
       ],
-      clientId: [this.provider?.clientId, [trimmedRequiredValidator()]],
+      clientId: [this.provider()?.clientId, [trimmedRequiredValidator()]],
       // Required only on create: on edit a blank field means "keep the stored
       // secret", which is why it is never populated from the provider.
       clientSecret: [
         "",
-        this.mode === FormMode.add ? [Validators.required] : [],
+        this.mode() === FormMode.add ? [Validators.required] : [],
       ],
       scope: [
-        this.provider?.scope ?? "openid profile email",
+        this.provider()?.scope ?? "openid profile email",
         [trimmedRequiredValidator(), openidScopeValidator()],
       ],
-      allowProvisioning: [this.provider?.allowProvisioning ?? false],
-      linkByUsername: [this.provider?.linkByUsername ?? false],
-      enabled: [this.provider?.enabled ?? true],
+      allowProvisioning: [this.provider()?.allowProvisioning ?? false],
+      linkByUsername: [this.provider()?.linkByUsername ?? false],
+      enabled: [this.provider()?.enabled ?? true],
     });
 
-    if (this.mode === FormMode.view) {
+    if (this.mode() === FormMode.view) {
       this.form.disable();
     }
 

@@ -41,6 +41,7 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
 import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 import { UrlLabelPipe } from "../pipes/url-label.pipe";
 import { UrlHintPipe } from "../pipes/url-hint.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
     selector: "app-receipt-processing-settings-form",
@@ -232,8 +233,10 @@ export class ReceiptProcessingSettingsFormComponent extends BaseFormComponent im
   private showConfirmationDialog(): void {
     const ref = this.dialog.open(ConfirmationDialogComponent, DEFAULT_DIALOG_CONFIG);
 
-    ref.componentInstance.headerText = "Update Key";
-    ref.componentInstance.dialogContent = "Are you sure you want to update the key? This will replace the previous key.";
+    setDialogInputs(ref, {
+      headerText: "Update Key",
+      dialogContent: "Are you sure you want to update the key? This will replace the previous key.",
+    });
 
     ref.afterClosed()
       .pipe(
@@ -264,9 +267,11 @@ export class ReceiptProcessingSettingsFormComponent extends BaseFormComponent im
   public checkConnectivity(): void {
     if (this.form.valid && this.formConfig.mode === FormMode.edit && this.form.dirty) {
       const ref = this.dialog.open(ConfirmationDialogComponent, DEFAULT_DIALOG_CONFIG);
-      ref.componentInstance.headerText = "Check Connectivity";
-      ref.componentInstance.dialogContent = `You have made changes to the receipt processing settings.
-       Would you like to check connectivity with the unsaved changes? Otherwise the existing settings will be used.`;
+      setDialogInputs(ref, {
+        headerText: "Check Connectivity",
+        dialogContent: `You have made changes to the receipt processing settings.
+       Would you like to check connectivity with the unsaved changes? Otherwise the existing settings will be used.`,
+      });
 
       ref.afterClosed()
         .pipe(

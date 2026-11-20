@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, OnInit, input } from "@angular/core";
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { take, tap } from "rxjs";
@@ -18,9 +18,9 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
     imports: [DialogComponent, ReactiveFormsModule, InputComponent, DialogFooterComponent, FormGetPipe]
 })
 export class CategoryForm implements OnInit {
-  @Input() public headerText: string = "";
+  public readonly headerText = input<string>("");
 
-  @Input() public category?: CategoryView;
+  public readonly category = input<CategoryView>();
 
   public form: FormGroup = new FormGroup({});
 
@@ -37,19 +37,19 @@ export class CategoryForm implements OnInit {
   }
 
   private initForm(): void {
-    const name = this.category?.name ?? "";
+    const name = this.category()?.name ?? "";
 
     const nameValidator = this.duplicateValidator.isUnique("category", 0, name);
     this.form = this.formBuilder.group({
       name: [name, Validators.required, nameValidator],
-      description: [this.category?.description ?? ""],
+      description: [this.category()?.description ?? ""],
     });
   }
 
   public submit(): void {
-    if (this.form.valid && this.category) {
+    if (this.form.valid && this.category()) {
       const category: Category = {
-        id: this.category?.id,
+        id: this.category()?.id,
         name: this.form.value.name,
         description: this.form.value.description,
       };
@@ -63,7 +63,7 @@ export class CategoryForm implements OnInit {
           })
         )
         .subscribe();
-    } else if (this.form.valid && !this.category) {
+    } else if (this.form.valid && !this.category()) {
       this.categoryService
         .createCategory(this.form.value as Category)
         .pipe(

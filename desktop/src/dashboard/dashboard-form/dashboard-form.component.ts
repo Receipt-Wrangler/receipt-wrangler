@@ -305,7 +305,7 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
     if (this.isAddingWidget) {
       const widget = this.widgets.at(this.widgets.length - 1) as FormGroup;
       if (widget.valid) {
-        const form = this.receiptFilterComponents().at(-1)!.parentForm;
+        const form = this.receiptFilterComponents().at(-1)!.parentForm();
         widget.get("configuration")?.patchValue(form.value);
         this.originalWidgets.push(widget.value);
 
@@ -318,7 +318,7 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
       ) as FormGroup;
 
       if (widget.valid) {
-        const form = this.receiptFilterComponents().at(0)!.parentForm;
+        const form = this.receiptFilterComponents().at(0)!.parentForm();
         widget.get("configuration")?.patchValue(form.value);
         const widgetList = this.widgetList();
         this.originalWidgets.splice(

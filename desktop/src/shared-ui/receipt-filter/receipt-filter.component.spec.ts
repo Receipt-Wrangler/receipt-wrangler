@@ -102,21 +102,21 @@ describe("ReceiptFilterComponent", () => {
     const categories = [{ id: 2, name: "Groceries" }] as Category[];
     const tags = [{ id: 3, name: "Reimbursable" }] as Tag[];
 
-    component.categories = categories;
-    component.tags = tags;
+    fixture.componentRef.setInput("categories", categories);
+    fixture.componentRef.setInput("tags", tags);
     component.ngOnInit();
 
-    expect(component.categories).toBe(categories);
-    expect(component.tags).toBe(tags);
+    expect(component.categories()).toBe(categories);
+    expect(component.tags()).toBe(tags);
   });
 
   it("should init form with no default initial data", () => {
     const destroyRef = TestBed.inject(DestroyRef);
 
-    component.parentForm = buildReceiptFilterForm({}, destroyRef);
+    fixture.componentRef.setInput("parentForm", buildReceiptFilterForm({}, destroyRef));
     component.ngOnInit();
 
-    expect(component.parentForm.value).toEqual(defaultReceiptFilter);
+    expect(component.parentForm().value).toEqual(defaultReceiptFilter);
   });
 
   it("should init form with initial data", () => {
@@ -128,10 +128,10 @@ describe("ReceiptFilterComponent", () => {
 
     const destroyRef = TestBed.inject(DestroyRef);
 
-    component.parentForm = buildReceiptFilterForm(filledFilter, destroyRef);
+    fixture.componentRef.setInput("parentForm", buildReceiptFilterForm(filledFilter, destroyRef));
     component.ngOnInit();
 
-    expect(component.parentForm.value).toEqual(filledFilter);
+    expect(component.parentForm().value).toEqual(filledFilter);
   });
 
   it("should reset form", () => {
@@ -142,18 +142,18 @@ describe("ReceiptFilterComponent", () => {
     });
 
     component.formCommand.subscribe((formCommand) => {
-      applyFormCommand(component.parentForm, formCommand);
+      applyFormCommand(component.parentForm(), formCommand);
     });
 
     const destroyRef = TestBed.inject(DestroyRef);
 
-    component.parentForm = buildReceiptFilterForm(filledFilter, destroyRef);
+    fixture.componentRef.setInput("parentForm", buildReceiptFilterForm(filledFilter, destroyRef));
     component.ngOnInit();
 
-    expect(component.parentForm.value).toEqual(filledFilter);
+    expect(component.parentForm().value).toEqual(filledFilter);
 
     component.resetFilter();
-    expect(component.parentForm.value).toEqual(defaultReceiptFilter);
+    expect(component.parentForm().value).toEqual(defaultReceiptFilter);
   });
 
   it("should set form in state and close dialog", () => {
@@ -166,7 +166,7 @@ describe("ReceiptFilterComponent", () => {
     component.submitButtonClicked();
 
     expect(storeRefSpy).toHaveBeenCalledWith(
-      new SetReceiptFilter(component.parentForm.value)
+      new SetReceiptFilter(component.parentForm().value)
     );
     expect(dialogRefSpy).toHaveBeenCalledWith(true);
   });
@@ -176,8 +176,8 @@ describe("ReceiptFilterComponent", () => {
 
     const countListRows = (showGroupFilter: boolean): number => {
       const localFixture = TestBed.createComponent(ReceiptFilterComponent);
-      localFixture.componentInstance.parentForm = buildReceiptFilterForm({}, destroyRef);
-      localFixture.componentInstance.showGroupFilter = showGroupFilter;
+      localFixture.componentRef.setInput("parentForm", buildReceiptFilterForm({}, destroyRef));
+      localFixture.componentRef.setInput("showGroupFilter", showGroupFilter);
       localFixture.detectChanges();
       // The rows are the shared app-filter-field; CUSTOM_ELEMENTS_SCHEMA keeps
       // it unrendered here, so the inner controls it projects are not in the DOM.
@@ -189,7 +189,7 @@ describe("ReceiptFilterComponent", () => {
   });
 
   it("defaults showGroupFilter to false", () => {
-    expect(component.showGroupFilter).toBe(false);
+    expect(component.showGroupFilter()).toBe(false);
   });
 
   it("should close dialog on cancel", () => {

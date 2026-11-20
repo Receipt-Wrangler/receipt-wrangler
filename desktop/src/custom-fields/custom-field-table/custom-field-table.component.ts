@@ -22,6 +22,7 @@ import { AddButtonComponent } from "../../shared-ui/add-button/add-button.compon
 import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 import { CustomFieldTypePipe } from "../../pipes/custom-field-type.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
   selector: "app-custom-field-table",
@@ -93,9 +94,11 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
     const dialogRef = this.matDialog.open(CustomFieldFormComponent, DEFAULT_DIALOG_CONFIG);
     const resolvedMode = mode ?? this.resolveDialogMode(customField);
 
-    dialogRef.componentInstance.headerText = this.buildDialogHeaderText(customField, resolvedMode);
-    dialogRef.componentInstance.customField = customField;
-    dialogRef.componentInstance.mode = resolvedMode;
+    setDialogInputs(dialogRef, {
+      headerText: this.buildDialogHeaderText(customField, resolvedMode),
+      customField,
+      mode: resolvedMode,
+    });
 
     dialogRef
       .afterClosed()
@@ -218,8 +221,10 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
       DEFAULT_DIALOG_CONFIG
     );
 
-    dialogRef.componentInstance.headerText = `Delete ${customField.name}`;
-    dialogRef.componentInstance.dialogContent = `Are you sure you want to delete ${customField.name}? This action is irreversible and will remove this custom field from the receipts it is associated with.`;
+    setDialogInputs(dialogRef, {
+      headerText: `Delete ${customField.name}`,
+      dialogContent: `Are you sure you want to delete ${customField.name}? This action is irreversible and will remove this custom field from the receipts it is associated with.`,
+    });
 
     dialogRef
       .afterClosed()

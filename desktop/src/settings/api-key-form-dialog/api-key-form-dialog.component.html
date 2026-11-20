@@ -1,4 +1,4 @@
-<app-dialog [headerText]="headerText">
+<app-dialog [headerText]="headerText()">
   @if (!apiKeyResult()) {
     <div>
       <form [formGroup]="form">
@@ -34,7 +34,7 @@
       </form>
 
       <app-dialog-footer
-        [submitButtonTooltip]="apiKey ? 'Update API Key' : 'Create API Key'"
+        [submitButtonTooltip]="apiKey() ? 'Update API Key' : 'Create API Key'"
         (submitClicked)="submitButtonClicked()"
         (cancelClicked)="cancelButtonClicked()"
       ></app-dialog-footer>

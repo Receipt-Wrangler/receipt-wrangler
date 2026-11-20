@@ -1,4 +1,4 @@
-<app-dialog [headerText]="headerText">
+<app-dialog [headerText]="headerText()">
   <form [formGroup]="form">
     <div class="d-flex flex-column">
       <app-form-section
@@ -7,12 +7,12 @@
       >
         <app-input
           label="Name"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'name'"
         ></app-input>
         <app-input
           label="Description"
-          [readonly]="mode | inputReadonly"
+          [readonly]="mode() | inputReadonly"
           [inputFormControl]="form | formGet : 'description'"
         ></app-input>
         <app-select
@@ -35,7 +35,7 @@
               <app-input
                 class="w-100"
                 label="Value"
-                [readonly]="mode | inputReadonly"
+                [readonly]="mode() | inputReadonly"
                 [inputFormControl]="form | formGet: 'options.' + index + '.value'"
               ></app-input>
               @if (canDeleteOption(index)) {
@@ -50,7 +50,7 @@
       }
     </div>
 
-    @if (mode !== FormMode.view) {
+    @if (mode() !== FormMode.view) {
       <app-dialog-footer
         (cancelClicked)="closeDialog()"
         (submitClicked)="submit()"
@@ -62,7 +62,7 @@
 <ng-template
   #optionsButtonTemplate
 >
-  @if (mode !== FormMode.view) {
+  @if (mode() !== FormMode.view) {
     <app-add-button
       tooltip="Add option"
       data-testid="custom-field-option-add"

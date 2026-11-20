@@ -20,6 +20,7 @@ import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.com
 import { ButtonComponent } from "../../button/button/button.component";
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
     selector: "app-system-email-table",
@@ -167,8 +168,10 @@ export class SystemEmailTableComponent implements OnInit, AfterViewInit {
   public deleteButtonClicked(systemEmail: SystemEmail): void {
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
 
-    dialogRef.componentInstance.headerText = "Delete System Email";
-    dialogRef.componentInstance.dialogContent = `Are you sure you want to delete the email: ${systemEmail.username}?`;
+    setDialogInputs(dialogRef, {
+      headerText: "Delete System Email",
+      dialogContent: `Are you sure you want to delete the email: ${systemEmail.username}?`,
+    });
 
     const index = this.dataSource().data.findIndex((se) => se.id === systemEmail.id);
 

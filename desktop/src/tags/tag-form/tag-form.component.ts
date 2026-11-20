@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, OnInit, input } from "@angular/core";
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { take, tap } from "rxjs";
@@ -18,9 +18,9 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
     imports: [DialogComponent, ReactiveFormsModule, InputComponent, DialogFooterComponent, FormGetPipe]
 })
 export class TagFormComponent implements OnInit {
-  @Input() public headerText: string = "";
+  public readonly headerText = input<string>("");
 
-  @Input() public tag?: TagView;
+  public readonly tag = input<TagView>();
 
   public form: FormGroup = new FormGroup({});
 
@@ -37,23 +37,24 @@ export class TagFormComponent implements OnInit {
   }
 
   private initForm(): void {
-    const name = this.tag?.name ?? "";
+    const name = this.tag()?.name ?? "";
 
     const nameValidator = this.duplicateValidator.isUnique("tag", 0, name);
     this.form = this.formBuilder.group({
       name: [name, Validators.required, nameValidator],
-      description: [this.tag?.description ?? ""],
+      description: [this.tag()?.description ?? ""],
     });
   }
 
   public submit(): void {
-    if (this.form.valid && this.tag) {
+    const tag = this.tag();
+    if (this.form.valid && tag) {
       const command: UpsertTagCommand = {
         name: this.form.value.name,
         description: this.form.value.description,
       };
       this.categoryService
-        .updateTag (this.tag.id as number, command)
+        .updateTag (tag.id as number, command)
         .pipe(
           take(1),
           tap(() => {
@@ -62,7 +63,7 @@ export class TagFormComponent implements OnInit {
           })
         )
         .subscribe();
-    } else if (this.form.valid && !this.tag) {
+    } else if (this.form.valid && !tag) {
       this.categoryService
         .createTag(this.form.value)
         .pipe(

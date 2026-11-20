@@ -30,6 +30,7 @@ import { ButtonComponent } from "../../button/button/button.component";
 import { SystemEmailChildSystemTaskComponent } from "../system-email-child-system-task/system-email-child-system-task.component";
 import { FormGetPipe } from "../../pipes/form-get.pipe";
 import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
   selector: "app-system-email-form",
@@ -106,8 +107,10 @@ export class SystemEmailFormComponent implements OnInit {
   private updateSystemEmail(): void {
     if (this.form.get("password")?.dirty) {
       const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
-      dialogRef.componentInstance.headerText = "Update email password";
-      dialogRef.componentInstance.dialogContent = "Are you sure you want to update the email password? This will replace the previous password.";
+      setDialogInputs(dialogRef, {
+        headerText: "Update email password",
+        dialogContent: "Are you sure you want to update the email password? This will replace the previous password.",
+      });
 
       dialogRef.afterClosed()
         .pipe(
@@ -140,9 +143,11 @@ export class SystemEmailFormComponent implements OnInit {
   public checkEmailConnectivity(): void {
     if (this.formConfig.mode === FormMode.edit && this.form.valid && this.form.dirty) {
       const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
-      dialogRef.componentInstance.headerText = "Check email connectivity";
-      dialogRef.componentInstance.dialogContent = `You have made changes to the email settings. Would you like to check connectivity with
-      the unsaved changes? Otherwise, the existing email settings will be used.`;
+      setDialogInputs(dialogRef, {
+        headerText: "Check email connectivity",
+        dialogContent: `You have made changes to the email settings. Would you like to check connectivity with
+      the unsaved changes? Otherwise, the existing email settings will be used.`,
+      });
 
       dialogRef.afterClosed()
         .pipe(

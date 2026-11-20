@@ -1,5 +1,5 @@
 @if (inDialog()) {
-  <app-dialog [headerText]="headerText">
+  <app-dialog [headerText]="headerText()">
     <ng-template [ngTemplateOutlet]="formTemplate"></ng-template>
   </app-dialog>
 } @else {
@@ -12,7 +12,7 @@
       label="Receipt Date"
       fieldName="date"
       type="date"
-      [parentForm]="parentForm"
+      [parentForm]="parentForm()"
       [basePath]="basePath()"
     ></app-filter-field>
 
@@ -20,7 +20,7 @@
       label="Name"
       fieldName="name"
       type="text"
-      [parentForm]="parentForm"
+      [parentForm]="parentForm()"
       [basePath]="basePath()"
     ></app-filter-field>
 
@@ -28,11 +28,11 @@
       label="Paid by"
       fieldName="paidBy"
       type="users"
-      [parentForm]="parentForm"
+      [parentForm]="parentForm()"
       [basePath]="basePath()"
     ></app-filter-field>
 
-    @if (showGroupFilter) {
+    @if (showGroupFilter()) {
       <app-filter-field
         label="Group"
         fieldName="group"
@@ -40,7 +40,7 @@
         optionFilterKey="name"
         optionDisplayKey="name"
         optionValueKey="id"
-        [parentForm]="parentForm"
+        [parentForm]="parentForm()"
         [basePath]="basePath()"
         [options]="groups() ?? []"
         [multiple]="true"
@@ -51,7 +51,7 @@
       label="Amount"
       fieldName="amount"
       type="number"
-      [parentForm]="parentForm"
+      [parentForm]="parentForm()"
       [basePath]="basePath()"
       [isCurrency]="true"
     ></app-filter-field>
@@ -63,9 +63,9 @@
       optionFilterKey="name"
       optionDisplayKey="name"
       optionValueKey="id"
-      [parentForm]="parentForm"
+      [parentForm]="parentForm()"
       [basePath]="basePath()"
-      [options]="categories"
+      [options]="categories()"
       [multiple]="true"
     ></app-filter-field>
 
@@ -76,9 +76,9 @@
       optionFilterKey="name"
       optionDisplayKey="name"
       optionValueKey="id"
-      [parentForm]="parentForm"
+      [parentForm]="parentForm()"
       [basePath]="basePath()"
-      [options]="tags"
+      [options]="tags()"
       [multiple]="true"
     ></app-filter-field>
 
@@ -89,7 +89,7 @@
       optionFilterKey="value"
       optionDisplayKey="displayValue"
       optionValueKey="value"
-      [parentForm]="parentForm"
+      [parentForm]="parentForm()"
       [basePath]="basePath()"
       [options]="receiptStatusOptions"
       [multiple]="true"
@@ -99,7 +99,7 @@
       label="Resolved Date"
       fieldName="resolvedDate"
       type="date"
-      [parentForm]="parentForm"
+      [parentForm]="parentForm()"
       [basePath]="basePath()"
     ></app-filter-field>
 
@@ -107,7 +107,7 @@
       label="Added At"
       fieldName="createdAt"
       type="date"
-      [parentForm]="parentForm"
+      [parentForm]="parentForm()"
       [basePath]="basePath()"
     ></app-filter-field>
 

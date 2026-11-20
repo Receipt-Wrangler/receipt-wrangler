@@ -1,6 +1,6 @@
-<app-dialog [headerText]="headerText">
+<app-dialog [headerText]="headerText()">
   <span>
-    {{ dialogContent }}
+    {{ dialogContent() }}
   </span>
   <app-dialog-footer
     submitButtonTooltip="Confirm"

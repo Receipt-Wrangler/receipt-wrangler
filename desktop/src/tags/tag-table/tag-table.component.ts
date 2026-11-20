@@ -19,6 +19,7 @@ import { HasAppPermissionDirective } from "../../directives/has-app-permission.d
 import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
 import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
     selector: "app-tags-list",
@@ -158,8 +159,10 @@ export class TagTableComponent implements OnInit, AfterViewInit {
       DEFAULT_DIALOG_CONFIG
     );
 
-    dialogRef.componentInstance.tag = tagView as TagView;
-    dialogRef.componentInstance.headerText = `Edit ${tagView.name}`;
+    setDialogInputs(dialogRef, {
+      tag: tagView as TagView,
+      headerText: `Edit ${tagView.name}`,
+    });
 
     dialogRef
       .afterClosed()
@@ -180,7 +183,7 @@ export class TagTableComponent implements OnInit, AfterViewInit {
       DEFAULT_DIALOG_CONFIG
     );
 
-    dialogRef.componentInstance.headerText = `Add tag`;
+    setDialogInputs(dialogRef, { headerText: `Add tag` });
 
     dialogRef
       .afterClosed()
@@ -200,8 +203,10 @@ export class TagTableComponent implements OnInit, AfterViewInit {
       ConfirmationDialogComponent,
       DEFAULT_DIALOG_CONFIG
     );
-    dialogRef.componentInstance.headerText = `Delete ${tagView.name}`;
-    dialogRef.componentInstance.dialogContent = `Are you sure you want to delete ${tagView.name}? This action is irreversiable and will remove this tag from the receipts it is associated with.`;
+    setDialogInputs(dialogRef, {
+      headerText: `Delete ${tagView.name}`,
+      dialogContent: `Are you sure you want to delete ${tagView.name}? This action is irreversiable and will remove this tag from the receipts it is associated with.`,
+    });
     dialogRef
       .afterClosed()
       .pipe(

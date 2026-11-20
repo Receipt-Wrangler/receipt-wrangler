@@ -118,7 +118,7 @@ describe("UserFormComponent", () => {
       appRoleId: 5,
     } as User;
 
-    component.user = user;
+    fixture.componentRef.setInput("user", user);
     component.ngOnInit();
 
     expect(component.form.value).toEqual({
@@ -130,7 +130,9 @@ describe("UserFormComponent", () => {
   });
 
   it("should attempt to update user on submit and get refresh token if the user is updating his/her own record", () => {
+    // Keep the other slices: grantRows reads the group state once a user is set.
     store.reset({
+      ...store.snapshot(),
       auth: {
         userId: "1",
       },
@@ -162,7 +164,7 @@ describe("UserFormComponent", () => {
       appRoleId: 5,
     } as User;
 
-    component.user = user;
+    fixture.componentRef.setInput("user", user);
     component.ngOnInit();
 
     component.submit();
@@ -178,7 +180,7 @@ describe("UserFormComponent", () => {
 
     expect(storeSpy).toHaveBeenCalledWith(
       new UpdateUser("1", {
-        ...component.user,
+        ...component.user(),
         ...component.form.value,
       })
     );
@@ -189,7 +191,9 @@ describe("UserFormComponent", () => {
   });
 
   it("should attempt to update user on submit and not get refresh token if the user is not updating his/her own record", () => {
+    // Keep the other slices: grantRows reads the group state once a user is set.
     store.reset({
+      ...store.snapshot(),
       auth: {
         userId: "2",
       },
@@ -221,7 +225,7 @@ describe("UserFormComponent", () => {
       appRoleId: 5,
     } as User;
 
-    component.user = user;
+    fixture.componentRef.setInput("user", user);
     component.ngOnInit();
 
     component.submit();
@@ -237,7 +241,7 @@ describe("UserFormComponent", () => {
 
     expect(storeSpy).toHaveBeenCalledWith(
       new UpdateUser("1", {
-        ...component.user,
+        ...component.user(),
         ...component.form.value,
       })
     );
@@ -360,7 +364,7 @@ describe("UserFormComponent", () => {
   });
 
   it("should disable isDummyUser if user is defined", () => {
-    component.user = {} as User;
+    fixture.componentRef.setInput("user", {} as User);
 
     component.ngOnInit();
 
@@ -487,7 +491,7 @@ describe("UserFormComponent", () => {
       const freshFixture = TestBed.createComponent(UserFormComponent);
       const freshComponent = freshFixture.componentInstance;
       const closeSpy = jest.spyOn(freshComponent.matDialogRef, "close");
-      freshComponent.user = user;
+      freshFixture.componentRef.setInput("user", user);
       freshComponent.ngOnInit();
       await freshFixture.whenStable();
 
@@ -513,7 +517,7 @@ describe("UserFormComponent", () => {
       getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
       const freshFixture = TestBed.createComponent(UserFormComponent);
       const freshComponent = freshFixture.componentInstance;
-      freshComponent.user = user;
+      freshFixture.componentRef.setInput("user", user);
       freshComponent.ngOnInit();
       await freshFixture.whenStable();
 
@@ -529,7 +533,7 @@ describe("UserFormComponent", () => {
       getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
       const freshFixture = TestBed.createComponent(UserFormComponent);
       const freshComponent = freshFixture.componentInstance;
-      freshComponent.user = user;
+      freshFixture.componentRef.setInput("user", user);
       freshComponent.ngOnInit();
       await freshFixture.whenStable();
 
@@ -542,7 +546,7 @@ describe("UserFormComponent", () => {
       getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
       const freshFixture = TestBed.createComponent(UserFormComponent);
       const freshComponent = freshFixture.componentInstance;
-      freshComponent.user = user;
+      freshFixture.componentRef.setInput("user", user);
       freshComponent.ngOnInit();
       await freshFixture.whenStable();
 

@@ -1,4 +1,4 @@
-import { Component, Input } from "@angular/core";
+import { Component, input } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
@@ -10,18 +10,18 @@ import { SourceFileViewerDialogComponent } from "./source-file-viewer-dialog.com
 // binding, not their rendering.
 @Component({ selector: "app-dialog", template: "<ng-content></ng-content>" })
 class DialogStubComponent {
-  @Input() public headerText?: string;
+  public readonly headerText = input<string>();
 }
 
 @Component({ selector: "app-image-viewer", template: "" })
 class ImageViewerStubComponent {
-  @Input() public imageBase64?: string;
+  public readonly imageBase64 = input<string>();
 }
 
 @Component({ selector: "app-button", template: "" })
 class ButtonStubComponent {
-  @Input() public buttonText?: string;
-  @Input() public matButtonType?: string;
+  public readonly buttonText = input<string>();
+  public readonly matButtonType = input<string>();
 }
 
 describe("SourceFileViewerDialogComponent", () => {
@@ -60,8 +60,8 @@ describe("SourceFileViewerDialogComponent", () => {
     const viewer = fixture.debugElement.query(By.directive(ImageViewerStubComponent)).componentInstance;
     const dialog = fixture.debugElement.query(By.directive(DialogStubComponent)).componentInstance;
 
-    expect(viewer.imageBase64).toBe(data.encodedImage);
-    expect(dialog.headerText).toBe(data.name);
+    expect(viewer.imageBase64()).toBe(data.encodedImage);
+    expect(dialog.headerText()).toBe(data.name);
   });
 
   it("closes through the dialog ref", () => {

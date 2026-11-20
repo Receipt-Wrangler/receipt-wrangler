@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, TemplateRef, input, output } from "@angular/core";
+import { Component, OnInit, TemplateRef, input, output } from "@angular/core";
 import { FormGroup, } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
@@ -22,7 +22,7 @@ import { ButtonComponent } from "../../button/button/button.component";
   imports: [DialogComponent, NgTemplateOutlet, FilterFieldComponent, DialogFooterComponent, ButtonComponent]
 })
 export class ReceiptFilterComponent implements OnInit {
-  @Input() public headerText: string = "";
+  public readonly headerText = input<string>("");
 
   public readonly footerTemplate = input<TemplateRef<any>>();
 
@@ -30,7 +30,7 @@ export class ReceiptFilterComponent implements OnInit {
 
   public readonly inDialog = input<boolean>(true);
 
-  @Input() public parentForm: FormGroup = new FormGroup({});
+  public readonly parentForm = input<FormGroup>(new FormGroup({}));
 
   public readonly basePath = input<string>("");
 
@@ -43,14 +43,14 @@ export class ReceiptFilterComponent implements OnInit {
   // Sourced from the selected group's grant-filtered AppData catalog by the
   // caller (set imperatively for the dialog, bound for the inline dashboard use)
   // rather than the admin-only global GET /category and GET /tag endpoints.
-  @Input() public categories: Category[] = [];
+  public readonly categories = input<Category[]>([]);
 
-  @Input() public tags: Tag[] = [];
+  public readonly tags = input<Tag[]>([]);
 
   // Only rendered on the "All groups" view (the caller sets it from
   // group.isAllGroup); hidden on single-group and dashboard-widget views, where
   // the view is already pinned to one group.
-  @Input() public showGroupFilter: boolean = false;
+  public readonly showGroupFilter = input<boolean>(false);
 
   // The user's own groups (minus the synthetic "All" group) — the selectable
   // set for the group filter.
@@ -65,7 +65,7 @@ export class ReceiptFilterComponent implements OnInit {
     // RECEIPT_FILTER_FIELDS is the shared definition of every filter field's
     // label and operation type, so these rows and the filter chips that describe
     // them cannot drift apart.
-    setupAutoOperationSelection(this.parentForm, this.basePath(), RECEIPT_FILTER_FIELDS);
+    setupAutoOperationSelection(this.parentForm(), this.basePath(), RECEIPT_FILTER_FIELDS);
   }
 
   public resetFilter(): void {
@@ -96,9 +96,9 @@ export class ReceiptFilterComponent implements OnInit {
   }
 
   public submitButtonClicked(): void {
-    const filter = this.parentForm.value;
+    const filter = this.parentForm().value;
 
-    if (this.parentForm.valid) {
+    if (this.parentForm().valid) {
       this.store
         .dispatch(new SetReceiptFilter(filter))
         .pipe(
@@ -109,7 +109,7 @@ export class ReceiptFilterComponent implements OnInit {
         )
         .subscribe();
     } else {
-      this.parentForm.markAllAsTouched();
+      this.parentForm().markAllAsTouched();
     }
   }
 

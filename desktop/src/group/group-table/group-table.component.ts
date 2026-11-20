@@ -25,6 +25,7 @@ import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-butt
 import { AsyncPipe } from "@angular/common";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { GroupTableEditButtonPipe } from "./group-table-edit-button.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 
 @Component({
@@ -167,8 +168,10 @@ export class GroupTableComponent extends BaseTableComponent<Group> implements On
         DEFAULT_DIALOG_CONFIG
       );
 
-      dialogRef.componentInstance.headerText = "Delete Group";
-      dialogRef.componentInstance.dialogContent = `Are you sure you would like to the group '${group.name}'? All receipts will be deleted as a result.`;
+      setDialogInputs(dialogRef, {
+        headerText: "Delete Group",
+        dialogContent: `Are you sure you would like to the group '${group.name}'? All receipts will be deleted as a result.`,
+      });
 
       dialogRef.afterClosed().subscribe((r) => {
         if (r) {

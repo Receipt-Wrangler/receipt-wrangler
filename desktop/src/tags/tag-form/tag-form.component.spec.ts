@@ -55,7 +55,7 @@ describe("CategoryForm", () => {
       description: "test",
       numberOfReceipts: 1,
     };
-    component.tag = tag;
+    fixture.componentRef.setInput("tag", tag);
 
     component.ngOnInit();
 
@@ -78,7 +78,7 @@ describe("CategoryForm", () => {
       description: "test",
       numberOfReceipts: 1,
     };
-    component.tag = tag;
+    fixture.componentRef.setInput("tag", tag);
 
     component.ngOnInit();
     component.submit();

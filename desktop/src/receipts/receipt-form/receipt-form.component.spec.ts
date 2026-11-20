@@ -23,6 +23,7 @@ import { provideTestStore } from "../../store/test-store";
 import { ReceiptFormComponent } from "./receipt-form.component";
 import { provideNgxMask } from "ngx-mask";
 import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 describe("ReceiptFormComponent", () => {
   let component: ReceiptFormComponent;
@@ -1414,10 +1415,7 @@ describe("ReceiptFormComponent", () => {
     let receiptService: ReceiptService;
 
     const stubDialog = (confirmed: boolean | undefined) =>
-      jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue({
-        componentInstance: {},
-        afterClosed: () => of(confirmed),
-      } as any);
+      jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue(mockDialogRef({ afterClosed: of(confirmed) }) as any);
 
     beforeEach(() => {
       component.originalReceipt.set({ id: 4, name: "Lunch" } as any);

@@ -26,6 +26,7 @@ import { SetGroups } from "../../store/group.state.actions";
 import { SetQuickDateField, SetReceiptFilter, SetSummaryConfigGroupId } from "../../store/receipt-table.actions";
 import { ReceiptsTableComponent } from "./receipts-table.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 const customField_ = (id: number): CustomField =>
   ({ id, name: "Vendor", type: CustomFieldType.Text } as CustomField);
@@ -536,10 +537,7 @@ describe("ReceiptsTableComponent", () => {
     let router: Router;
 
     const stubDialog = (confirmed: boolean | undefined) =>
-      jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue({
-        componentInstance: {},
-        afterClosed: () => of(confirmed),
-      } as any);
+      jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue(mockDialogRef({ afterClosed: of(confirmed) }) as any);
 
     beforeEach(() => {
       receiptService = TestBed.inject(ReceiptService);
@@ -638,10 +636,7 @@ describe("ReceiptsTableComponent", () => {
       let refresh: jest.SpyInstance;
 
       const stubConfirmation = (confirmed: boolean | undefined) =>
-        jest.spyOn(dialog, "open").mockReturnValue({
-          componentInstance: {},
-          afterClosed: () => of(confirmed),
-        } as any);
+        jest.spyOn(dialog, "open").mockReturnValue(mockDialogRef({ afterClosed: of(confirmed) }) as any);
 
       const stubResult = (result: BulkReceiptDeleteResult) =>
         jest.spyOn(receiptService, "bulkDeleteReceipts").mockReturnValue(of(result) as any);

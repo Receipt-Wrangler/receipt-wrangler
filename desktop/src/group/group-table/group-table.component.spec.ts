@@ -18,6 +18,7 @@ import { SystemSettingsState } from "../../store/system-settings.state";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 
 import { GroupTableComponent } from "./group-table.component";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 describe("GroupTableComponent", () => {
   let component: GroupTableComponent;
@@ -146,7 +147,7 @@ describe("GroupTableComponent", () => {
         .mockImplementation(() => {});
       jest
         .spyOn(TestBed.inject(MatDialog), "open")
-        .mockReturnValue({ afterClosed: () => of(true), componentInstance: {} } as any);
+        .mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
       store.dispatch(new SetGroups([{ id: 1 } as Group, { id: 2 } as Group]));
       component.dataSource.set(

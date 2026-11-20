@@ -60,13 +60,13 @@ describe("OidcProviderFormComponent", () => {
   });
 
   function initEdit(): void {
-    component.provider = provider;
-    component.mode = FormMode.edit;
+    fixture.componentRef.setInput("provider", provider);
+    fixture.componentRef.setInput("mode", FormMode.edit);
     fixture.detectChanges();
   }
 
   function initAdd(): void {
-    component.mode = FormMode.add;
+    fixture.componentRef.setInput("mode", FormMode.add);
     fixture.detectChanges();
   }
 

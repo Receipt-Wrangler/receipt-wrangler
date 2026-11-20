@@ -19,6 +19,7 @@ import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.com
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 import { MatChipListbox, MatChipOption } from "@angular/material/chips";
 import { GroupPipe } from "../../pipes/group.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 // Stable empty reference so the dashboards computed doesn't emit a fresh [] on
 // every recompute (which would needlessly re-run the auto-select effect).
@@ -155,8 +156,10 @@ export class GroupDashboardsComponent {
       (d) => d.id.toString() === dashboardId
     );
 
-    dialogRef.componentInstance.headerText = "Delete Dashboard";
-    dialogRef.componentInstance.dialogContent = `Are you sure you want to delete dashboard "${selectedDashboard?.name}"? This action is irreversable.`;
+    setDialogInputs(dialogRef, {
+      headerText: "Delete Dashboard",
+      dialogContent: `Are you sure you want to delete dashboard "${selectedDashboard?.name}"? This action is irreversable.`,
+    });
 
     dialogRef
       .afterClosed()

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, Input, OnInit, computed, effect, inject, signal } from "@angular/core";
+import { Component, DestroyRef, OnInit, computed, effect, inject, signal, input } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
@@ -47,7 +47,7 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
     imports: [ReactiveFormsModule, FormSectionComponent, InputComponent, SelectComponent, ButtonComponent, CheckboxComponent, GrantPickerComponent, SubmitButtonComponent, CancelButtonComponent, FormGetPipe]
 })
 export class UserFormComponent implements OnInit {
-  @Input() public user?: User;
+  public readonly user = input<User>();
 
   public isDummerUserHelpText: string =
     "A dummy user is a user who cannot log in, but can still act as a receipt payer, or be charged shares. Dummy users can be converted to normal users, but normal users cannot be converted to dummy users.";
@@ -71,7 +71,7 @@ export class UserFormComponent implements OnInit {
     // side effect, so an effect() is the sanctioned tool here.
     effect(() => {
       const roles = this.roles();
-      if (!this.user && this.form.get("appRoleId")?.value == null) {
+      if (!this.user() && this.form.get("appRoleId")?.value == null) {
         const defaultRole = roles.find(
           (role) => role.scope === PermissionScope.App && role.isDefault
         );
@@ -129,12 +129,13 @@ export class UserFormComponent implements OnInit {
    * server re-checks on every request.
    */
   public readonly grantRows = computed<MemberGrantRow[]>(() => {
-    if (!this.user) {
+    const user = this.user();
+    if (!user) {
       return [];
     }
     const permissions = this.groupPermissions();
     return buildMemberGrantRows(
-      this.user.id,
+      user.id,
       this.groups(),
       this.roles().filter((role) => role.scope === PermissionScope.Group),
     ).filter((row) =>
@@ -152,7 +153,7 @@ export class UserFormComponent implements OnInit {
   public ngOnInit(): void {
     this.initForm();
     this.listenToAppRoleChanges();
-    if (!this.user) {
+    if (!this.user()) {
       this.listenToIsDummyChanges();
     } else {
       this.loadGrantPools();
@@ -211,17 +212,17 @@ export class UserFormComponent implements OnInit {
 
   private initForm(): void {
     this.form = this.formBuilder.group({
-      displayName: [this.user?.displayName ?? "", Validators.required],
+      displayName: [this.user()?.displayName ?? "", Validators.required],
       username: [
-        this.user?.username ?? "",
+        this.user()?.username ?? "",
         Validators.required,
-        this.userValidators.uniqueUsername(0, this.user?.username ?? ""),
+        this.userValidators.uniqueUsername(0, this.user()?.username ?? ""),
       ],
-      appRoleId: [this.user?.appRoleId ?? null, Validators.required],
+      appRoleId: [this.user()?.appRoleId ?? null, Validators.required],
       isDummyUser: [false],
     });
 
-    if (!this.user) {
+    if (!this.user()) {
       this.form.addControl(
         "password",
         new FormControl("", Validators.required)
@@ -239,15 +240,16 @@ export class UserFormComponent implements OnInit {
   }
 
   public submit(): void {
-    if (this.form.valid && this.user) {
+    const user = this.user();
+    if (this.form.valid && user) {
       this.userService
-        .updateUserById(this.user.id, this.form.value)
+        .updateUserById(user.id, this.form.value)
         .pipe(
           take(1),
           switchMap(() =>
             this.store.dispatch(
-              new UpdateUser(this.user?.id.toString() as string, {
-                ...this.user,
+              new UpdateUser(user.id.toString(), {
+                ...user,
                 ...this.form.value,
               })
             )
@@ -258,7 +260,7 @@ export class UserFormComponent implements OnInit {
           switchMap(() =>
             saveChangedMemberGrants(
               this.groupsService,
-              this.user!.id,
+              user.id,
               this.grantRows(),
               this.editedGrants
             )
@@ -275,7 +277,7 @@ export class UserFormComponent implements OnInit {
             iif(
               () =>
                 this.store.selectSnapshot(AuthState.loggedInUser).id ===
-                this.user?.id,
+                user.id,
               defer(() => this.tokenRefreshService.refreshToken()),
               of(undefined)
             )
@@ -288,7 +290,7 @@ export class UserFormComponent implements OnInit {
           })
         )
         .subscribe();
-    } else if (this.form.valid && !this.user) {
+    } else if (this.form.valid && !user) {
       this.userService
         .createUser(this.form.value)
         .pipe(

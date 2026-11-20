@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, DestroyRef, inject } from "@angular/core";
+import { Component, OnInit, DestroyRef, inject, input } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
@@ -40,11 +40,11 @@ const optionValueRequiredValidator = trimmedRequiredValidator();
 export class CustomFieldFormComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
-  @Input() public headerText: string = "";
+  public readonly headerText = input<string>("");
 
-  @Input() public customField?: CustomField;
+  public readonly customField = input<CustomField>();
 
-  @Input() public mode: FormMode = FormMode.add;
+  public readonly mode = input<FormMode>(FormMode.add);
 
   public typeOptions: FormOption[] = Object.keys(CustomFieldType).map((key) => {
     return {
@@ -74,7 +74,7 @@ export class CustomFieldFormComponent implements OnInit {
   // stored in a type-specific column, so re-typing would mis-column every value
   // already recorded against the field. The server rejects it too.
   public get typeReadonly(): boolean {
-    return this.mode !== FormMode.add;
+    return this.mode() !== FormMode.add;
   }
 
   public ngOnInit(): void {
@@ -88,14 +88,15 @@ export class CustomFieldFormComponent implements OnInit {
     }
 
     const command = this.buildCommand();
+    const customField = this.customField();
 
     const request$: Observable<CustomField> =
-      this.mode === FormMode.edit && this.customField
-        ? this.customFieldService.updateCustomField(this.customField.id, command)
+      this.mode() === FormMode.edit && customField
+        ? this.customFieldService.updateCustomField(customField.id, command)
         : this.customFieldService.createCustomField(command);
 
     const successMessage =
-      this.mode === FormMode.edit ? "Custom field updated" : "Custom field created";
+      this.mode() === FormMode.edit ? "Custom field updated" : "Custom field created";
 
     request$
       .pipe(
@@ -123,7 +124,7 @@ export class CustomFieldFormComponent implements OnInit {
   // holds an option id, so deleting one would orphan every receipt that picked
   // it. An option added in this session has no id yet and is safe to drop.
   public canDeleteOption(index: number): boolean {
-    if (this.mode === FormMode.view || this.options.length <= 1) {
+    if (this.mode() === FormMode.view || this.options.length <= 1) {
       return false;
     }
 
@@ -141,17 +142,17 @@ export class CustomFieldFormComponent implements OnInit {
         // A new option carries no id; the server reads that as "append".
         id: option.id ?? undefined,
         value: option.value,
-        customFieldId: this.customField?.id ?? 0,
+        customFieldId: this.customField()?.id ?? 0,
       })),
     };
   }
 
   private initForm(): void {
     this.form = this.formBuilder.group({
-      name: [this.customField?.name, [Validators.required]],
-      type: [this.customField?.type, [Validators.required]],
-      description: [this.customField?.description],
-      options: this.formBuilder.array(this.customField?.options?.map(option => this.buildOption(option)) ?? []),
+      name: [this.customField()?.name, [Validators.required]],
+      type: [this.customField()?.type, [Validators.required]],
+      description: [this.customField()?.description],
+      options: this.formBuilder.array(this.customField()?.options?.map(option => this.buildOption(option)) ?? []),
     });
   }
 

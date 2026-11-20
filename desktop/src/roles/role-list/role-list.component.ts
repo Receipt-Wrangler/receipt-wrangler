@@ -42,6 +42,7 @@ import { TableComponent } from "../../table/table/table.component";
 import { NgClass } from "@angular/common";
 import { ButtonComponent } from "../../button/button/button.component";
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 // A role carries no icon of its own; pick a sensible default per scope. These
 // are inline style values, so the violet "group" accent is a literal (matching
@@ -250,8 +251,10 @@ export class RoleListComponent implements AfterViewInit {
     }
 
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
-    dialogRef.componentInstance.headerText = "Delete Role";
-    dialogRef.componentInstance.dialogContent = `Are you sure you want to delete the role: ${role.name}?`;
+    setDialogInputs(dialogRef, {
+      headerText: "Delete Role",
+      dialogContent: `Are you sure you want to delete the role: ${role.name}?`,
+    });
 
     dialogRef
       .afterClosed()

@@ -30,6 +30,7 @@ import { AsyncPipe } from "@angular/common";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { AiTypePipe } from "../pipes/ai-type.pipe";
 import { OcrEnginePipe } from "../pipes/ocr-engine.pipe";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
     selector: "app-receipt-processing-settings-table",
@@ -148,8 +149,10 @@ export class ReceiptProcessingSettingsTableComponent extends BaseTableComponent<
   public deleteReceiptProcessingSettings(receiptProcessingSettings: ReceiptProcessingSettings): void {
     const ref = this.dialog.open(ConfirmationDialogComponent, DEFAULT_DIALOG_CONFIG);
 
-    ref.componentInstance.headerText = "Delete Receipt Processing Settings";
-    ref.componentInstance.dialogContent = `Are you sure you want to delete the receipt processing settings: ${receiptProcessingSettings.name}?`;
+    setDialogInputs(ref, {
+      headerText: "Delete Receipt Processing Settings",
+      dialogContent: `Are you sure you want to delete the receipt processing settings: ${receiptProcessingSettings.name}?`,
+    });
 
     ref.afterClosed()
       .pipe(

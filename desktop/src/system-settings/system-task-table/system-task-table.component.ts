@@ -27,6 +27,7 @@ import { MatChipSet, MatChip, MatChipRemove } from "@angular/material/chips";
 import { MatIcon } from "@angular/material/icon";
 import { SystemEmailChildSystemTaskComponent } from "../system-email-child-system-task/system-email-child-system-task.component";
 import { ReceiptProcessingSettingsChildSystemTaskAccordionComponent } from "../../receipt-processing-settings/receipt-processing-settings-child-system-task-accordion/receipt-processing-settings-child-system-task-accordion.component";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
   selector: "app-system-task-table",
@@ -96,11 +97,13 @@ export class SystemTaskTableComponent implements OnInit {
       minWidth: "75%",
       maxWidth: "100%",
     });
-    dialogRef.componentInstance.headerText = "Filter System Tasks";
-    dialogRef.componentInstance.parentForm = buildSystemTaskFilterForm(this.filter(), this.destroyRef);
+    setDialogInputs(dialogRef, {
+      headerText: "Filter System Tasks",
+      parentForm: buildSystemTaskFilterForm(this.filter(), this.destroyRef),
+    });
 
     const formCommandSubscription = dialogRef.componentInstance.formCommand.subscribe(
-      (formCommand) => applyFormCommand(dialogRef.componentInstance.parentForm, formCommand)
+      (formCommand) => applyFormCommand(dialogRef.componentInstance.parentForm(), formCommand)
     );
 
     dialogRef

@@ -65,7 +65,7 @@ describe("SystemTaskFilterComponent", () => {
 
     fixture = TestBed.createComponent(SystemTaskFilterComponent);
     component = fixture.componentInstance;
-    component.parentForm = buildSystemTaskFilterForm({}, destroyRef);
+    fixture.componentRef.setInput("parentForm", buildSystemTaskFilterForm({}, destroyRef));
     fixture.detectChanges();
   });
 
@@ -74,15 +74,15 @@ describe("SystemTaskFilterComponent", () => {
   });
 
   it("builds an empty form matching the default filter", () => {
-    expect(component.parentForm.value).toEqual(buildDefaultSystemTaskFilter());
+    expect(component.parentForm().value).toEqual(buildDefaultSystemTaskFilter());
   });
 
   it("round-trips a seeded filter", () => {
     const localFixture = TestBed.createComponent(SystemTaskFilterComponent);
-    localFixture.componentInstance.parentForm = buildSystemTaskFilterForm(filledFilter, destroyRef);
+    localFixture.componentRef.setInput("parentForm", buildSystemTaskFilterForm(filledFilter, destroyRef));
     localFixture.detectChanges();
 
-    expect(localFixture.componentInstance.parentForm.value).toEqual(filledFilter);
+    expect(localFixture.componentInstance.parentForm().value).toEqual(filledFilter);
   });
 
   it("pins System above the real users in the Ran By options", () => {
@@ -99,21 +99,21 @@ describe("SystemTaskFilterComponent", () => {
   // reset() leaves a FormArray populated, so the two list fields need an
   // explicit clear command on top of it.
   it("resets every field, clearing the list ones", () => {
-    component.parentForm = buildSystemTaskFilterForm(filledFilter, destroyRef);
+    fixture.componentRef.setInput("parentForm", buildSystemTaskFilterForm(filledFilter, destroyRef));
     component.formCommand.subscribe((formCommand) =>
-      applyFormCommand(component.parentForm, formCommand)
+      applyFormCommand(component.parentForm(), formCommand)
     );
 
     component.resetFilter();
 
-    expect(component.parentForm.value).toEqual(buildDefaultSystemTaskFilter());
+    expect(component.parentForm().value).toEqual(buildDefaultSystemTaskFilter());
   });
 
   it("dispatches the filter and closes with true on submit", () => {
     const dispatchSpy = jest.spyOn(store, "dispatch").mockReturnValue(of({}));
     const closeSpy = jest.spyOn(TestBed.inject(MatDialogRef<SystemTaskFilterComponent>), "close");
 
-    component.parentForm = buildSystemTaskFilterForm(filledFilter, destroyRef);
+    fixture.componentRef.setInput("parentForm", buildSystemTaskFilterForm(filledFilter, destroyRef));
     component.submitButtonClicked();
 
     expect(dispatchSpy).toHaveBeenCalledWith(new SetSystemTaskFilter(filledFilter as any));

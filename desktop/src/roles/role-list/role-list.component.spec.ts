@@ -20,6 +20,7 @@ import { RoleListItem, RoleScope } from "./role-list-item.interface";
 import { provideStore } from "@ngxs/store";
 import { AuthState } from "../../store/auth.state";
 import { TableComponent } from "../../table/table/table.component";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 function listItem(overrides: Partial<RoleListItem> = {}): RoleListItem {
   return {
@@ -80,7 +81,7 @@ async function setup(
   dialogRef: { componentInstance: any; afterClosed: jest.Mock };
 }> {
   const dialogRef = {
-    componentInstance: {} as any,
+    ...mockDialogRef(),
     afterClosed: jest.fn().mockReturnValue(of(confirmResult)),
   };
   const matDialogMock = { open: jest.fn().mockReturnValue(dialogRef) };

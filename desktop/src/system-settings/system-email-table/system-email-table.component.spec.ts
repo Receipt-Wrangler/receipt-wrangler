@@ -10,6 +10,7 @@ import {SystemEmailTableState} from "../../store/system-email-table.state";
 
 import {SystemEmailTableComponent} from "./system-email-table.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { mockDialogRef } from "../../testing/dialog-ref.testing";
 
 describe("SystemEmailsComponent", () => {
   let component: SystemEmailTableComponent;
@@ -36,10 +37,7 @@ describe("SystemEmailsComponent", () => {
   });
 
   it("should pop confirmation dialog", () => {
-    const matDialogSpy = jest.spyOn(component.matDialog, "open").mockReturnValue({
-      componentInstance: {},
-      afterClosed: () => of(undefined)
-    } as any);
+    const matDialogSpy = jest.spyOn(component.matDialog, "open").mockReturnValue(mockDialogRef({ afterClosed: of(undefined) }) as any);
     component.dataSource.set(new MatTableDataSource([
       {
         id: 1,

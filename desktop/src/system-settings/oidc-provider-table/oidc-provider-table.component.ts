@@ -32,6 +32,7 @@ import { HasAppPermissionDirective } from "../../directives/has-app-permission.d
 import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
 import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
 import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { setDialogInputs } from "src/utils/dialog-inputs";
 
 @Component({
   selector: "app-oidc-provider-table",
@@ -109,9 +110,11 @@ export class OidcProviderTableComponent implements OnInit, AfterViewInit {
     const dialogRef = this.matDialog.open(OidcProviderFormComponent, DEFAULT_DIALOG_CONFIG);
     const resolvedMode = mode ?? this.resolveDialogMode(provider);
 
-    dialogRef.componentInstance.headerText = this.buildDialogHeaderText(provider, resolvedMode);
-    dialogRef.componentInstance.provider = provider;
-    dialogRef.componentInstance.mode = resolvedMode;
+    setDialogInputs(dialogRef, {
+      headerText: this.buildDialogHeaderText(provider, resolvedMode),
+      provider,
+      mode: resolvedMode,
+    });
 
     dialogRef
       .afterClosed()
@@ -129,9 +132,10 @@ export class OidcProviderTableComponent implements OnInit, AfterViewInit {
   public openDeleteConfirmationDialog(provider: OidcProviderView): void {
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent, DEFAULT_DIALOG_CONFIG);
 
-    dialogRef.componentInstance.headerText = `Delete ${provider.displayName}`;
-    dialogRef.componentInstance.dialogContent =
-      `Are you sure you want to delete ${provider.displayName}? Anyone who signs in with it will lose that ability, and accounts created by it may be left without a way to sign in.`;
+    setDialogInputs(dialogRef, {
+      headerText: `Delete ${provider.displayName}`,
+      dialogContent: `Are you sure you want to delete ${provider.displayName}? Anyone who signs in with it will lose that ability, and accounts created by it may be left without a way to sign in.`,
+    });
 
     dialogRef
       .afterClosed()
