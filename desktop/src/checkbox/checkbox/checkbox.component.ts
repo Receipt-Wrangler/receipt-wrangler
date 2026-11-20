@@ -1,6 +1,5 @@
-import { Component, Input } from "@angular/core";
+import { Component, input } from "@angular/core";
 import { FormControl, ReactiveFormsModule } from "@angular/forms";
-import { BaseInputInterface } from "../../base-input";
 import { MatCheckbox } from "@angular/material/checkbox";
 import { NgClass } from "@angular/common";
 import { HelpIconComponent } from "../../shared-ui/help-icon/help-icon.component";
@@ -11,23 +10,21 @@ import { HelpIconComponent } from "../../shared-ui/help-icon/help-icon.component
   styleUrls: ["./checkbox.component.scss"],
   imports: [MatCheckbox, NgClass, ReactiveFormsModule, HelpIconComponent]
 })
-export class CheckboxComponent implements BaseInputInterface {
-  @Input() public inputFormControl: FormControl<any> = new FormControl();
+export class CheckboxComponent {
+  public readonly inputFormControl = input<FormControl<any>>(new FormControl());
 
-  @Input() public label: string = "";
+  public readonly label = input<string>("");
 
-  @Input() public additionalErrorMessages?:
-    | { [key: string]: string }
-    | undefined;
+  public readonly additionalErrorMessages = input<{ [key: string]: string }>();
 
-  @Input() public readonly: boolean = false;
+  public readonly readonly = input<boolean>(false);
 
-  @Input() public placeholder?: string | undefined;
+  public readonly placeholder = input<string>();
 
-  @Input() public helpText?: string;
+  public readonly helpText = input<string>();
 
   public handleKeydown(event: KeyboardEvent): void {
-    if (this.readonly) {
+    if (this.readonly()) {
       event.preventDefault();
       return;
     }

@@ -6,6 +6,7 @@ import { ActivatedRoute } from "@angular/router";
 import { FormMode } from "../../enums/form-mode.enum";
 import { FormConfig } from "../../interfaces";
 import { Group, ReceiptStatus } from "../../open-api";
+import { applyFormCommand } from "../../utils";
 
 import { GroupSettingsEmailComponent } from "./group-settings-email.component";
 import { provideStore } from "@ngxs/store";
@@ -42,7 +43,7 @@ describe("GroupSettingsEmailComponent", () => {
     fixture = TestBed.createComponent(GroupSettingsEmailComponent);
 
     component = fixture.componentInstance;
-    component.form = new FormGroup({
+    fixture.componentRef.setInput("form", new FormGroup({
       systemEmailId: new FormControl(""),
       emailWhiteList: new FormArray([]),
       subjectLineRegexes: new FormArray([]),
@@ -51,11 +52,12 @@ describe("GroupSettingsEmailComponent", () => {
       emailIntegrationEnabled: new FormControl(false),
       emailBodyProcessingEnabled: new FormControl(false),
       emailRequireSignedSender: new FormControl(true),
-    });
+    }));
+    // Stands in for the parent, which applies each emitted command to the form.
     component.formCommand.subscribe((command) =>
-      component.handleFormCommand(command)
+      applyFormCommand(component.form(), command)
     );
-    component.formConfig = formConfig;
+    fixture.componentRef.setInput("formConfig", formConfig);
     fixture.detectChanges();
   });
 
@@ -66,7 +68,7 @@ describe("GroupSettingsEmailComponent", () => {
   it("should init form with empty values", () => {
     component.ngOnInit();
 
-    expect(component.form.value).toEqual({
+    expect(component.form().value).toEqual({
       systemEmailId: undefined,
       emailIntegrationEnabled: undefined,
       emailBodyProcessingEnabled: undefined,
@@ -77,7 +79,7 @@ describe("GroupSettingsEmailComponent", () => {
       emailDefaultReceiptPaidById: undefined,
     });
 
-    const form = component.form;
+    const form = component.form();
     expect(
       form.get("systemEmailId")?.hasValidator(Validators.required)
     ).toBe(false);
@@ -123,7 +125,7 @@ describe("GroupSettingsEmailComponent", () => {
 
     component.ngOnInit();
 
-    expect(component.form.value).toEqual({
+    expect(component.form().value).toEqual({
       systemEmailId: "test@test.com",
       emailIntegrationEnabled: true,
       emailBodyProcessingEnabled: undefined,
@@ -141,7 +143,7 @@ describe("GroupSettingsEmailComponent", () => {
       emailDefaultReceiptPaidById: 1,
     });
 
-    const form = component.form;
+    const form = component.form();
     expect(
       form.get("systemEmailId")?.hasValidator(Validators.required)
     ).toBe(true);
@@ -163,12 +165,12 @@ describe("GroupSettingsEmailComponent", () => {
 
     component.ngOnInit();
 
-    expect(component.form.get("emailRequireSignedSender")?.value).toBe(false);
+    expect(component.form().get("emailRequireSignedSender")?.value).toBe(false);
   });
 
   it("should keep the signed sender check on when the settings omit it", () => {
     const activatedRoute = TestBed.inject(ActivatedRoute);
-    component.form.get("emailRequireSignedSender")?.setValue(false);
+    component.form().get("emailRequireSignedSender")?.setValue(false);
     activatedRoute.snapshot.data = {
       ...activatedRoute.snapshot.data,
       group: { id: 1, groupSettings: { id: 1, groupId: 1 } } as any,
@@ -178,7 +180,7 @@ describe("GroupSettingsEmailComponent", () => {
 
     // The form always submits this control, so an unset value must not read as
     // "off" and silently disable the check on save.
-    expect(component.form.get("emailRequireSignedSender")?.value).toBe(true);
+    expect(component.form().get("emailRequireSignedSender")?.value).toBe(true);
   });
 
   it("should render the signed sender checkbox bound to its control", () => {

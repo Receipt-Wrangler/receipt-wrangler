@@ -89,9 +89,9 @@ export class AutocomleteComponent
   public override ngOnInit(): void {
     super.ngOnInit();
     if (!this.inputId) {
-      this.inputId = this.label.replace(/ /g, "_").toLowerCase();
+      this.inputId = this.label().replace(/ /g, "_").toLowerCase();
     }
-    this.isRequired = this.inputFormControl.hasValidator(Validators.required);
+    this.isRequired = this.inputFormControl().hasValidator(Validators.required);
     this.setSingleOptionSelected();
 
     if (!this.multiple()) {
@@ -101,8 +101,8 @@ export class AutocomleteComponent
 
   private setSingleOptionSelected(): void {
     if (!this.multiple()) {
-      this.inputFormControl.valueChanges
-        .pipe(startWith(this.inputFormControl.value))
+      this.inputFormControl().valueChanges
+        .pipe(startWith(this.inputFormControl().value))
         .subscribe((v) => {
           this.singleOptionSelected.set(!!v);
         });
@@ -110,7 +110,7 @@ export class AutocomleteComponent
   }
 
   private initSingleAutocomplete(): void {
-    this.filterFormControl.setValue(this.inputFormControl.value);
+    this.filterFormControl.setValue(this.inputFormControl().value);
   }
 
   // Re-seeds the single-select display from the current inputFormControl value.
@@ -130,7 +130,7 @@ export class AutocomleteComponent
     const filterValue = value.toString()?.toLowerCase();
 
     if (this.multiple()) {
-      const formArray = this.inputFormControl as any as FormArray;
+      const formArray = this.inputFormControl() as any as FormArray;
       const selectedValues = (formArray.value as any[]) ?? [];
       // TODO: Restrict the user form adding an already added value
 
@@ -160,7 +160,7 @@ export class AutocomleteComponent
   public optionSelected(event: MatAutocompleteSelectedEvent): void {
     if (this.multiple()) {
       const customOptionSelected = event.option.id === this.creatableOptionId;
-      const formArray = this.inputFormControl as any as FormArray;
+      const formArray = this.inputFormControl() as any as FormArray;
 
       if (customOptionSelected && !this.optionValueKey()) {
         formArray.push(
@@ -172,7 +172,7 @@ export class AutocomleteComponent
       } else if (customOptionSelected && this.optionValueKey()) {
         formArray.push(new FormControl(this.filterFormControl.value));
       } else {
-        (this.inputFormControl as any as FormArray).push(
+        (this.inputFormControl() as any as FormArray).push(
           new FormControl(event.option.value)
         );
       }
@@ -184,7 +184,7 @@ export class AutocomleteComponent
         }
       }, 0);
     } else {
-      this.inputFormControl.setValue(event.option.value);
+      this.inputFormControl().setValue(event.option.value);
     }
   }
 
@@ -214,7 +214,7 @@ export class AutocomleteComponent
 
   public removeOption(index: number) {
     if (this.multiple()) {
-      const formArray = this.inputFormControl as any as FormArray;
+      const formArray = this.inputFormControl() as any as FormArray;
       formArray.removeAt(index);
       this.filterFormControl.setValue(null);
       this.inputMultiple().nativeElement.focus();
@@ -227,9 +227,9 @@ export class AutocomleteComponent
 
   public clearFilter(): void {
     if (this.multiple()) {
-      this.inputFormControl.setValue([]);
+      this.inputFormControl().setValue([]);
     } else {
-      this.inputFormControl.setValue(null);
+      this.inputFormControl().setValue(null);
     }
     this.filterFormControl.setValue("");
   }

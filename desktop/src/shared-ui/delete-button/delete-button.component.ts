@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { FormButtonComponent } from '../form-button/form-button.component';
 import { ButtonComponent } from '../../button/button/button.component';
 
@@ -9,8 +9,5 @@ import { ButtonComponent } from '../../button/button/button.component';
     imports: [ButtonComponent]
 })
 export class DeleteButtonComponent extends FormButtonComponent {
-  constructor() {
-    super();
-    this.color = 'warn';
-  }
+  public override readonly color = input<string>('warn');
 }

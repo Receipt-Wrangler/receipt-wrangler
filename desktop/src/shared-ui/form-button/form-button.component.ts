@@ -1,4 +1,4 @@
-import { Component, Input, input, output } from "@angular/core";
+import { Component, input, output } from "@angular/core";
 import { FormMode } from "src/enums/form-mode.enum";
 
 @Component({
@@ -9,11 +9,11 @@ import { FormMode } from "src/enums/form-mode.enum";
 export class FormButtonComponent {
   public readonly mode = input<FormMode>(FormMode.view);
 
-  @Input() public tooltip?: string;
+  public readonly tooltip = input<string>();
 
   public readonly disabled = input<boolean>(false);
 
-  @Input() public color: string = "primary";
+  public readonly color = input<string>("primary");
 
   public readonly buttonRouterLink = input<string[]>();
 

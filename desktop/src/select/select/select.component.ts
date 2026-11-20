@@ -67,7 +67,7 @@ export class SelectComponent extends BaseInputComponent implements OnInit {
    * option list does, optionsDisplayArray included.
    */
   public selectedIndex(): number {
-    const value = this.inputFormControl.value;
+    const value = this.inputFormControl().value;
     return this.options().findIndex(
       (option) => (this.optionValueKey() ? option[this.optionValueKey()] : option) === value
     );

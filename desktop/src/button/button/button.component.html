@@ -14,9 +14,9 @@
       (click)="emitClicked($event)"
     >
       <div class="d-flex align-items-center">
-        @if (icon) {
+        @if (icon()) {
           <mat-icon class="me-1">
-            {{ icon }}
+            {{ icon() }}
           </mat-icon>
         }
         <span>
@@ -43,9 +43,9 @@
       (click)="emitClicked($event)"
     >
       <div class="d-flex align-items-center">
-        @if (icon) {
+        @if (icon()) {
           <mat-icon class="me-1">
-            {{ icon }}
+            {{ icon() }}
           </mat-icon>
         }
         <span>
@@ -72,12 +72,12 @@
       [matBadge]="matBadgeContent()"
       (click)="emitClicked($event)"
     >
-      @if (customIcon) {
-        <mat-icon [svgIcon]="customIcon"></mat-icon>
+      @if (customIcon()) {
+        <mat-icon [svgIcon]="customIcon()"></mat-icon>
       }
-      @if (icon) {
+      @if (icon()) {
         <mat-icon>
-          {{ icon }}
+          {{ icon() }}
         </mat-icon>
       }
     </button>

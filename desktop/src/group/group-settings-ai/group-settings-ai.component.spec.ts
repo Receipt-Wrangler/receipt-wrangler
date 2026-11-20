@@ -1,5 +1,6 @@
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { FormGroup } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 import { FormConfig } from "../../interfaces";
 
@@ -32,7 +33,8 @@ describe("GroupSettingsAiComponent", () => {
 
     fixture = TestBed.createComponent(GroupSettingsAiComponent);
     component = fixture.componentInstance;
-    component.formConfig = {} as FormConfig;
+    fixture.componentRef.setInput("form", new FormGroup({}));
+    fixture.componentRef.setInput("formConfig", {} as FormConfig);
     fixture.detectChanges();
   });
 

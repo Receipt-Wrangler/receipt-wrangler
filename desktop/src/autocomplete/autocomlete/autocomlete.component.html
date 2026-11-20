@@ -1,8 +1,8 @@
-<mat-form-field class="w-100" appearance="fill" [hintLabel]="hint ?? ''">
-  <mat-label>{{ label }}</mat-label>
+<mat-form-field class="w-100" appearance="fill" [hintLabel]="hint() ?? ''">
+  <mat-label>{{ label() }}</mat-label>
   @if (multiple()) {
     <mat-chip-grid #chipGrid>
-      @for (option of inputFormControl.value; track option; let i = $index) {
+      @for (option of inputFormControl().value; track option; let i = $index) {
         <mat-chip-row
           (removed)="removeOption(i)"
         >
@@ -20,7 +20,7 @@
               }}
             </div>
           }
-          @if (!readonly) {
+          @if (!readonly()) {
             <button matChipRemove>
               <mat-icon>cancel</mat-icon>
             </button>
@@ -37,7 +37,7 @@
       [formControl]="filterFormControl"
       [matAutocomplete]="auto"
       [matChipInputFor]="chipGrid"
-      [readonly]="readonly"
+      [readonly]="readonly()"
       [required]="isRequired"
     />
   }
@@ -48,11 +48,11 @@
         type="text"
         [formControl]="filterFormControl"
         [matAutocomplete]="auto"
-        [readonly]="readonly || singleOptionSelected()"
+        [readonly]="readonly() || singleOptionSelected()"
         [required]="isRequired"
       />
     }
-    @if (singleOptionSelected() && !readonly) {
+    @if (singleOptionSelected() && !readonly()) {
       <app-button
         data-testid="autocomplete-clear"
         matButtonType="iconButton"

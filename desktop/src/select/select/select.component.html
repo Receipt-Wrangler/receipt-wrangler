@@ -1,14 +1,14 @@
 <mat-form-field class="w-100">
-  <mat-label>{{ label }}</mat-label>
-  @if (readonly) {
+  <mat-label>{{ label() }}</mat-label>
+  @if (readonly()) {
     <input
       matInput
       [readonly]="true"
-      [value]="inputFormControl.value | readonlyValue : options() : optionDisplayKey() : optionValueKey() : optionsDisplayArray()"
+      [value]="inputFormControl().value | readonlyValue : options() : optionDisplayKey() : optionValueKey() : optionsDisplayArray()"
     />
   } @else {
     <mat-select
-      [formControl]="inputFormControl"
+      [formControl]="inputFormControl()"
       (blur)="inputBlur.emit($event)"
       readonly
     >

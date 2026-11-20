@@ -56,12 +56,12 @@ describe("AutocomleteComponent", () => {
   //   component.optionFilterKey = 'name';
 
   //   fixture.componentRef.setInput("multiple", true);
-  //   component.inputFormControl = new FormArray([
+  //   fixture.componentRef.setInput("inputFormControl", new FormArray([
   //     new FormGroup({
   //       id: new FormControl(2),
   //       name: new FormControl('Option 2'),
   //     }),
-  //   ]) as any;
+  //   ]) as any);
 
   //   const result = component._filter('Option');
   //   console.log(result);
@@ -86,7 +86,7 @@ describe("AutocomleteComponent", () => {
 
   it("re-seeds the single-select display from inputFormControl on syncSingleDisplay", () => {
     fixture.componentRef.setInput("multiple", false);
-    component.inputFormControl.setValue(42);
+    component.inputFormControl().setValue(42);
     component.filterFormControl.setValue("");
 
     component.syncSingleDisplay();
@@ -96,7 +96,7 @@ describe("AutocomleteComponent", () => {
 
   it("leaves the display untouched on syncSingleDisplay in multiple mode", () => {
     fixture.componentRef.setInput("multiple", true);
-    component.inputFormControl = new FormArray([new FormControl(1)]) as any;
+    fixture.componentRef.setInput("inputFormControl", new FormArray([new FormControl(1)]) as any);
     component.filterFormControl.setValue("stale");
 
     component.syncSingleDisplay();
@@ -117,7 +117,7 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect(component.inputFormControl.value).toEqual("value");
+    expect(component.inputFormControl().value).toEqual("value");
   });
 
   it("should set the selected option value to the inputFormControl in single mode with full object as value", () => {
@@ -132,7 +132,7 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect(component.inputFormControl.value).toEqual({
+    expect(component.inputFormControl().value).toEqual({
       id: "id1",
       name: "Groceries",
     });
@@ -141,9 +141,9 @@ describe("AutocomleteComponent", () => {
   it("should add the selected option value to the inputFormControl as a FormControl instance in multiple mode", () => {
     fixture.componentRef.setInput("multiple", true);
     fixture.componentRef.setInput("optionValueKey", "value");
-    component.inputFormControl = new FormArray([
+    fixture.componentRef.setInput("inputFormControl", new FormArray([
       new FormControl("value 1"),
-    ]) as any;
+    ]) as any);
 
     const event = {
       option: {
@@ -154,7 +154,7 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect((component.inputFormControl as any as FormArray).value).toEqual([
+    expect((component.inputFormControl() as any as FormArray).value).toEqual([
       "value 1",
       "value 2",
     ]);
@@ -163,12 +163,12 @@ describe("AutocomleteComponent", () => {
   it("should add the selected option value to the inputFormControl as a FormControl instance in multiple mode with full object", () => {
     fixture.componentRef.setInput("multiple", true);
     fixture.componentRef.setInput("optionValueKey", "value");
-    component.inputFormControl = new FormArray([
+    fixture.componentRef.setInput("inputFormControl", new FormArray([
       new FormGroup({
         id: new FormControl("id0"),
         name: new FormControl("Utilities"),
       }),
-    ]) as any;
+    ]) as any);
 
     const event = {
       option: {
@@ -182,7 +182,7 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect((component.inputFormControl as any as FormArray).value).toEqual([
+    expect((component.inputFormControl() as any as FormArray).value).toEqual([
       {
         id: "id0",
         name: "Utilities",
@@ -199,9 +199,9 @@ describe("AutocomleteComponent", () => {
     fixture.componentRef.setInput('defaultCreatableObject', { name: "Custom Option" });
     fixture.componentRef.setInput('creatableValueKey', "name");
     fixture.componentRef.setInput("multiple", true);
-    component.inputFormControl = new FormArray([
+    fixture.componentRef.setInput("inputFormControl", new FormArray([
       new FormControl("value 1"),
-    ]) as any;
+    ]) as any);
 
     const event = {
       option: {
@@ -214,7 +214,7 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect((component.inputFormControl as any as FormArray).value).toEqual([
+    expect((component.inputFormControl() as any as FormArray).value).toEqual([
       "value 1",
       {
         name: "new value",
@@ -226,9 +226,9 @@ describe("AutocomleteComponent", () => {
     component.creatableOptionId = "create-option";
     fixture.componentRef.setInput("optionValueKey", "name");
     fixture.componentRef.setInput("multiple", true);
-    component.inputFormControl = new FormArray([
+    fixture.componentRef.setInput("inputFormControl", new FormArray([
       new FormControl("value 1"),
-    ]) as any;
+    ]) as any);
 
     const event = {
       option: {
@@ -241,7 +241,7 @@ describe("AutocomleteComponent", () => {
 
     component.optionSelected(event);
 
-    expect((component.inputFormControl as any as FormArray).value).toEqual([
+    expect((component.inputFormControl() as any as FormArray).value).toEqual([
       "value 1",
       "new value",
     ]);
@@ -264,7 +264,7 @@ describe("AutocomleteComponent", () => {
       const blur = jest.fn();
 
       fixture.componentRef.setInput("multiple", true);
-      component.inputFormControl = new FormArray([]) as any;
+      fixture.componentRef.setInput("inputFormControl", new FormArray([]) as any);
       (component as any).matAutocompleteTrigger = () => ({ openPanel, closePanel });
       (component as any).inputMultiple = () => ({ nativeElement: { blur } });
 

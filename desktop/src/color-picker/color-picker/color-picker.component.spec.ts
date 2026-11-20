@@ -24,7 +24,7 @@ describe('ColorPickerComponent', () => {
     });
     fixture = TestBed.createComponent(ColorPickerComponent);
     component = fixture.componentInstance;
-    component.inputFormControl = new FormControl();
+    fixture.componentRef.setInput("inputFormControl", new FormControl());
     fixture.detectChanges();
   });
 
@@ -40,7 +40,7 @@ describe('ColorPickerComponent', () => {
     };
     component.colorSelected(event);
 
-    expect(component.inputFormControl.value).toEqual('#CD5C5C');
+    expect(component.inputFormControl().value).toEqual('#CD5C5C');
   });
 
   it('should not prevent default if the field is not readonly', () => {
@@ -59,7 +59,7 @@ describe('ColorPickerComponent', () => {
       preventDefault: () => {},
     };
     const eventSpy = jest.spyOn(event, 'preventDefault');
-    component.readonly = true;
+    fixture.componentRef.setInput("readonly", true);
     component.handleClick(event);
 
     expect(eventSpy).toHaveBeenCalledTimes(1);

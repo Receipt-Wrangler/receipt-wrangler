@@ -1,7 +1,7 @@
-import { Component, Input, OnInit, input } from "@angular/core";
+import { Component, OnInit, input, output } from "@angular/core";
 import { FormGroup } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
-import { BaseFormComponent } from "../../form";
+import { FormCommand } from "../../form";
 import { FormConfig } from "../../interfaces";
 import { Group, Prompt } from "../../open-api";
 import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
@@ -14,12 +14,14 @@ import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
     styleUrl: "./group-settings-ai.component.scss",
     imports: [AutocomleteComponent, FormGetPipe, InputReadonlyPipe]
 })
-export class GroupSettingsAiComponent extends BaseFormComponent implements OnInit {
-  @Input() public override form: FormGroup = new FormGroup({});
+export class GroupSettingsAiComponent implements OnInit {
+  public readonly form = input.required<FormGroup>();
 
   public readonly canEdit = input<boolean>(false);
 
-  @Input() public override formConfig!: FormConfig;
+  public readonly formConfig = input.required<FormConfig>();
+
+  public readonly formCommand = output<FormCommand>();
 
   public group!: Group;
 
@@ -28,7 +30,6 @@ export class GroupSettingsAiComponent extends BaseFormComponent implements OnIni
   constructor(
     private activatedRoute: ActivatedRoute,
   ) {
-    super();
   }
 
   public ngOnInit(): void {
@@ -75,6 +76,10 @@ export class GroupSettingsAiComponent extends BaseFormComponent implements OnIni
         payload: this.group.groupSettings?.fallbackPromptId ?? null
       }
     );
+  }
+
+  private emitFormCommand(formCommand: FormCommand): void {
+    this.formCommand.emit(formCommand);
   }
 
   public promptDisplayWith(id: number): string {

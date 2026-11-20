@@ -157,8 +157,8 @@ describe("InputComponent", () => {
       await fixture.whenStable();
 
       expect(passwordGeneratorService.generateAndCopy).toHaveBeenCalled();
-      expect(component.inputFormControl.value).toEqual(GENERATED_PASSWORD);
-      expect(component.inputFormControl.dirty).toEqual(true);
+      expect(component.inputFormControl().value).toEqual(GENERATED_PASSWORD);
+      expect(component.inputFormControl().dirty).toEqual(true);
       expect(component.type).toEqual("text");
       expect(
         fixture.nativeElement.querySelector("input").getAttribute("type")
@@ -188,7 +188,7 @@ describe("InputComponent", () => {
       component.generatePassword();
 
       expect(passwordGeneratorService.generateAndCopy).not.toHaveBeenCalled();
-      expect(component.inputFormControl.value).toEqual("");
+      expect(component.inputFormControl().value).toEqual("");
     });
 
     it("does nothing for a readonly field", () => {

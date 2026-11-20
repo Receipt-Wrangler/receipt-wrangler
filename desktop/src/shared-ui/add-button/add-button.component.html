@@ -3,7 +3,7 @@
   [matButtonType]="buttonText() ? 'matRaisedButton' : 'iconButton'"
   [buttonText]="buttonText() ?? ''"
   type="button"
-  [tooltip]="tooltip ?? ''"
+  [tooltip]="tooltip() ?? ''"
   [disabled]="disabled()"
   [routerLink]="buttonRouterLink()"
   (clicked)="clicked.emit($event)"

@@ -1,24 +1,24 @@
 <div class="mb-2">
   <app-checkbox
     label="Enable Email Integration"
-    [inputFormControl]="form | formGet : 'emailIntegrationEnabled'"
-    [readonly]="formConfig.mode | inputReadonly"
+    [inputFormControl]="form() | formGet : 'emailIntegrationEnabled'"
+    [readonly]="formConfig().mode | inputReadonly"
   ></app-checkbox>
 </div>
 <div class="mb-2">
   <app-checkbox
     label="Process Email Body Text"
     helpText="When enabled, email body text will be processed alongside attachments for receipt extraction"
-    [inputFormControl]="form | formGet : 'emailBodyProcessingEnabled'"
-    [readonly]="formConfig.mode | inputReadonly"
+    [inputFormControl]="form() | formGet : 'emailBodyProcessingEnabled'"
+    [readonly]="formConfig().mode | inputReadonly"
   ></app-checkbox>
 </div>
 <div class="mb-2">
   <app-checkbox
     label="Require Signed Sender (DKIM)"
     helpText="When enabled, an email is only processed if it carries a valid DKIM signature from the sender's domain, which proves the sender address was not forged. Turn off for senders whose mail is not signed."
-    [inputFormControl]="form | formGet : 'emailRequireSignedSender'"
-    [readonly]="formConfig.mode | inputReadonly"
+    [inputFormControl]="form() | formGet : 'emailRequireSignedSender'"
+    [readonly]="formConfig().mode | inputReadonly"
   ></app-checkbox>
 </div>
 <app-autocomlete
@@ -26,26 +26,26 @@
   optionDisplayKey="username"
   label="Email to Read Receipts From"
   optionValueKey="id"
-  [inputFormControl]="form | formGet:'systemEmailId'"
+  [inputFormControl]="form() | formGet:'systemEmailId'"
   [options]="systemEmails"
   [displayWith]="systemEmailDisplayWith.bind(this)"
-  [readonly]="formConfig.mode |  inputReadonly"
+  [readonly]="formConfig().mode |  inputReadonly"
 ></app-autocomlete>
 <app-user-autocomplete
   class="mb-2"
   label="Default Paid By"
-  [inputFormControl]="form | formGet : 'emailDefaultReceiptPaidById'"
+  [inputFormControl]="form() | formGet : 'emailDefaultReceiptPaidById'"
   [groupId]="group.id.toString()"
   [selectGroupMembersOnly]="true"
-  [readonly]="formConfig.mode | inputReadonly"
+  [readonly]="formConfig().mode | inputReadonly"
 ></app-user-autocomplete>
 
 <div class="mb-2">
   <app-status-select
     aria-label="Default Status"
-    [inputFormControl]="form | formGet : 'emailDefaultReceiptStatus'"
+    [inputFormControl]="form() | formGet : 'emailDefaultReceiptStatus'"
     [addBlankOption]="true"
-    [readonly]="formConfig.mode | inputReadonly"
+    [readonly]="formConfig().mode | inputReadonly"
   ></app-status-select>
 </div>
 
@@ -56,7 +56,7 @@
   [array]="subjectLineRegexes.controls"
   [itemDisplayTemplate]="subjectLineRegexDisplayTemplate"
   [itemEditTemplate]="subjectLineRegexEditingTemplate"
-  [disabled]="formConfig.mode | inputReadonly"
+  [disabled]="formConfig().mode | inputReadonly"
   (addButtonClicked)="addSubjectLineRegex()"
   (itemDoneButtonClicked)="itemDoneButtonClicked(0)"
   (itemCancelButtonClicked)="subjectLineItemCancelButtonClicked()"
@@ -71,7 +71,7 @@
   [array]="emailWhiteList.controls"
   [itemDisplayTemplate]="emailWhiteListDisplayTemplate"
   [itemEditTemplate]="emailWhiteListEditingTemplate"
-  [disabled]="formConfig.mode | inputReadonly"
+  [disabled]="formConfig().mode | inputReadonly"
   (addButtonClicked)="addEmailWhiteList()"
   (itemDoneButtonClicked)="itemDoneButtonClicked(1)"
   (itemCancelButtonClicked)="emailWhiteListItemCancelButtonClicked()"
@@ -88,7 +88,7 @@
     <app-input
       label="Regex"
       [inputFormControl]="
-        form | formGet : 'subjectLineRegexes.' + index + '.regex'
+        form() | formGet : 'subjectLineRegexes.' + index + '.regex'
       "
     ></app-input>
   </div>
@@ -102,7 +102,7 @@
   <div class="w-100">
     <app-input
       label="Email"
-      [inputFormControl]="form | formGet : 'emailWhiteList.' + index + '.email'"
+      [inputFormControl]="form() | formGet : 'emailWhiteList.' + index + '.email'"
     ></app-input>
   </div>
 </ng-template>

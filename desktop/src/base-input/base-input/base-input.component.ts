@@ -1,7 +1,6 @@
-import { Component, Input, OnInit, input, output } from "@angular/core";
+import { Component, OnInit, input, output } from "@angular/core";
 import { FormControl } from "@angular/forms";
 import { map, Observable, startWith } from "rxjs";
-import { BaseInputInterface } from "../base-input.interface";
 import { InputErrorMessage } from "./input-error-message";
 
 @Component({
@@ -9,18 +8,18 @@ import { InputErrorMessage } from "./input-error-message";
     templateUrl: "./base-input.component.html",
     styleUrls: ["./base-input.component.scss"]
 })
-export class BaseInputComponent implements OnInit, BaseInputInterface {
-  @Input() public inputFormControl: FormControl = new FormControl();
+export class BaseInputComponent implements OnInit {
+  public readonly inputFormControl = input<FormControl>(new FormControl());
 
-  @Input() public label: string = "";
+  public readonly label = input<string>("");
 
-  @Input() public additionalErrorMessages?: { [key: string]: string };
+  public readonly additionalErrorMessages = input<{ [key: string]: string }>();
 
-  @Input() public readonly: boolean = false;
+  public readonly readonly = input<boolean>(false);
 
-  @Input() public placeholder?: string;
+  public readonly placeholder = input<string>();
 
-  @Input() public hint?: string;
+  public readonly hint = input<string>();
 
   public readonly appearance = input<"fill" | "outline">("fill");
 
@@ -32,18 +31,18 @@ export class BaseInputComponent implements OnInit, BaseInputInterface {
 
   public ngOnInit(): void {
     this.errorMessages = {
-      required: `${this.label} is required.`,
-      email: `${this.label} must be a valid email address.`,
-      duplicate: `${this.label} must be unique.`,
+      required: `${this.label()} is required.`,
+      email: `${this.label()} must be a valid email address.`,
+      duplicate: `${this.label()} must be unique.`,
       min: `Value must be larger than 0`,
     };
 
-    this.formControlErrors = this.inputFormControl.statusChanges.pipe(
-      startWith(this.inputFormControl.status),
+    this.formControlErrors = this.inputFormControl().statusChanges.pipe(
+      startWith(this.inputFormControl().status),
       map(() => {
-        const errors = this.inputFormControl.errors;
+        const errors = this.inputFormControl().errors;
         if (errors) {
-          const keys = Object.keys(this.inputFormControl.errors as any);
+          const keys = Object.keys(this.inputFormControl().errors as any);
           return keys.map((k: string) => {
             const value = errors[k];
             let message = "";
@@ -65,10 +64,10 @@ export class BaseInputComponent implements OnInit, BaseInputInterface {
       })
     );
 
-    if (this.additionalErrorMessages) {
+    if (this.additionalErrorMessages()) {
       this.errorMessages = {
         ...this.errorMessages,
-        ...this.additionalErrorMessages,
+        ...this.additionalErrorMessages(),
       };
     }
   }

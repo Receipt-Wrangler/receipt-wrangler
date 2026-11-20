@@ -1,7 +1,6 @@
 import { Component, ElementRef, input, viewChild } from "@angular/core";
 import { MatAutocompleteTrigger, MatAutocomplete, MatOption } from "@angular/material/autocomplete";
 import { BaseInputComponent } from "../../base-input";
-import { InputInterface } from "../../input";
 import { MatFormField, MatLabel, MatInput, MatHint, MatError } from "@angular/material/input";
 import { CdkTextareaAutosize } from "@angular/cdk/text-field";
 import { ReactiveFormsModule } from "@angular/forms";
@@ -14,8 +13,7 @@ import { AsyncPipe } from "@angular/common";
     imports: [MatFormField, MatLabel, CdkTextareaAutosize, MatInput, ReactiveFormsModule, MatAutocompleteTrigger, MatHint, MatAutocomplete, MatOption, MatError, AsyncPipe]
 })
 export class TextareaComponent
-  extends BaseInputComponent
-  implements InputInterface {
+  extends BaseInputComponent {
   public readonly matAutocompleteTrigger = viewChild.required(MatAutocompleteTrigger);
 
   public readonly textarea = viewChild.required<ElementRef<HTMLTextAreaElement>>("nativeTextarea");
@@ -31,7 +29,7 @@ export class TextareaComponent
   public validEndCharacters = [" ", "\n", undefined];
 
   public onOptionSelected(): void {
-    const value = this.inputFormControl.value;
+    const value = this.inputFormControl().value;
     // Calculate insertion index for autocomplete selection
     let insertionIndex = value.slice(this.lastKnownSelection).search(/[\s\n]|$/);
     insertionIndex = insertionIndex === -1 ? value.length : this.lastKnownSelection + insertionIndex;
@@ -62,7 +60,7 @@ export class TextareaComponent
   }
 
   private getTriggerWordFromIndex(index: number): { word: string | null, triggerIndex: number } {
-    const preText = this.inputFormControl.value.substring(0, index + 1);
+    const preText = this.inputFormControl().value.substring(0, index + 1);
     // Regex to capture word following the trigger character, allowing for empty follow-up
     const match = preText.match(new RegExp(`\\${this.trigger()}([^${this.validEndCharacters.join("")}]*)$`));
     if (match && match.index !== undefined) {
@@ -73,7 +71,7 @@ export class TextareaComponent
 
   public getOptionValue(option: string): string {
     const insertionIndex = this.textarea().nativeElement.selectionEnd;
-    const value = this.inputFormControl.value;
+    const value = this.inputFormControl().value;
     const triggerWordDetails = this.getTriggerWordFromIndex(insertionIndex - 1);
     return value.slice(0, triggerWordDetails.triggerIndex) + this.trigger() + option + value.slice(insertionIndex) + " ";
   }

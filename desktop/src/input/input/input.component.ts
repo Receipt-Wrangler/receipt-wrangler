@@ -4,7 +4,6 @@ import { BaseInputComponent } from "../../base-input";
 import { CurrencySeparator, CurrencySymbolPosition } from "../../open-api/index";
 import { PasswordGeneratorService } from "../../services/password-generator.service";
 import { SystemSettingsState } from "../../store/system-settings.state";
-import { InputInterface } from "../input.interface";
 import { MatFormField, MatLabel, MatInput, MatError, MatSuffix, MatHint } from "@angular/material/input";
 import { ReactiveFormsModule } from "@angular/forms";
 import { NgxMaskDirective } from "ngx-mask";
@@ -21,7 +20,7 @@ import { AsyncPipe } from "@angular/common";
 })
 export class InputComponent
   extends BaseInputComponent
-  implements InputInterface, OnChanges {
+  implements OnChanges {
   public readonly nativeInput = viewChild.required<{
     nativeElement: HTMLElement;
 }>("nativeInput");
@@ -110,12 +109,12 @@ export class InputComponent
    * event's change-detection pass will render it.
    */
   public generatePassword(): void {
-    if (this.inputFormControl.disabled || this.readonly) {
+    if (this.inputFormControl().disabled || this.readonly()) {
       return;
     }
 
-    this.inputFormControl.setValue(this.passwordGeneratorService.generateAndCopy());
-    this.inputFormControl.markAsDirty();
+    this.inputFormControl().setValue(this.passwordGeneratorService.generateAndCopy());
+    this.inputFormControl().markAsDirty();
     this.type = "text";
   }
 
@@ -129,7 +128,7 @@ export class InputComponent
 
   // TODO: Figure this out as apart of validation issues
   // private getMinValue(): string {
-  //   const err = this.inputFormControl.errors as any;
+  //   const err = this.inputFormControl().errors as any;
   //   return err['min']['min'] ?? '0';
   // }
 }

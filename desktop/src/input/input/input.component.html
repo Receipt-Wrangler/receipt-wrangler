@@ -9,17 +9,17 @@
   <mat-form-field
     class="w-100"
     [appearance]="appearance()"
-    [subscriptSizing]="hint ? 'dynamic' : 'fixed'"
+    [subscriptSizing]="hint() ? 'dynamic' : 'fixed'"
   >
-    <mat-label>{{ label }}</mat-label>
+    <mat-label>{{ label() }}</mat-label>
     <div class="d-flex align-items-center">
       <input
         #nativeInput
         matInput
         [id]="inputId()"
         [type]="type"
-        [readonly]="readonly"
-        [formControl]="inputFormControl"
+        [readonly]="readonly()"
+        [formControl]="inputFormControl()"
         [prefix]="maskPrefix"
         [suffix]="maskSuffix"
         [mask]="mask"
@@ -45,7 +45,7 @@
             data-testid="password-generate"
             aria-label="Generate password"
             matTooltip="Generate password"
-            [disabled]="inputFormControl.disabled || readonly"
+            [disabled]="inputFormControl().disabled || readonly()"
             (click)="generatePassword()"
           >
             <mat-icon>autorenew</mat-icon>
@@ -57,7 +57,7 @@
             mat-icon-button
             type="button"
             data-testid="password-visibility-toggle"
-            [matTooltip]="type === 'password' ? 'Show ' + label : 'Hide ' + label"
+            [matTooltip]="type === 'password' ? 'Show ' + label() : 'Hide ' + label()"
             (click)="toggleVisibility()"
           >
             @if (type === 'password') {
@@ -69,9 +69,9 @@
         }
       </div>
     }
-    @if (hint) {
+    @if (hint()) {
       <mat-hint>
-        {{ hint }}
+        {{ hint() }}
       </mat-hint>
     }
   </mat-form-field>
