@@ -40,7 +40,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    `/dashboard/group/<id>` ("All Dashboards", empty on a fresh DB).
 
 **Driving the UI / screenshots with Playwright in the sandbox.** `@playwright/test` is pinned to
-`1.59.1`, which expects Chromium build **1217**. The sandbox pre-installs whatever build its image
+`1.63.0`, which expects Chromium build **1243**. The sandbox pre-installs whatever build its image
 ships under `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` (1243 as of 2026-11, 1194 before that), with
 `/opt/pw-browsers/chromium` a symlink to that build's binary. Do **not** run
 `playwright install` / `npm run e2e:install` (the download is blocked and pointless). Instead launch
@@ -63,12 +63,12 @@ await page.getByRole('button', { name: 'Login' }).click();
 await page.waitForURL(/\/dashboard\/group\/\d+/);
 ```
 
-**Running the whole `npm run e2e` suite in the sandbox — bridge the build numbers with symlinks.**
-The `executablePath` trick above only helps ad-hoc scripts; `playwright.config.ts` has no
-`launchOptions` hook, so the suite looks for the build the pinned Playwright expects and fails.
-Point that build number at the installed one with symlinks (outside the repo, so nothing is
-committed). Read both numbers rather than trusting this doc, since the installed one moves with the
-sandbox image:
+**Running the whole `npm run e2e` suite in the sandbox.** `playwright.config.ts` has no
+`launchOptions` hook, so the suite looks for exactly the build the pinned Playwright expects. As of
+2026-11 that is **1243, the build the sandbox ships, so the suite runs as-is** — verified with the
+full suite on 1.63.0 and no links. Compare the two numbers first rather than trusting this doc,
+since the installed one moves with the sandbox image. **Only when they differ**, bridge them with
+symlinks (outside the repo, so nothing is committed):
 
 ```bash
 cd /home/user/receipt-wrangler/desktop
@@ -80,9 +80,9 @@ ln -sfn /opt/pw-browsers/chromium-$SRC /opt/pw-browsers/chromium-$WANT
 ln -sfn /opt/pw-browsers/chromium_headless_shell-$SRC /opt/pw-browsers/chromium_headless_shell-$WANT
 ```
 
-That works because the installed directories already have the layout 1.59.1 looks for:
+That works when the installed directories already have the layout the pinned Playwright looks for:
 `chromium-$SRC/chrome-linux64/` and `chromium_headless_shell-$SRC/chrome-headless-shell-linux64/`
-(verified with build 1243, which ran the full suite). **An older image laid them out as
+(verified bridging 1.59.1's 1217 to build 1243, which ran the full suite). **An older image laid them out as
 `chrome-linux/`** (build 1194 did). There the headless shell needs its shape built by hand instead of
 the second link: `mkdir` `chromium_headless_shell-$WANT`, link its `chrome-headless-shell-linux64` to
 the installed `chrome-linux`, add a `chrome-headless-shell -> headless_shell` link inside that, and
@@ -195,9 +195,11 @@ do not undo them without re-checking `npm audit`:
   esbuild `application` builder, so build-angular was only a wrapper — but it hard-pinned
   `webpack-dev-server` and `http-proxy-middleware` (both → `braces`) plus ~400 more webpack-era
   packages. Do not add it back; nothing here uses a webpack builder.
-- **Exact pins (no caret):** `ngx-bootstrap` (`21.0.1`) and `@playwright/test` (`1.59.1`) are pinned
-  because their next minor introduced an incompatibility (ngx-bootstrap dropped `CarouselModule.forRoot()`;
-  Playwright `1.61` needs a newer browser build than the pinned `e2e:install` cache). Bump these
+- **Exact pins (no caret):** `ngx-bootstrap` (`21.0.1`) and `@playwright/test` (`1.63.0`) are pinned
+  because a new minor can break them (ngx-bootstrap dropped `CarouselModule.forRoot()`; every
+  Playwright minor needs a different browser build, and only supports the Ubuntu releases it knows —
+  CI's e2e runner, `ubuntu-26.04`, needs ≥ 1.61). 1.63.0 is chosen because its Chromium build (1243)
+  is the one the Claude Code sandbox ships, so the suite runs there without symlinks. Bump these
   deliberately — update the consuming code / reinstall browsers in the same change. The ngx-bootstrap
   reason no longer applies on its own: `src/carousel/` was the `forRoot()` caller, and since the
   standalone conversion it imports ngx-bootstrap's `CarouselComponent` / `SlideComponent` directly and
@@ -1669,9 +1671,8 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
 ### Running locally
 
 1. **One-time:** install browsers — `npm run e2e:install`. (In the Claude Code web sandbox the browser
-   is pre-installed and `e2e:install` is blocked — apply the `chromium-1217` /
-   `chromium_headless_shell-1217` symlinks from "Running in the Claude Code Web/Cloud Sandbox" above
-   instead.)
+   is pre-installed and `e2e:install` is blocked — see "Running in the Claude Code Web/Cloud Sandbox"
+   above, which covers when the build numbers match and the symlinks for when they don't.)
 2. **Every run:** source the dev env script so the `E2E_*` vars are exported:
    ```bash
    cd ../api/dev && source switch-to-sqlite.sh && cd -
@@ -1699,10 +1700,10 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
 
 In CI the same spec files run against the demo URL. GitHub secrets populate the `E2E_*` vars — point `E2E_BASE_URL` at `https://demo.receiptwrangler.io` and supply the secret credentials. When `E2E_BASE_URL` is remote, the config skips the `webServer` block and does not start a local dev server.
 
-**The e2e job runs on `ubuntu-24.04`, not `ubuntu-latest`.** `ubuntu-latest` moved to 26.04, and the
-pinned `@playwright/test` 1.59.1 refuses to install its browser there, so the job failed at
-`npm run e2e:install` before any spec ran. Move the runner forward together with a Playwright bump
-that supports it.
+**The e2e job runs on `ubuntu-26.04`, named explicitly rather than `ubuntu-latest`.** `playwright
+install --with-deps` only supports the Ubuntu releases its version knows: when `ubuntu-latest`
+moved to 26.04, the then-pinned 1.59.1 failed `npm run e2e:install` before any spec ran (26.04 needs
+≥ 1.61). Move the runner and the `@playwright/test` pin together, never one alone.
 
 **Specs must not depend on data the demo backend happens to hold.** A spec that borrows "the first
 category" passes against the long-lived demo and fails on a fresh local database, where the only
