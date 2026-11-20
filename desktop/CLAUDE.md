@@ -1699,6 +1699,16 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
 
 In CI the same spec files run against the demo URL. GitHub secrets populate the `E2E_*` vars — point `E2E_BASE_URL` at `https://demo.receiptwrangler.io` and supply the secret credentials. When `E2E_BASE_URL` is remote, the config skips the `webServer` block and does not start a local dev server.
 
+**The e2e job runs on `ubuntu-24.04`, not `ubuntu-latest`.** `ubuntu-latest` moved to 26.04, and the
+pinned `@playwright/test` 1.59.1 refuses to install its browser there, so the job failed at
+`npm run e2e:install` before any spec ran. Move the runner forward together with a Playwright bump
+that supports it.
+
+**Specs must not depend on data the demo backend happens to hold.** A spec that borrows "the first
+category" passes against the long-lived demo and fails on a fresh local database, where the only
+categories are other specs' short-lived ones. Seed what you assert on (`apiCreateCategory` and
+friends) and delete it in teardown.
+
 **The mobile suite shares that backend.** `.github/workflows/mobile-e2e.yml`'s `android-e2e` job reads
 the same `secrets.E2E_BASE_URL`, and both suites mutate **global** System Settings (the login-QR
 toggle, the AI-powered-receipts flag). Their workflow-level concurrency groups differ, so the desktop

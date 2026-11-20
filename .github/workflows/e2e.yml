@@ -16,7 +16,11 @@ concurrency:
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: ubuntu-latest moved to 26.04, and the pinned
+    # @playwright/test (1.59.1) refuses to install its browser there ("Playwright
+    # does not support chromium on ubuntu26.04-x64"), failing the job before any
+    # test runs. Move this forward together with a Playwright bump that supports it.
+    runs-on: ubuntu-24.04
     # This job and mobile-e2e.yml's android-e2e job drive the SAME backend
     # (secrets.E2E_BASE_URL) and both mutate global System Settings -- e.g. the
     # login-QR toggle, which each suite asserts on. Their workflow-level
