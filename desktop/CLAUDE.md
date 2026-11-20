@@ -1656,23 +1656,27 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
    is pre-installed and `e2e:install` is blocked — apply the `chromium-1217` /
    `chromium_headless_shell-1217` symlinks from "Running in the Claude Code Web/Cloud Sandbox" above
    instead.)
-2. **One-time:** create the two e2e accounts against your local DB with
-   `../api/dev/seed-e2e-users.sh` (idempotent; it logs in as the auto-created `admin`/`admin` and
-   creates both below; it finds its own files, so it runs without leaving `desktop/`). By hand
-   instead: on a fresh DB, public sign-up is
-   **off** (`enableLocalSignUp` defaults false) and the API has already auto-created `admin`/`admin`,
-   so create them as `admin` (Users screen, or `POST /api/user/` with `appRoleId`):
+2. **Every run:** source the dev env script so the `E2E_*` vars are exported:
+   ```bash
+   cd ../api/dev && source switch-to-sqlite.sh && cd -
+   ```
+   (`switch-to-mariadb.sh` / `switch-to-postgresql.sh` work the same — all three export the same `E2E_*` defaults.)
+3. **Start the Go API** in its own terminal, from `api/` with the same env script sourced there:
+   `go run main.go`. For a local Redis, override `REDIS_HOST=127.0.0.1` (the script exports the
+   docker-compose name `redis`; see `api/CLAUDE.md`). It is ready when it logs
+   `Listening on port 8081`. Playwright auto-starts the Angular dev server via its `webServer`
+   config, but it cannot launch the API.
+4. **One-time:** create the two e2e accounts against your local DB with
+   `../api/dev/seed-e2e-users.sh`. It is idempotent and needs the API from step 3, which creates
+   `admin`/`admin` on its first start; the script logs in as that user to create both below, and
+   finds its own files, so it runs without leaving `desktop/`. By hand instead: on a fresh DB,
+   public sign-up is **off** (`enableLocalSignUp` defaults false), so create them as `admin`
+   (Users screen, or `POST /api/user/` with `appRoleId`):
    - username `e2e-admin`, password `e2e-admin-password`, display name `E2E Admin`, role Legacy Admin
    - username `e2e-user`, password `e2e-user-password`, display name **`E2E User`**, role Legacy User
 
    The display name matters: the provisioning fixtures pick the member by the option text
    `E2E User`, so any other name times out every spec that builds a group in `beforeAll`.
-3. **Every run:** source the dev env script so the `E2E_*` vars are exported:
-   ```bash
-   cd ../api/dev && source switch-to-sqlite.sh && cd -
-   ```
-   (`switch-to-mariadb.sh` / `switch-to-postgresql.sh` work the same — all three export the same `E2E_*` defaults.)
-4. Start the Go API separately (`cd ../api && go run main.go`). Playwright auto-starts the Angular dev server via its `webServer` config, but it cannot launch the API.
 5. Run the tests: `npm run e2e` (or `npm run e2e:ui` for watch-style debugging).
 
 ### CI
