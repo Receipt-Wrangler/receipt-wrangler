@@ -551,6 +551,27 @@ describe("QuickActionsDialogComponent", () => {
         );
       });
 
+      it("should report a missing amount rather than throw", () => {
+        // A fresh dialog whose opener never passed amountToSplit.
+        fixture = TestBed.createComponent(QuickActionsDialogComponent);
+        component = fixture.componentInstance;
+        fixture.componentRef.setInput("originalReceipt", { id: 1 } as any);
+        fixture.detectChanges();
+        jest.spyOn(component.itemsToAdd, "emit");
+        component.localForm.patchValue({
+          quickAction: component.radioValues[0].value,
+        });
+
+        setupUsersInForm(createTestUsers());
+
+        component.addSplits();
+
+        expect(mockSnackbarService.error).toHaveBeenCalledWith(
+          "Amount to split does not exist or is invalid!"
+        );
+        expect(component.itemsToAdd.emit).not.toHaveBeenCalled();
+      });
+
       it("should handle percentage values with more than 2 decimal places", () => {
         component.localForm.patchValue({
           quickAction: component.radioValues[2].value,

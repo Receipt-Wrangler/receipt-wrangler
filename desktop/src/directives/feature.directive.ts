@@ -3,7 +3,7 @@ import { Store } from '@ngxs/store';
 import { FeatureConfigState } from '../store/feature-config.state';
 
 /**
- * Add the template content to the DOM unless the condition is true.
+ * Renders the template content only while the named feature is enabled.
  */
 @Directive({ selector: '[appFeature]' })
 export class FeatureDirective {

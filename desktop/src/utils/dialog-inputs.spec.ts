@@ -27,20 +27,6 @@ describe("setDialogInputs", () => {
     expect(document.body.textContent).toContain("Delete tag: 3");
   });
 
-  it("only accepts the component's input names and value types", () => {
-    const setInput = jest.fn();
-    const dialogRef = {
-      componentRef: { setInput },
-    } as unknown as MatDialogRef<DialogContentComponent>;
-
-    // @ts-expect-error not an input of the component
-    setDialogInputs(dialogRef, { notAnInput: 1 });
-    // @ts-expect-error count takes a number
-    setDialogInputs(dialogRef, { count: "3" });
-
-    expect(setInput).toHaveBeenCalledTimes(2);
-  });
-
   it("throws for a dialog opened from a template", () => {
     const dialogRef = { componentRef: null } as MatDialogRef<DialogContentComponent>;
 

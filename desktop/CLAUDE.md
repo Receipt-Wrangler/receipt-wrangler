@@ -362,7 +362,7 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
 - **Form fields:** `app-input`, `app-textarea`, `app-select`, `app-checkbox`, grouped with
   `app-form-section`; bind via the `formGet` pipe.
 - **Field hints:** `app-input` and `app-textarea` bind
-  `[subscriptSizing]="hint ? 'dynamic' : 'fixed'"`, and that conditional is load-bearing both ways.
+  `[subscriptSizing]="hint() ? 'dynamic' : 'fixed'"`, and that conditional is load-bearing both ways.
   Material's default `fixed` reserves a **single line** for the subscript and positions the hint
   wrapper **absolutely**, so a hint that wraps to two or more lines escapes its box and paints over
   whatever follows the field — which is exactly what a long hint in a narrow column does (the MCP
@@ -1509,7 +1509,9 @@ effect(() => {
 - **Dialog components take inputs through `setDialogInputs(dialogRef, { ... })`**
   (`src/utils/dialog-inputs.ts`), since `MatDialog` creates them without bindings. Its keys and values
   are type-checked against the component's `input()`s. Call it right after `open()`: the dialog's
-  first change detection runs later, so `input.required` works for a dialog too. A dialog opened from
+  first change detection runs later, so `input.required` works for a dialog too. The type can't tell a
+  required input from a defaulted one, though, so nothing makes an opener pass a required key; one
+  left out throws NG0950 when the dialog reads it. A dialog opened from
   a `TemplateRef` binds its inputs in the template instead. Specs that stub `MatDialog.open` return
   `mockDialogRef()` (`src/testing/dialog-ref.testing.ts`); its `inputs` records what the opener set.
 

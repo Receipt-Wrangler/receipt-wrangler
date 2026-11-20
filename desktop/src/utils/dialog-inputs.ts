@@ -13,6 +13,11 @@ export type DialogInputs<T> = {
  * be assigned, so openers pass its inputs through here. Call it straight after
  * `open()`: the dialog's first change detection runs later, so the values are
  * in place before the component first reads them, required inputs included.
+ *
+ * Keys and values are checked against the component's input() declarations at
+ * each call site, by the app build. Every key is optional, though: Angular's
+ * types do not mark a required input apart from a defaulted one, so an opener
+ * must pass a dialog's required inputs itself.
  */
 export function setDialogInputs<T>(
   dialogRef: MatDialogRef<T>,
