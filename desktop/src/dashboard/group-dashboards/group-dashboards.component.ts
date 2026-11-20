@@ -1,7 +1,7 @@
-import { Component, computed, effect } from "@angular/core";
+import { Component, computed, effect, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
 import { Router, RouterLink, RouterOutlet } from "@angular/router";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "src/constants";
@@ -24,7 +24,6 @@ import { GroupPipe } from "../../pipes/group.pipe";
 // every recompute (which would needlessly re-run the auto-select effect).
 const EMPTY_DASHBOARDS: Dashboard[] = [];
 
-@UntilDestroy()
 @Component({
     selector: "app-group-dashboards",
     templateUrl: "./group-dashboards.component.html",
@@ -32,6 +31,8 @@ const EMPTY_DASHBOARDS: Dashboard[] = [];
     imports: [TableHeaderComponent, HasGroupPermissionDirective, AddButtonComponent, EditButtonComponent, DeleteButtonComponent, MatChipListbox, MatChipOption, RouterLink, RouterOutlet, GroupPipe]
 })
 export class GroupDashboardsComponent {
+  private readonly destroyRef = inject(DestroyRef);
+
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);
 
   // Dashboard CRUD buttons gate on the group-scoped permissions via
@@ -120,7 +121,7 @@ export class GroupDashboardsComponent {
     dialogRef
       .afterClosed()
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((dashboard) => {
           const index = this.dashboards().findIndex(
             (d) => d.id === dashboard?.id
@@ -160,7 +161,7 @@ export class GroupDashboardsComponent {
     dialogRef
       .afterClosed()
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((confirmed) => {
           if (confirmed) {
             this.dashboardService

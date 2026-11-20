@@ -1,8 +1,8 @@
-import { Component, OnInit, viewChild } from "@angular/core";
+import { Component, OnInit, viewChild, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { ActivatedRoute, Router } from "@angular/router";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { startWith, take, tap } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants";
 import { FormMode } from "../../enums/form-mode.enum";
@@ -42,7 +42,6 @@ import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 import { UrlLabelPipe } from "../pipes/url-label.pipe";
 import { UrlHintPipe } from "../pipes/url-hint.pipe";
 
-@UntilDestroy()
 @Component({
     selector: "app-receipt-processing-settings-form",
     templateUrl: "./receipt-processing-settings-form.component.html",
@@ -54,6 +53,8 @@ import { UrlHintPipe } from "../pipes/url-hint.pipe";
     imports: [ReactiveFormsModule, FormHeaderComponent, AuditDetailSectionComponent, FormSectionComponent, InputComponent, AutocomleteComponent, SelectComponent, CheckboxComponent, TaskTableComponent, FormButtonBarComponent, SubmitButtonComponent, EditButtonComponent, ButtonComponent, ReceiptProcessingSettingsChildSystemTaskAccordionComponent, FormGetPipe, InputReadonlyPipe, UrlLabelPipe, UrlHintPipe]
 })
 export class ReceiptProcessingSettingsFormComponent extends BaseFormComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   public readonly taskTableComponent = viewChild.required(TaskTableComponent);
 
   public originalReceiptProcessingSettings?: ReceiptProcessingSettings;
@@ -123,7 +124,7 @@ export class ReceiptProcessingSettingsFormComponent extends BaseFormComponent im
   private listenForIsVisionModelChange(): void {
     this.form.get("isVisionModel")?.valueChanges
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         startWith(this.form.get("isVisionModel")?.value),
         tap((isVisionModel: boolean) => {
           if (isVisionModel) {
@@ -137,7 +138,7 @@ export class ReceiptProcessingSettingsFormComponent extends BaseFormComponent im
   private listenForTypeChange(): void {
     this.form.get("aiType")?.valueChanges
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((type: AiType) => {
           switch (type) {
             case AiType.Gemini:

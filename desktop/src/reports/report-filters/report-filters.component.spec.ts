@@ -1,27 +1,17 @@
-import { Component, NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal, WritableSignal } from "@angular/core";
+import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal, WritableSignal, DestroyRef } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder, FormGroup } from "@angular/forms";
 import { Store } from "@ngxs/store";
-import { UntilDestroy } from "@ngneat/until-destroy";
 import { FilterOperation, User } from "../../open-api";
 import { UserState } from "../../store";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { REPORT_GENERATOR_PAID_BY_ID, ReportFiltersComponent } from "./report-filters.component";
 
-// buildReceiptFilterForm wires untilDestroyed subscriptions, so seeding a realistic
-// filter needs an @UntilDestroy()-decorated context — a throwaway host, exactly as the
-// receipt filter's own spec and report-form.factory.spec do.
-@UntilDestroy()
-@Component({
-  selector: "app-noop", template: ""
-})
-class NoopComponent {}
-
 describe("ReportFiltersComponent", () => {
   let fixture: ComponentFixture<ReportFiltersComponent>;
   let component: ReportFiltersComponent;
   let formBuilder: FormBuilder;
-  let host: NoopComponent;
+  let destroyRef: DestroyRef;
   let usersSignal: WritableSignal<User[]>;
 
   beforeEach(async () => {
@@ -34,7 +24,7 @@ describe("ReportFiltersComponent", () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ReportFiltersComponent, NoopComponent],
+      imports: [ReportFiltersComponent],
       providers: [
         provideZonelessChangeDetection(),
         FormBuilder,
@@ -44,7 +34,7 @@ describe("ReportFiltersComponent", () => {
     }).compileComponents();
 
     formBuilder = TestBed.inject(FormBuilder);
-    host = TestBed.createComponent(NoopComponent).componentInstance;
+    destroyRef = TestBed.inject(DestroyRef);
     fixture = TestBed.createComponent(ReportFiltersComponent);
     component = fixture.componentInstance;
   });
@@ -59,7 +49,7 @@ describe("ReportFiltersComponent", () => {
    * covers the rendered DOM.
    */
   function mountWithFilter(seed: unknown): void {
-    const form = new FormGroup({ filter: buildReceiptFilterForm(seed, host) });
+    const form = new FormGroup({ filter: buildReceiptFilterForm(seed, destroyRef) });
     fixture.componentRef.setInput("form", form);
     component.ngOnInit();
   }

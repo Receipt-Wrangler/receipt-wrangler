@@ -1,8 +1,7 @@
 import { DatePipe } from "@angular/common";
-import { Component, OnInit, TemplateRef, computed, viewChild } from "@angular/core";
+import { Component, OnInit, TemplateRef, computed, viewChild, DestroyRef, inject } from "@angular/core";
 import { MatDialog } from "@angular/material/dialog";
 import { ActivatedRoute } from "@angular/router";
-import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants/dialog.constant";
@@ -29,7 +28,6 @@ import { MatIcon } from "@angular/material/icon";
 import { SystemEmailChildSystemTaskComponent } from "../system-email-child-system-task/system-email-child-system-task.component";
 import { ReceiptProcessingSettingsChildSystemTaskAccordionComponent } from "../../receipt-processing-settings/receipt-processing-settings-child-system-task-accordion/receipt-processing-settings-child-system-task-accordion.component";
 
-@UntilDestroy()
 @Component({
   selector: "app-system-task-table",
   templateUrl: "./system-task-table.component.html",
@@ -44,6 +42,8 @@ import { ReceiptProcessingSettingsChildSystemTaskAccordionComponent } from "../.
   imports: [TableHeaderComponent, ButtonComponent, MatChipSet, MatChip, MatChipRemove, MatIcon, TaskTableComponent, SystemEmailChildSystemTaskComponent, ReceiptProcessingSettingsChildSystemTaskAccordionComponent]
 })
 export class SystemTaskTableComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   public readonly expandedRowTemplate = viewChild.required<TemplateRef<any>>("expandedRowTemplate");
   public readonly taskTableComponent = viewChild.required(TaskTableComponent);
 
@@ -97,7 +97,7 @@ export class SystemTaskTableComponent implements OnInit {
       maxWidth: "100%",
     });
     dialogRef.componentInstance.headerText = "Filter System Tasks";
-    dialogRef.componentInstance.parentForm = buildSystemTaskFilterForm(this.filter(), this);
+    dialogRef.componentInstance.parentForm = buildSystemTaskFilterForm(this.filter(), this.destroyRef);
 
     const formCommandSubscription = dialogRef.componentInstance.formCommand.subscribe(
       (formCommand) => applyFormCommand(dialogRef.componentInstance.parentForm, formCommand)

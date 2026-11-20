@@ -1,11 +1,10 @@
-import { Component, EmbeddedViewRef, HostListener, Injector, OnInit, Signal, TemplateRef, computed, runInInjectionContext, signal, viewChild } from "@angular/core";
-import { toSignal } from "@angular/core/rxjs-interop";
+import { Component, EmbeddedViewRef, HostListener, Injector, OnInit, Signal, TemplateRef, computed, runInInjectionContext, signal, viewChild, DestroyRef, inject } from "@angular/core";
+import { toSignal, takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { MatExpansionPanel } from "@angular/material/expansion";
 import { MatSnackBarRef } from "@angular/material/snack-bar";
 import { ActivatedRoute, Router } from "@angular/router";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { debounceTime, catchError, finalize, forkJoin, map, of, startWith, take, tap } from "rxjs";
 import { CarouselComponent } from "src/carousel/carousel/carousel.component";
@@ -73,7 +72,6 @@ import { ReceiptHistoryDrawerComponent } from "../receipt-history-drawer/receipt
 import { FormGetPipe } from "../../pipes/form-get.pipe";
 import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
-@UntilDestroy()
 @Component({
   selector: "app-receipt-form",
   templateUrl: "./receipt-form.component.html",
@@ -83,6 +81,8 @@ import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
   imports: [ReactiveFormsModule, FormHeaderComponent, FormSectionComponent, AuditDetailSectionComponent, InputComponent, CheckboxComponent, CategoryAutocompleteComponent, TagAutocompleteComponent, DatepickerComponent, GroupAutocompleteComponent, UserAutocompleteComponent, SelectComponent, CustomFieldComponent, UploadImageComponent, MatProgressSpinner, CarouselComponent, ItemListComponent, ShareListComponent, ReceiptCommentsComponent, FormButtonBarComponent, ButtonComponent, SubmitButtonComponent, QuickActionsDialogComponent, CdkDrag, CdkDragHandle, FilteredStatefulMenuComponent, ReceiptHistoryDrawerComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class ReceiptFormComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   public readonly shareListComponent = viewChild.required(ShareListComponent);
 
   public readonly itemListComponent = viewChild.required(ItemListComponent);
@@ -299,7 +299,7 @@ export class ReceiptFormComponent implements OnInit {
 
   public ngOnInit(): void {
     this.activatedRoute.data
-      .pipe(untilDestroyed(this))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((data) => {
         this.duplicatedSnackbarRef?.dismiss();
         // categories/tags are sourced per-group from AppData (see
@@ -414,7 +414,7 @@ export class ReceiptFormComponent implements OnInit {
   private setupAmountSyncListener(): void {
     // Listen to receiptItems changes
     this.form.get("receiptItems")?.valueChanges.pipe(
-      untilDestroyed(this),
+      takeUntilDestroyed(this.destroyRef),
       debounceTime(100)
     ).subscribe(() => {
       if (this.syncAmountWithItems) {
@@ -427,7 +427,6 @@ export class ReceiptFormComponent implements OnInit {
     this.formHeaderTextSource.set(runInInjectionContext(this.injector, () => toSignal(
       (this.form.get("name") as AbstractControl).valueChanges.pipe(
         startWith(this.form.get("name")?.value),
-        untilDestroyed(this),
         map((name) => {
           let action = "";
           switch (this.mode()) {
@@ -579,7 +578,7 @@ export class ReceiptFormComponent implements OnInit {
 
   private listenForSyncWithItemsChanges(): void {
     this.form
-      .get("syncAmountWithItems")?.valueChanges.pipe(untilDestroyed(this), tap((sync) => this.toggleAmountSync(sync))).subscribe();
+      .get("syncAmountWithItems")?.valueChanges.pipe(takeUntilDestroyed(this.destroyRef), tap((sync) => this.toggleAmountSync(sync))).subscribe();
   }
 
   private buildCustomOptionFormGroup(value: CustomFieldValue): FormGroup {
@@ -599,7 +598,7 @@ export class ReceiptFormComponent implements OnInit {
     this.form
       .get("groupId")
       ?.valueChanges.pipe(
-      untilDestroyed(this),
+      takeUntilDestroyed(this.destroyRef),
       startWith(this.form.get("groupId")?.value),
       tap((groupId) => {
         this.currentGroupId.set(groupId);

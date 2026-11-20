@@ -1,6 +1,6 @@
-import { AfterViewInit, Component, computed, OnInit, signal, TemplateRef, viewChild } from "@angular/core";
+import { AfterViewInit, Component, computed, OnInit, signal, TemplateRef, viewChild, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
@@ -27,7 +27,6 @@ import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { GroupTableEditButtonPipe } from "./group-table-edit-button.pipe";
 
 
-@UntilDestroy()
 @Component({
     selector: "app-group-table",
     templateUrl: "./group-table.component.html",
@@ -42,6 +41,8 @@ import { GroupTableEditButtonPipe } from "./group-table-edit-button.pipe";
     imports: [TableHeaderComponent, HasAppPermissionDirective, AddButtonComponent, ButtonComponent, TableComponent, RouterLink, HasGroupPermissionDirective, EditButtonComponent, DeleteButtonComponent, AsyncPipe, AppDatePipe, GroupTableEditButtonPipe]
 })
 export class GroupTableComponent extends BaseTableComponent<Group> implements OnInit, AfterViewInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   public groups = this.store.selectSignal(GroupState.groups);
 
   private readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");
@@ -98,7 +99,7 @@ export class GroupTableComponent extends BaseTableComponent<Group> implements On
   private listenForFilterChanges(): void {
     this.store.select(GroupTableState.filter)
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((filter) => {
             this.getTableData();
             if (filter.associatedGroup === AssociatedGroup.All) {

@@ -1,12 +1,11 @@
 import { CdkVirtualScrollViewport, CdkFixedSizeVirtualScroll, CdkVirtualForOf } from "@angular/cdk/scrolling";
-import { AfterViewInit, Component, Input, TemplateRef, ViewEncapsulation, input, output, viewChild } from "@angular/core";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
+import { AfterViewInit, Component, Input, TemplateRef, ViewEncapsulation, input, output, viewChild, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { tap } from "rxjs";
 import { MatList, MatListItem, MatListItemTitle, MatListItemLine, MatListItemAvatar, MatListItemMeta } from "@angular/material/list";
 import { NgClass, NgTemplateOutlet } from "@angular/common";
 import { RouterLink } from "@angular/router";
 
-@UntilDestroy()
 @Component({
     selector: "app-dashboard-list",
     templateUrl: "./dashboard-list.component.html",
@@ -15,6 +14,8 @@ import { RouterLink } from "@angular/router";
     imports: [CdkVirtualScrollViewport, CdkFixedSizeVirtualScroll, MatList, MatListItem, CdkVirtualForOf, NgClass, RouterLink, MatListItemTitle, NgTemplateOutlet, MatListItemLine, MatListItemAvatar, MatListItemMeta]
 })
 export class DashboardListComponent implements AfterViewInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   public readonly cdkVirtualScrollViewport = viewChild.required(CdkVirtualScrollViewport);
 
   public readonly itemHeaderTemplate = input.required<TemplateRef<any>>();
@@ -44,7 +45,7 @@ export class DashboardListComponent implements AfterViewInit {
   private listenForEndOfList(): void {
     this.cdkVirtualScrollViewport().renderedRangeStream
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((range) => {
           if (range.end === this.items.length) {
 

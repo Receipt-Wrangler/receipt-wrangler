@@ -1,6 +1,6 @@
-import { AfterViewInit, Component, OnInit, signal, TemplateRef, viewChild } from "@angular/core";
+import { AfterViewInit, Component, OnInit, signal, TemplateRef, viewChild, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { TableComponent } from "src/table/table/table.component";
@@ -25,7 +25,6 @@ import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { UserPipe } from "../../pipes/user.pipe";
 
 
-@UntilDestroy()
 @Component({
   selector: "app-api-key-table",
   templateUrl: "./api-key-table.component.html",
@@ -40,6 +39,8 @@ import { UserPipe } from "../../pipes/user.pipe";
   imports: [TableHeaderComponent, AddButtonComponent, ButtonComponent, TableComponent, EditButtonComponent, DeleteButtonComponent, AsyncPipe, AppDatePipe, UserPipe]
 })
 export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> implements OnInit, AfterViewInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   private readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");
 
   private readonly descriptionCell = viewChild.required<TemplateRef<any>>("descriptionCell");
@@ -95,7 +96,7 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
   private listenForFilterChanges(): void {
     this.store.select(ApiKeyTableState.filter)
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((filter) => {
             this.getTableData();
             if (filter.associatedApiKeys === AssociatedApiKeys.All) {

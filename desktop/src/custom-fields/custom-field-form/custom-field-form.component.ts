@@ -1,7 +1,7 @@
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, Input, OnInit, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Observable, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { FormOption } from "../../interfaces/form-option.interface";
@@ -31,7 +31,6 @@ import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 // Validators.required would call "   " valid and eat a 400.
 const optionValueRequiredValidator = trimmedRequiredValidator();
 
-@UntilDestroy()
 @Component({
   selector: "app-custom-field-form",
   templateUrl: "./custom-field-form.component.html",
@@ -39,6 +38,8 @@ const optionValueRequiredValidator = trimmedRequiredValidator();
   imports: [DialogComponent, ReactiveFormsModule, FormSectionComponent, InputComponent, SelectComponent, DeleteButtonComponent, DialogFooterComponent, AddButtonComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class CustomFieldFormComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   @Input() public headerText: string = "";
 
   @Input() public customField?: CustomField;
@@ -156,7 +157,7 @@ export class CustomFieldFormComponent implements OnInit {
 
   private listenForTypeChanges(): void {
     this.form.get("type")?.valueChanges.pipe(
-      untilDestroyed(this),
+      takeUntilDestroyed(this.destroyRef),
       tap((type) => {
         if (type === CustomFieldType.Select) {
           (this.form.get("options") as FormArray).push(this.buildOption());

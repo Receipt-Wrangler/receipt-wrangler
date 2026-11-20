@@ -1,3 +1,4 @@
+import { DestroyRef } from "@angular/core";
 import { FormGroup } from "@angular/forms";
 import { FilterOperation, SystemTaskPagedRequestFilter } from "../open-api/index";
 import { toDateWireFilter } from "./date-wire-filter";
@@ -8,39 +9,39 @@ import { buildFieldFormGroup, listenForBetweenOperation } from "./filter-form";
  * shape as `buildReceiptFilterForm`, built from the same shared helpers, so the
  * two dialogs behave identically.
  *
- * `thisContext` must be an `@UntilDestroy()` component: the helpers tie their
- * subscriptions to its lifetime.
+ * `destroyRef` is the calling component's: the helpers tie their subscriptions
+ * to its lifetime.
  */
-export function buildSystemTaskFilterForm(filter: any, thisContext: any): FormGroup {
+export function buildSystemTaskFilterForm(filter: any, destroyRef: DestroyRef): FormGroup {
   const formGroup = new FormGroup({
     type: buildFieldFormGroup(
       filter?.type?.value ?? [],
       filter?.type?.operation,
-      thisContext,
+      destroyRef,
       true
     ),
     ranBy: buildFieldFormGroup(
       filter?.ranBy?.value ?? [],
       filter?.ranBy?.operation,
-      thisContext,
+      destroyRef,
       true
     ),
     startedAt: buildFieldFormGroup(
       filter?.startedAt?.value,
       filter?.startedAt?.operation,
-      thisContext,
+      destroyRef,
       filter?.startedAt?.operation === FilterOperation.Between
     ),
     endedAt: buildFieldFormGroup(
       filter?.endedAt?.value,
       filter?.endedAt?.operation,
-      thisContext,
+      destroyRef,
       filter?.endedAt?.operation === FilterOperation.Between
     ),
   });
 
-  listenForBetweenOperation(formGroup, "startedAt", thisContext);
-  listenForBetweenOperation(formGroup, "endedAt", thisContext);
+  listenForBetweenOperation(formGroup, "startedAt", destroyRef);
+  listenForBetweenOperation(formGroup, "endedAt", destroyRef);
 
   return formGroup;
 }

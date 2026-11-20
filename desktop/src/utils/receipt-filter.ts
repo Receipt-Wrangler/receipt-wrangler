@@ -1,74 +1,75 @@
+import { DestroyRef } from "@angular/core";
 import { FormGroup } from "@angular/forms";
 import { FilterOperation } from "../open-api/index";
 import { buildFieldFormGroup, listenForBetweenOperation } from "./filter-form";
 
-export function buildReceiptFilterForm(filter: any, thisContext: any): FormGroup {
+export function buildReceiptFilterForm(filter: any, destroyRef: DestroyRef): FormGroup {
   const formGroup = new FormGroup({
     date: buildFieldFormGroup(
       filter?.date?.value,
       filter?.date?.operation,
-      thisContext,
+      destroyRef,
       filter?.date?.operation === FilterOperation.Between
     ),
     amount: buildFieldFormGroup(
       filter?.amount?.value,
       filter?.amount?.operation,
-      thisContext,
+      destroyRef,
       filter?.amount?.operation === FilterOperation.Between
     ),
     name: buildFieldFormGroup(
       filter?.name?.value,
       filter?.name?.operation,
-      thisContext
+      destroyRef
     ),
     paidBy: buildFieldFormGroup(
       filter?.paidBy?.value ?? [],
       filter?.paidBy?.operation,
-      thisContext,
+      destroyRef,
       true
     ),
     categories: buildFieldFormGroup(
       filter?.categories?.value ?? [],
       filter?.categories?.operation,
-      thisContext,
+      destroyRef,
       true
     ),
     tags: buildFieldFormGroup(
       filter?.tags?.value ?? [],
       filter?.tags?.operation,
-      thisContext,
+      destroyRef,
       true
     ),
     status: buildFieldFormGroup(
       filter?.status?.value ?? [],
       filter?.status?.operation,
-      thisContext,
+      destroyRef,
       true
     ),
     group: buildFieldFormGroup(
       filter?.group?.value ?? [],
       filter?.group?.operation,
-      thisContext,
+      destroyRef,
       true
     ),
     resolvedDate: buildFieldFormGroup(
       filter?.resolvedDate?.value,
       filter?.resolvedDate?.operation,
-      thisContext,
+      destroyRef,
       filter?.resolvedDate?.operation === FilterOperation.Between
     ),
     createdAt: buildFieldFormGroup(
       filter?.createdAt?.value,
       filter?.createdAt?.operation,
-      thisContext,
+      destroyRef,
       filter?.createdAt?.operation === FilterOperation.Between
     ),
   });
 
-  listenForBetweenOperation(formGroup, "amount", thisContext);
-  listenForBetweenOperation(formGroup, "date", thisContext);
-  listenForBetweenOperation(formGroup, "resolvedDate", thisContext);
-  listenForBetweenOperation(formGroup, "createdAt", thisContext);
+  listenForBetweenOperation(formGroup, "amount", destroyRef);
+  listenForBetweenOperation(formGroup, "date", destroyRef);
+  listenForBetweenOperation(formGroup, "resolvedDate", destroyRef);
+  listenForBetweenOperation(formGroup, "createdAt", destroyRef);
 
 
   return formGroup;

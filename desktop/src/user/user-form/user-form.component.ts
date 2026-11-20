@@ -2,7 +2,6 @@ import { Component, DestroyRef, Input, OnInit, computed, effect, inject, signal 
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
-import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { catchError, defer, iif, of, startWith, switchMap, take, tap, } from "rxjs";
 import { UserValidators } from "src/validators/user-validators";
@@ -40,7 +39,6 @@ import { SubmitButtonComponent } from "../../shared-ui/submit-button/submit-butt
 import { CancelButtonComponent } from "../../shared-ui/cancel-button/cancel-button.component";
 import { FormGetPipe } from "../../pipes/form-get.pipe";
 
-@UntilDestroy()
 @Component({
     selector: "app-user-form",
     templateUrl: "./user-form.component.html",

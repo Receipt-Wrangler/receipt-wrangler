@@ -1,5 +1,6 @@
+import { DestroyRef } from "@angular/core";
 import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
-import { untilDestroyed } from "@ngneat/until-destroy";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { distinctUntilChanged, pairwise, startWith, tap } from "rxjs";
 import { FilterField, FilterFieldType } from "../constants/filter-fields.constant";
 import { OperationsPipe } from "../shared-ui/receipt-filter/operations.pipe";
@@ -10,8 +11,8 @@ import { FilterOperation } from "../open-api/index";
  * shared by `buildReceiptFilterForm` and `buildSystemTaskFilterForm` so the two
  * cannot drift on how a BETWEEN range or an auto-selected operation behaves.
  *
- * Every entry point takes a `thisContext`: `untilDestroyed` needs the calling
- * component, which must therefore carry `@UntilDestroy()`.
+ * The builders take the calling component's `DestroyRef`, which their
+ * subscriptions are torn down with.
  */
 
 /**
@@ -22,7 +23,7 @@ import { FilterOperation } from "../open-api/index";
 export function buildFieldFormGroup(
   value: string | string[] | number | any,
   operation: string | undefined,
-  thisContext: any,
+  destroyRef: DestroyRef,
   isArray?: boolean,
 ): FormGroup {
   const formBuilder = new FormBuilder();
@@ -38,7 +39,7 @@ export function buildFieldFormGroup(
   }
 
   valueControl.valueChanges.pipe(
-    untilDestroyed(thisContext),
+    takeUntilDestroyed(destroyRef),
     startWith(value),
     tap((value) => {
       if (!!value && value?.length > 0) {
@@ -60,7 +61,7 @@ export function buildFieldFormGroup(
  * Swaps a field's value control between a scalar and a two-slot range as the
  * operation flips in and out of BETWEEN.
  */
-export function listenForBetweenOperation(form: FormGroup, key: string, thisContext: any): void {
+export function listenForBetweenOperation(form: FormGroup, key: string, destroyRef: DestroyRef): void {
   updateValidatorsOnOperationChange(true, form, key, null, form.get(key)?.get("operation")?.value);
 
   form
@@ -71,7 +72,7 @@ export function listenForBetweenOperation(form: FormGroup, key: string, thisCont
       startWith(form.get(key)?.get("operation")?.value),
       distinctUntilChanged(),
       pairwise(),
-      untilDestroyed(thisContext),
+      takeUntilDestroyed(destroyRef),
       tap(([prev, curr]: [FilterOperation | null, FilterOperation | null]) => {
         updateValidatorsOnOperationChange(false, form, key, prev, curr);
       }),

@@ -1,7 +1,7 @@
-import { Component, OnInit, ViewEncapsulation, computed, signal, viewChildren, viewChild } from "@angular/core";
+import { Component, OnInit, ViewEncapsulation, computed, signal, viewChildren, viewChild, DestroyRef, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { catchError, of, take, tap } from "rxjs";
 import { ReceiptFilterComponent } from "src/shared-ui/receipt-filter/receipt-filter.component";
@@ -24,7 +24,6 @@ import { AddButtonComponent } from "../../shared-ui/add-button/add-button.compon
 import { FormGetPipe } from "../../pipes/form-get.pipe";
 import { WidgetTypePipe } from "../widget-type.pipe";
 
-@UntilDestroy()
 @Component({
     selector: "app-dashboard-form",
     templateUrl: "./dashboard-form.component.html",
@@ -33,6 +32,8 @@ import { WidgetTypePipe } from "../widget-type.pipe";
     imports: [DialogComponent, ReactiveFormsModule, InputComponent, FormSectionComponent, EditableListComponent, DialogFooterComponent, CardComponent, SelectComponent, ReceiptFilterComponent, AddButtonComponent, FormGetPipe, WidgetTypePipe]
 })
 export class DashboardFormComponent extends BaseFormComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
+
   public readonly receiptFilterComponents = viewChildren(ReceiptFilterComponent);
 
   public readonly widgetList = viewChild.required(EditableListComponent);
@@ -131,7 +132,7 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
             templates.map((template) => ({ id: template.id, name: template.name }))
           );
         }),
-        untilDestroyed(this)
+        takeUntilDestroyed(this.destroyRef)
       )
       .subscribe();
   }
@@ -156,7 +157,7 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
         formGroup = this.formBuilder.group({
           name: [widget.name, Validators.required],
           widgetType: [widget.widgetType, Validators.required],
-          configuration: buildReceiptFilterForm(widget.configuration, this),
+          configuration: buildReceiptFilterForm(widget.configuration, this.destroyRef),
         });
         break;
       case WidgetType.PieChart:
@@ -184,11 +185,11 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
     formGroup.get("widgetType")
       ?.valueChanges
       .pipe(
-        untilDestroyed(this),
+        takeUntilDestroyed(this.destroyRef),
         tap((widgetType: WidgetType) => {
           if (widgetType === WidgetType.FilteredReceipts) {
             formGroup.removeControl("configuration");
-            formGroup.addControl("configuration", buildReceiptFilterForm({}, this));
+            formGroup.addControl("configuration", buildReceiptFilterForm({}, this.destroyRef));
           } else if (widgetType === WidgetType.PieChart) {
             formGroup.removeControl("configuration");
             formGroup.addControl("configuration", this.buildPieChartConfigForm({}));
@@ -207,7 +208,7 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
   private buildPieChartConfigForm(config: any): FormGroup {
     return this.formBuilder.group({
       chartGrouping: [config?.chartGrouping ?? ChartGrouping.Categories, Validators.required],
-      filter: buildReceiptFilterForm(config?.filter ?? {}, this),
+      filter: buildReceiptFilterForm(config?.filter ?? {}, this.destroyRef),
     });
   }
 
@@ -339,7 +340,7 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
       (this.widgets.at(index) as FormGroup).removeControl("configuration");
       (this.widgets.at(index) as FormGroup).addControl(
         "configuration",
-        buildReceiptFilterForm(originalWidget.configuration, this)
+        buildReceiptFilterForm(originalWidget.configuration, this.destroyRef)
       );
     }
   }

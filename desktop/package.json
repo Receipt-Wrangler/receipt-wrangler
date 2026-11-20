@@ -30,7 +30,6 @@
     "@fontsource/inter": "^5.0.17",
     "@fontsource/raleway": "^5.0.17",
     "@ng-bootstrap/ng-bootstrap": "^20.0.0",
-    "@ngneat/until-destroy": "^10.0.0",
     "@ngxs/storage-plugin": "^21.0.0",
     "@ngxs/store": "^21.0.0",
     "@popperjs/core": "^2.11.8",

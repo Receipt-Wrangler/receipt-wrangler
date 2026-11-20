@@ -1558,7 +1558,7 @@ items = viewChildren(ItemComponent);
   - Provide `initialValue` for Observables that don't emit synchronously.
   - Use `requireSync: true` for BehaviorSubject or other synchronous sources.
 - **`toObservable(signal)`**: Converts Signal to Observable. Only emits the latest stabilized value.
-- **`takeUntilDestroyed()`**: Replaces `@UntilDestroy()` / `untilDestroyed(this)`. Use in constructor or pass `DestroyRef`.
+- **`takeUntilDestroyed()`**: The app's only subscription teardown (`@ngneat/until-destroy` is gone). Call it bare in an injection context (constructor, field initializer); anywhere else pass a `DestroyRef`, declared as `private readonly destroyRef = inject(DestroyRef)` on the component itself, never on a shared base class, where it would clash with subclasses that declare their own.
 - **`outputFromObservable()`**: Declares an output from an Observable source.
 
 ```typescript
@@ -1928,9 +1928,10 @@ four pieces rather than copying a row template:
   for list/users fields, because the multi-select autocompletes `push()` onto the control),
   `listenForBetweenOperation` (swaps the value control between a scalar and a two-slot range as the
   operation flips) and `setupAutoOperationSelection` (picks the first operation for a field's type as
-  soon as it gains a value, and clears it when the value empties). Every entry point takes a
-  `thisContext` for `untilDestroyed`, so **the calling component must carry `@UntilDestroy()`**.
-  `buildReceiptFilterForm` and `buildSystemTaskFilterForm` are thin field lists over these.
+  soon as it gains a value, and clears it when the value empties). The two builders take the calling
+  component's **`DestroyRef`** and tear their subscriptions down with it, so pass
+  `this.destroyRef`; `setupAutoOperationSelection` takes none. `buildReceiptFilterForm` and
+  `buildSystemTaskFilterForm` are thin field lists over these.
 - **`src/utils/filter-chips.ts`** builds the chip labels (`"<Field> <operation> <value>"`,
   `WITHIN_CURRENT_MONTH` stopping at the operation, `BETWEEN` joined with `" – "`). It is pure: the
   caller injects `formatDate` / `formatCurrency` / `resolveOptionName`. `receipt-filter-chips.ts` and
