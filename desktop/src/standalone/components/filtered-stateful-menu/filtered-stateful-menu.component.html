@@ -27,7 +27,7 @@
       (click)="$event.stopImmediatePropagation(); $event.stopPropagation();"
     ></app-input>
     <div class="d-flex flex-column">
-      @if (filteredItems.length === 0) {
+      @if (filteredItems().length === 0) {
         <div
           mat-menu-item
           class="pe-none"
