@@ -3,6 +3,15 @@ import { Action, createSelector, Selector, State, StateContext, } from "@ngxs/st
 import { FeatureConfig, OidcProviderSummary } from "../open-api";
 import { SetFeatureConfig } from "./feature-config.state.actions";
 
+/**
+ * Whether `feature` is on in `config`: a plain truthiness check, so an empty
+ * array (`oidcProviders: []`) counts as on. Shared by `hasFeature` and
+ * `*appFeature` so the two cannot disagree.
+ */
+export function isFeatureEnabled(config: FeatureConfig, feature: string): boolean {
+  return !!(config as any)[feature];
+}
+
 @State<FeatureConfig>({
   name: "featureConfig",
   defaults: {
@@ -40,9 +49,9 @@ export class FeatureConfigState {
   }
 
   static hasFeature(feature: string) {
-    return createSelector([FeatureConfigState], (state: FeatureConfig) => {
-      return !!(state as any)[feature];
-    });
+    return createSelector([FeatureConfigState], (state: FeatureConfig) =>
+      isFeatureEnabled(state, feature)
+    );
   }
 
   @Action(SetFeatureConfig)
