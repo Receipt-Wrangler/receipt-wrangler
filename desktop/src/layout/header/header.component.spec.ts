@@ -1,3 +1,4 @@
+import { InteractivityChecker } from "@angular/cdk/a11y";
 import { OverlayContainer } from "@angular/cdk/overlay";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
@@ -192,12 +193,12 @@ describe("HeaderComponent", () => {
 
       expect(panel()).not.toBeNull();
       expect(panel()!.textContent).toContain("All caught up!");
-      expect(bellButton().closest("app-button")!.getAttribute("aria-expanded")).toBe("true");
+      expect(bellButton().getAttribute("aria-expanded")).toBe("true");
 
       await clickBell();
 
       expect(panel()).toBeNull();
-      expect(bellButton().closest("app-button")!.getAttribute("aria-expanded")).toBe("false");
+      expect(bellButton().getAttribute("aria-expanded")).toBe("false");
     });
 
     it("moves focus into the panel when it opens", async () => {
@@ -217,6 +218,53 @@ describe("HeaderComponent", () => {
       expect(panel()).toBeNull();
       expect(component.notificationsOpen()).toBe(false);
       expect(document.activeElement).toBe(bellButton());
+    });
+
+    describe("Tab", () => {
+      const pressTab = async (target: HTMLElement): Promise<KeyboardEvent> => {
+        const event = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+        target.dispatchEvent(event);
+        await fixture.whenStable();
+        return event;
+      };
+
+      // jsdom lays nothing out, so the checker finds nothing visible and hence
+      // nothing tabbable; a spec that needs tabbable content says so.
+      const treatEverythingAsTabbable = () => {
+        const checker = TestBed.inject(InteractivityChecker);
+        jest.spyOn(checker, "isFocusable").mockReturnValue(true);
+        jest.spyOn(checker, "isTabbable").mockReturnValue(true);
+      };
+
+      it("stays on the panel when nothing in it is tabbable", async () => {
+        await clickBell();
+
+        const event = await pressTab(panel()!);
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(panel());
+      });
+
+      it("brings focus back to the panel once it has fallen to the body", async () => {
+        treatEverythingAsTabbable();
+        await clickBell();
+        panel()!.blur();
+        expect(document.activeElement).toBe(document.body);
+
+        const event = await pressTab(document.body);
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(panel());
+      });
+
+      it("is left to the focus trap while focus is inside and there is somewhere to go", async () => {
+        treatEverythingAsTabbable();
+        await clickBell();
+
+        const event = await pressTab(panel()!);
+
+        expect(event.defaultPrevented).toBe(false);
+      });
     });
 
     // Whether the click also reaches what is under it needs real hit-testing,

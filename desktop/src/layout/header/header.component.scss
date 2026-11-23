@@ -93,10 +93,15 @@
   border-radius: var(--bs-border-radius-lg);
   box-shadow: variables.$global-shadow;
 
-  // Focus is moved here on open, for keyboard users; the dialog itself is the
-  // focused thing, so it needs no ring.
+  // Focus is moved here on open. Opened with the mouse it shows no ring, as the
+  // popover never did; opened from the keyboard (or kept here by Tab) it does.
   &:focus {
     outline: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid map.get(variables.$primary-palette, 600);
+    outline-offset: 2px;
   }
 }
 

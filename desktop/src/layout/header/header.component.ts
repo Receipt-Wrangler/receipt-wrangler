@@ -1,4 +1,4 @@
-import { A11yModule } from "@angular/cdk/a11y";
+import { A11yModule, InteractivityChecker } from "@angular/cdk/a11y";
 import { hasModifierKey } from "@angular/cdk/keycodes";
 import { ConnectedPosition, OverlayModule } from "@angular/cdk/overlay";
 import { DOCUMENT } from "@angular/common";
@@ -95,6 +95,8 @@ export class HeaderComponent {
 
   private readonly injector = inject(Injector);
 
+  private readonly interactivityChecker = inject(InteractivityChecker);
+
   private readonly canReadNotifications = this.store.selectSignal(
     AuthState.hasAppPermission(Permission.AppNotificationsRead)
   );
@@ -159,10 +161,40 @@ export class HeaderComponent {
     this.notificationsOpen.set(false);
   }
 
-  /** Escape closes through the overlay's own handler; this only returns focus. */
+  /**
+   * Escape closes through the overlay's own handler; this only returns focus.
+   *
+   * Tab is normally `cdkTrapFocus`'s job, but its anchors can only hand focus to
+   * something tabbable inside the panel, and the CDK we pin has no fallback when
+   * there is nothing (an empty list: "Mark all as read" is disabled), so Tab
+   * walked out of the open panel. Deleting a notification also drops focus to
+   * <body>. In both cases keep focus on the panel itself. The overlay receives
+   * every keydown while it is open, wherever focus is.
+   */
   public onNotificationsKeydown(event: KeyboardEvent): void {
     if (event.key === "Escape" && !hasModifierKey(event)) {
       this.focusBeforeNotifications?.focus();
+      return;
     }
+
+    const panel = this.notificationsPanel()?.nativeElement;
+    if (event.key !== "Tab" || !panel) {
+      return;
+    }
+
+    const focusIsInside = panel.contains(this.document.activeElement);
+    if (!focusIsInside || !this.hasTabbableContent(panel)) {
+      event.preventDefault();
+      panel.focus();
+    }
+  }
+
+  /** The same test `cdkTrapFocus` uses to find somewhere to send Tab. */
+  private hasTabbableContent(panel: HTMLElement): boolean {
+    return Array.from(panel.querySelectorAll<HTMLElement>("*")).some(
+      (element) =>
+        this.interactivityChecker.isFocusable(element) &&
+        this.interactivityChecker.isTabbable(element)
+    );
   }
 }

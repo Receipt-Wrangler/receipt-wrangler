@@ -64,15 +64,16 @@
           data-testid="header-notifications-button"
           matButtonType="iconButton"
           icon="notifications"
-          aria-haspopup="dialog"
-          [attr.aria-expanded]="notificationsOpen()"
+          ariaHasPopup="dialog"
+          [ariaExpanded]="notificationsOpen()"
           [matBadgeContent]="notificationCount()"
           (clicked)="toggleNotifications()"
         ></app-button>
 
         <!--
           No backdrop: a click outside closes the panel AND still lands on what
-          was clicked. Escape is handled by the overlay itself (it detaches).
+          was clicked. Escape is handled by the overlay itself (it detaches);
+          overlayKeydown returns focus on Escape and keeps Tab in the panel.
         -->
         <ng-template
           cdkConnectedOverlay

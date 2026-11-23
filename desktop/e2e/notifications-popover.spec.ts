@@ -105,11 +105,14 @@ test.describe('Header notifications popover', () => {
     await bell.locator('button').click();
     await expect(panel).toBeVisible();
     await expect(panel.getByText(receiptName)).toBeVisible();
-    await expect(bell).toHaveAttribute('aria-expanded', 'true');
+    await expect(bell.locator('button')).toHaveAttribute('aria-expanded', 'true');
+    // Opened with the mouse, the focused panel shows no ring, as the popover never did.
+    await expect(panel).toBeFocused();
+    await expect(panel).toHaveCSS('outline-style', 'none');
 
     await bell.locator('button').click();
     await expect(panel).toBeHidden();
-    await expect(bell).toHaveAttribute('aria-expanded', 'false');
+    await expect(bell.locator('button')).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('a click elsewhere closes the panel and still lands', async ({ page }) => {
@@ -133,6 +136,8 @@ test.describe('Header notifications popover', () => {
     await page.keyboard.press('Enter');
     await expect(panel).toBeVisible();
     await expect(panel).toBeFocused();
+    // Opened from the keyboard, the focused panel shows a ring.
+    await expect(panel).toHaveCSS('outline-style', 'solid');
 
     // The overlay renders at the end of <body>; without the trap, Tab would
     // leave the panel for whatever follows it in the document.
@@ -144,5 +149,29 @@ test.describe('Header notifications popover', () => {
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
     await expect(bellButton).toBeFocused();
+  });
+
+  // Last on purpose: it empties this account's notifications.
+  test('keyboard: once the list is emptied, Tab stays on the panel', async ({ page }) => {
+    const bellButton = page.getByTestId('header-notifications-button').locator('button');
+    const panel = page.getByTestId('header-notifications-panel');
+
+    await bellButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(panel).toBeFocused();
+
+    const markAllRead = panel.getByRole('button', { name: 'Mark all as read' });
+    await page.keyboard.press('Tab');
+    await expect(markAllRead).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(panel.getByText('All caught up!')).toBeVisible();
+    await expect(markAllRead).toBeDisabled();
+
+    // Nothing in the panel is tabbable now, so the focus trap alone would let
+    // Tab walk out to the page behind it.
+    for (let i = 0; i < 2; i++) {
+      await page.keyboard.press('Tab');
+      await expect(panel).toBeFocused();
+    }
   });
 });

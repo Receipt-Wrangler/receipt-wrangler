@@ -35,6 +35,15 @@ export class BaseButtonComponent {
    */
   public readonly ariaLabel = input<string>();
 
+  /**
+   * Popup state for a button that opens one (e.g. "dialog", "menu"). Set these
+   * rather than aria-* attributes on the <app-button> host: the host has no role,
+   * so assistive tech never reads state from it — only from the native button.
+   */
+  public readonly ariaHasPopup = input<string>();
+
+  public readonly ariaExpanded = input<boolean>();
+
   public readonly matBadgeContent = input<any>();
 
   public readonly matBadgeColor = input<ThemePalette>("primary");

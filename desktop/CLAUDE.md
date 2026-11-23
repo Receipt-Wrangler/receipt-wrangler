@@ -404,6 +404,9 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   `bulk-delete-result-dialog`. Do not hand-build a Close row. The cancel button is icon-only, so it
   passes its tooltip as `ariaLabel` (an `app-button` input that sets `aria-label` on an icon button);
   an icon-only `app-button` has no accessible name without one, since `mat-icon` is `aria-hidden`.
+  For a button that opens a popup, pass `ariaHasPopup` / `ariaExpanded` (`app-button` inputs that
+  land on the native `<button>`), never `aria-haspopup` / `[attr.aria-expanded]` on the host: the
+  host has no role, so state set there is never read. The header bell and the month stepper do this.
 - **Confirming an action:** the shared **`ConfirmationDialogComponent`**
   (`src/shared-ui/confirmation-dialog/`). Open it with `matDialog.open(ConfirmationDialogComponent)`,
   call `setDialogInputs(dialogRef, { headerText, dialogContent })` (two signal inputs — it does
@@ -2262,7 +2265,7 @@ actively removing rows is never invisible.
 
 The bell in `src/layout/header/` opens `app-notifications-list` in a `cdkConnectedOverlay`, the
 same building block as the month stepper. It replaced an `ngbPopover`, and `@ng-bootstrap/ng-bootstrap`
-(with its `@popperjs/core` and `@angular/localize` peers) left the app with it. Three choices in it
+(with its `@popperjs/core` and `@angular/localize` peers) left the app with it. These choices in it
 differ from the month stepper on purpose:
 
 - **No backdrop.** `(overlayOutsideClick)` closes it, so a click on another header control both
@@ -2275,14 +2278,25 @@ differ from the month stepper on purpose:
   restore focus on **every** close, pulling it off the control the user just clicked outside. So only
   Escape returns focus to the bell (`onNotificationsKeydown`); the overlay's own Escape handling
   detaches it.
+- **Tab is guarded too, because the trap has no fallback.** `cdkTrapFocus` (CDK 21.2.x) can only send
+  Tab to something tabbable *inside* the panel. An empty list has nothing ("Mark all as read" is
+  disabled), so Tab walked out of the open panel, and deleting a notification drops focus to
+  `<body>`. `onNotificationsKeydown` therefore keeps focus on the panel when it has nothing tabbable
+  or focus is outside it, using the trap's own `InteractivityChecker` test. Making the panel
+  `tabindex="0"` instead is a trap: the CDK returns the root first, so Shift+Tab could never wrap
+  backwards.
+- **The panel shows a `:focus-visible` ring and no `:focus` one**, so a keyboard open is visible and a
+  mouse open looks exactly as the popover did.
 - **It reproduces the old Bootstrap `.popover` look**, arrow included, from Bootstrap's CSS custom
   properties (`--bs-border-color-translucent`, `--bs-border-radius-lg`, `--bs-font-sans-serif`, …),
   so it is pixel-identical to the popover it replaced. The arrow's offset assumes the 48px icon
   button it is end-aligned to.
 
 E2E: `e2e/notifications-popover.spec.ts` (serial, provisioned account so its notification list is
-known). It covers the toggle, a click elsewhere landing (fails if a backdrop is added), and the
-keyboard path (fails without the focus trap).
+known). It covers the toggle, a click elsewhere landing (fails if a backdrop is added), the
+keyboard path (fails without the focus trap), the ring showing only for a keyboard open, and Tab
+staying on an emptied panel (fails without the Tab guard). That last case empties the account's list,
+so it runs last.
 
 ## System tasks table filtering
 
