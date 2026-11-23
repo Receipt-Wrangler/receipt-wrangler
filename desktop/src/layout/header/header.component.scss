@@ -73,3 +73,64 @@
   width: 28rem !important;
   max-width: 100%;
 }
+
+// The look of the Bootstrap `.popover` this panel replaced (ng-bootstrap's
+// NgbPopover), built from Bootstrap's own custom properties so it keeps
+// following the global stylesheet.
+.notifications-panel {
+  position: relative;
+  max-width: 276px;
+  padding: 1rem;
+  font-family: var(--bs-font-sans-serif);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  word-wrap: break-word;
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+  // The border is translucent; keep the fill out from under it.
+  background-clip: padding-box;
+  border: var(--bs-border-width) solid var(--bs-border-color-translucent);
+  border-radius: var(--bs-border-radius-lg);
+  box-shadow: variables.$global-shadow;
+
+  // Focus is moved here on open, for keyboard users; the dialog itself is the
+  // focused thing, so it needs no ring.
+  &:focus {
+    outline: none;
+  }
+}
+
+// Points up at the bell from the 8px gap above the panel. The panel is
+// end-aligned to the 48px bell, so the bell's centre is 24px in from the
+// panel's right edge.
+$notifications-arrow-width: 1rem;
+$notifications-arrow-height: 0.5rem;
+$notifications-bell-half-width: 24px;
+
+.notifications-panel__arrow {
+  position: absolute;
+  top: calc(-1 * #{$notifications-arrow-height} - var(--bs-border-width));
+  right: calc(#{$notifications-bell-half-width} - #{$notifications-arrow-width} / 2 - var(--bs-border-width));
+  width: $notifications-arrow-width;
+  height: $notifications-arrow-height;
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    border-style: solid;
+    border-color: transparent;
+    border-width: 0 calc(#{$notifications-arrow-width} / 2) $notifications-arrow-height;
+  }
+
+  // The border-coloured triangle, with the fill 1px below it.
+  &::before {
+    top: 0;
+    border-bottom-color: var(--bs-border-color-translucent);
+  }
+
+  &::after {
+    top: var(--bs-border-width);
+    border-bottom-color: var(--bs-body-bg);
+  }
+}

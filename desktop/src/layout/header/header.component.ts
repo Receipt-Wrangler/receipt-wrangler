@@ -1,4 +1,19 @@
-import { Component, computed, effect, signal, untracked } from "@angular/core";
+import { A11yModule } from "@angular/cdk/a11y";
+import { hasModifierKey } from "@angular/cdk/keycodes";
+import { ConnectedPosition, OverlayModule } from "@angular/cdk/overlay";
+import { DOCUMENT } from "@angular/common";
+import {
+  afterNextRender,
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  inject,
+  Injector,
+  signal,
+  untracked,
+  viewChild,
+} from "@angular/core";
 import { Router, RouterLinkActive, RouterLink } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
@@ -13,7 +28,6 @@ import { HasGroupPermissionDirective } from "../../directives/has-group-permissi
 import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
 import { SearchbarComponent } from "../../searchbar/searchbar/searchbar.component";
 import { ButtonComponent } from "../../button/button/button.component";
-import { NgbPopover } from "@ng-bootstrap/ng-bootstrap";
 import { MatProgressBar } from "@angular/material/progress-bar";
 import { NotificationsListComponent } from "../../notifications/notifications-list/notifications-list.component";
 
@@ -21,7 +35,7 @@ import { NotificationsListComponent } from "../../notifications/notifications-li
     selector: "app-header",
     templateUrl: "./header.component.html",
     styleUrls: ["./header.component.scss"],
-    imports: [MatIconButton, MatTooltip, MatIcon, HasGroupPermissionDirective, RouterLinkActive, RouterLink, HasAppPermissionDirective, SearchbarComponent, ButtonComponent, NgbPopover, MatProgressBar, NotificationsListComponent]
+    imports: [A11yModule, MatIconButton, MatTooltip, MatIcon, HasGroupPermissionDirective, RouterLinkActive, RouterLink, HasAppPermissionDirective, SearchbarComponent, ButtonComponent, MatProgressBar, NotificationsListComponent, OverlayModule]
 })
 export class HeaderComponent {
   public isLoggedIn = this.store.selectSignal(AuthState.isLoggedIn);
@@ -59,7 +73,27 @@ export class HeaderComponent {
 
   public notificationCount = signal<number | undefined>(undefined);
 
+  public readonly notificationsOpen = signal(false);
+
+  /**
+   * Under the bell, end-aligned to it, 8px down: where the ng-bootstrap popover
+   * this replaced sat. No flipped fallback — the bell lives in the sticky top
+   * header, and the panel's arrow only points up.
+   */
+  public readonly notificationsPositions: ConnectedPosition[] = [
+    { originX: "end", originY: "bottom", overlayX: "end", overlayY: "top", offsetY: 8 },
+  ];
+
   protected readonly Permission = Permission;
+
+  private readonly notificationsPanel = viewChild<ElementRef<HTMLElement>>("notificationsPanel");
+
+  /** What had focus when the panel opened (the bell), for Escape to return to. */
+  private focusBeforeNotifications: HTMLElement | null = null;
+
+  private readonly document = inject(DOCUMENT);
+
+  private readonly injector = inject(Injector);
 
   private readonly canReadNotifications = this.store.selectSignal(
     AuthState.hasAppPermission(Permission.AppNotificationsRead)
@@ -99,5 +133,36 @@ export class HeaderComponent {
 
   public toggleSidebar(): void {
     this.store.dispatch(new ToggleIsSidebarOpen());
+  }
+
+  /**
+   * The overlay renders at the end of <body>, not beside the bell, so Tab from
+   * the bell would never reach it: opening moves focus into the panel, and
+   * `cdkTrapFocus` keeps Tab inside. Deliberately not `cdkTrapFocusAutoCapture`,
+   * which restores focus on every close — after a click elsewhere in the header
+   * that would pull focus back off the control the user just clicked.
+   */
+  public toggleNotifications(): void {
+    if (this.notificationsOpen()) {
+      this.closeNotifications();
+      return;
+    }
+
+    this.focusBeforeNotifications = this.document.activeElement as HTMLElement | null;
+    this.notificationsOpen.set(true);
+    afterNextRender(() => this.notificationsPanel()?.nativeElement.focus(), {
+      injector: this.injector,
+    });
+  }
+
+  public closeNotifications(): void {
+    this.notificationsOpen.set(false);
+  }
+
+  /** Escape closes through the overlay's own handler; this only returns focus. */
+  public onNotificationsKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape" && !hasModifierKey(event)) {
+      this.focusBeforeNotifications?.focus();
+    }
   }
 }

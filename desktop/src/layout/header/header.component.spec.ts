@@ -1,3 +1,4 @@
+import { OverlayContainer } from "@angular/cdk/overlay";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
@@ -5,7 +6,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { Store } from "@ngxs/store";
-import { NgbPopoverModule } from "@ng-bootstrap/ng-bootstrap";
 import { of } from "rxjs";
 import { ToggleIsSidebarOpen } from "src/store/layout.state.actions";
 import { ApiModule, NotificationsService } from "../../open-api";
@@ -55,7 +55,6 @@ describe("HeaderComponent", () => {
     imports: [ApiModule,
         MatDialogModule,
         MatSnackBarModule,
-        NgbPopoverModule,
         HeaderComponent,],
     providers: [provideTestStore(), provideRouter([]), provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()],
     schemas: [NO_ERRORS_SCHEMA],
@@ -149,5 +148,88 @@ describe("HeaderComponent", () => {
 
     expect(countSpy).toHaveBeenCalledTimes(1);
     expect(component.notificationCount()).toBe(3);
+  });
+
+  describe("notifications panel", () => {
+    let overlayContainer: OverlayContainer;
+
+    const bellButton = (): HTMLButtonElement =>
+      fixture.nativeElement.querySelector('[data-testid="header-notifications-button"] button');
+
+    const panel = (): HTMLElement | null =>
+      overlayContainer
+        .getContainerElement()
+        .querySelector('[data-testid="header-notifications-panel"]');
+
+    const clickBell = async () => {
+      bellButton().click();
+      await fixture.whenStable();
+    };
+
+    // The overlay's keyboard dispatcher reads the legacy keyCode, which jsdom
+    // leaves at 0 unless it is defined explicitly.
+    const pressEscape = async (target: HTMLElement) => {
+      const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
+      Object.defineProperty(event, "keyCode", { get: () => 27 });
+      target.dispatchEvent(event);
+      await fixture.whenStable();
+    };
+
+    beforeEach(async () => {
+      overlayContainer = TestBed.inject(OverlayContainer);
+      jest.spyOn(notificationsService, "getNotificationCount").mockReturnValue(of(0) as any);
+      jest.spyOn(notificationsService, "getNotificationsForuser").mockReturnValue(of([]) as any);
+
+      logIn();
+      grantNotificationsRead();
+      await fixture.whenStable();
+    });
+
+    it("opens from the bell, and a second click closes it", async () => {
+      expect(panel()).toBeNull();
+
+      await clickBell();
+
+      expect(panel()).not.toBeNull();
+      expect(panel()!.textContent).toContain("All caught up!");
+      expect(bellButton().closest("app-button")!.getAttribute("aria-expanded")).toBe("true");
+
+      await clickBell();
+
+      expect(panel()).toBeNull();
+      expect(bellButton().closest("app-button")!.getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("moves focus into the panel when it opens", async () => {
+      bellButton().focus();
+
+      await clickBell();
+
+      expect(document.activeElement).toBe(panel());
+    });
+
+    it("closes on Escape and returns focus to the bell", async () => {
+      bellButton().focus();
+      await clickBell();
+
+      await pressEscape(panel()!);
+
+      expect(panel()).toBeNull();
+      expect(component.notificationsOpen()).toBe(false);
+      expect(document.activeElement).toBe(bellButton());
+    });
+
+    // Whether the click also reaches what is under it needs real hit-testing,
+    // which jsdom does not do: e2e/notifications-popover.spec.ts covers that.
+    it("closes when something else in the header is clicked", async () => {
+      const dispatch = jest.spyOn(store, "dispatch");
+      await clickBell();
+
+      fixture.nativeElement.querySelector('[data-testid="sidebar-toggle"]').click();
+      await fixture.whenStable();
+
+      expect(panel()).toBeNull();
+      expect(dispatch).toHaveBeenCalledWith(new ToggleIsSidebarOpen());
+    });
   });
 });
