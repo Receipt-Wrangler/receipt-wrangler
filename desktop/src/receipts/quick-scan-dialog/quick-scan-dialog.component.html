@@ -20,14 +20,13 @@
         <strong> Select images to upload</strong>
       </div>
     }
-    <carousel
-      [interval]="0"
-      [isAnimated]="true"
+    <app-slide-carousel
       [showIndicators]="false"
+      [showControls]="false"
       [(activeSlide)]="currentlySelectedIndex"
     >
       @for (preview of images; track preview; let i = $index) {
-        <slide>
+        <app-carousel-slide data-testid="quick-scan-slide">
           <div class="d-flex flex-column justify-content-center">
             <img
               class="mb-2"
@@ -75,9 +74,9 @@
               ></app-textarea>
             }
           </div>
-        </slide>
+        </app-carousel-slide>
       }
-    </carousel>
+    </app-slide-carousel>
 
   </form>
   <app-dialog-footer

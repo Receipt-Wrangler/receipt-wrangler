@@ -2,7 +2,6 @@ import { CUSTOM_ELEMENTS_SCHEMA, getDebugNode } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
-import { AccordionModule } from "ngx-bootstrap/accordion";
 import { SystemTask, SystemTaskStatus, SystemTaskType } from "../../open-api";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { SystemSettingsState } from "../../store/system-settings.state";
@@ -34,7 +33,7 @@ describe("ReceiptProcessingSettingsChildSystemTaskAccordionComponent", () => {
         }
       ],
       // The pipe and store let the panel templates themselves render (their dates use appDate).
-      imports: [AccordionModule, AppDatePipe, NgxsModule.forRoot([SystemSettingsState]), ReceiptProcessingSettingsChildSystemTaskAccordionComponent],
+      imports: [AppDatePipe, NgxsModule.forRoot([SystemSettingsState]), ReceiptProcessingSettingsChildSystemTaskAccordionComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA]
     })
       .compileComponents();

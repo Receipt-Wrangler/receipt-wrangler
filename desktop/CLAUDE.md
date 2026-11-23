@@ -195,15 +195,12 @@ do not undo them without re-checking `npm audit`:
   esbuild `application` builder, so build-angular was only a wrapper — but it hard-pinned
   `webpack-dev-server` and `http-proxy-middleware` (both → `braces`) plus ~400 more webpack-era
   packages. Do not add it back; nothing here uses a webpack builder.
-- **Exact pins (no caret):** `ngx-bootstrap` (`21.0.1`) and `@playwright/test` (`1.63.0`) are pinned
-  because a new minor can break them (ngx-bootstrap dropped `CarouselModule.forRoot()`; every
-  Playwright minor needs a different browser build, and only supports the Ubuntu releases it knows —
-  CI's e2e runner, `ubuntu-26.04`, needs ≥ 1.61). 1.63.0 is chosen because its Chromium build (1243)
-  is the one the Claude Code sandbox ships, so the suite runs there without symlinks. Bump these
-  deliberately — update the consuming code / reinstall browsers in the same change. The ngx-bootstrap
-  reason no longer applies on its own: `src/carousel/` was the `forRoot()` caller, and since the
-  standalone conversion it imports ngx-bootstrap's `CarouselComponent` / `SlideComponent` directly and
-  calls no `forRoot()`. Re-check the next minor against the receipt carousel before relaxing the pin.
+- **Exact pin (no caret):** `@playwright/test` (`1.63.0`) is pinned because every Playwright minor
+  needs a different browser build, and only supports the Ubuntu releases it knows — CI's e2e runner,
+  `ubuntu-26.04`, needs ≥ 1.61. 1.63.0 is chosen because its Chromium build (1243) is the one the
+  Claude Code sandbox ships, so the suite runs there without symlinks. Bump it deliberately and
+  reinstall browsers in the same change. (`ngx-bootstrap` was pinned here too, for its carousel; it
+  is gone, replaced by the app's own `app-slide-carousel` — see "The slide carousel" below.)
 - Stay on the Angular `21.2.x` patch line for security fixes; a jump to Angular 22 is a separate,
   breaking upgrade and out of scope for audit hygiene.
 
@@ -2764,15 +2761,21 @@ not reintroduce them.
 like a two-column grid rather than a short image box floating next to a tall form. Bootstrap's
 `.row` is already `display: flex` with the initial `align-items: stretch`, so the Images column is
 *already* the right height — the work is entirely in making its contents fill it, because every link
-between the column and the canvas is `height: auto` and three hosts (`app-carousel`, ngx-bootstrap's
-`<carousel>`, `app-image-viewer`) are `display: inline`.
+between the column and the canvas is `height: auto` and three hosts (`app-carousel`,
+`app-slide-carousel`, `app-image-viewer`) are `display: inline`.
 
 The height is handed down in two places, both **gated on a class**:
 - `carousel.component.scss` is global (`ViewEncapsulation.None`), which makes it the right home for
-  the ngx-bootstrap links. `.rw-carousel--fill` carries `display: block; height: 100%` down through
-  `carousel`, `.carousel.slide`, `.carousel-inner`, `.carousel-item.active`, `.item` and
-  `app-image-viewer`. Use `.carousel-item.active`, not `slide`, so the inactive slides ngx-bootstrap
-  takes out of flow stay out of it, and keep them `block` — `flex` fights Bootstrap's `float: left`.
+  the slide carousel's links. `.rw-carousel--fill` carries `display: block; height: 100%` down through
+  `app-slide-carousel`, `.carousel`, `.carousel-inner`, **every** `.carousel-item` and
+  `app-image-viewer`, and keeps them `block` — `flex` fights the slides' `float: left`.
+  - **Every slide, not just the active one.** Each image's canvas fits the image to its stage when it
+    loads, and the hidden slides load too. A hidden slide is out of flow, so without the height its
+    stage is collapsed at that moment, and the image shows up mis-scaled when you navigate to it
+    (larger and shifted up, since a stage that grows never re-grows the image). Its `100%` resolves
+    against `.carousel-inner`. The ngx-bootstrap carousel this replaced gave every slide the height
+    through its `.item` class, while this doc said "active only"; the rewrite took the doc at its
+    word and caught it in the before/after screenshots.
 - `receipt-form.component.scss` covers its own template under `.rw-images-pane`: a flex column so the
   always-present section header takes its own height and the content takes the rest. One `::ng-deep`
   is unavoidable — `app-form-section` wraps projected content in a **classless** div of its own,
@@ -2831,7 +2834,7 @@ this dialog does not use). Two things there are load-bearing:
 `autoFocus: "dialog"` because the close button is the only tabbable control, so the default
 first-tabbable focus opens the viewer with a focus ring drawn over the image.
 
-**ngx-bootstrap's carousel controls must stay small over a canvas.** Bootstrap sizes prev/next as
+**The carousel's controls must stay small over a canvas.** Bootstrap sizes prev/next as
 `top: 0; bottom: 0; width: 15%` at `z-index: 1`, as siblings of `.carousel-inner` — so on a
 full-height stage they become two full-height columns sitting *above* the canvas in hit-testing.
 Navigation still works, but pan, wheel zoom and double-click all die in those strips, and both the
@@ -2862,6 +2865,48 @@ no `DisallowUnknownFields`, so an old client still PUTting the field is ignored 
 `carouselComponent` is also no longer `viewChild.required`: the Zoom/Download/Fullscreen header
 buttons render whenever there are images, but the carousel itself is behind `@if (… && showImages)`,
 so hiding images and clicking one of them used to throw.
+
+
+## The slide carousel (`app-slide-carousel`)
+
+`src/shared-ui/slide-carousel/`: `app-slide-carousel` holding `app-carousel-slide`s. It replaced
+ngx-bootstrap's carousel, the package's last use, and backs both carousels in the app: `app-carousel`
+(the receipt form's image stage, inline and fullscreen) and Quick Scan's one slide per image.
+
+- **It draws with Bootstrap's own carousel classes** (`.carousel`, `.carousel-inner`,
+  `.carousel-item`, `.carousel-control-prev/next`, `.carousel-indicators`), so the global Bootstrap
+  stylesheet and `.rw-carousel--fill` style it exactly as they styled ngx-bootstrap's. The
+  before/after screenshots were pixel-identical, a frame frozen mid-crossfade included. This is the
+  deliberate exception to "check a new shared component's class names for a Bootstrap collision":
+  here the collision is the point.
+  - **The indicators carry an empty `data-bs-target`.** Bootstrap's CSS selects them by that
+    attribute (`.carousel-indicators [data-bs-target]`); without it they lose all styling. Bootstrap's
+    carousel JavaScript is not loaded (`angular.json` has no scripts), so it does nothing else.
+  - Prev/next are `<button type="button">`; Bootstrap 5's control CSS already resets a button's
+    background and border.
+- **The crossfade is ngx-bootstrap's, copied** into `carousel-slide.component.scss`: 0.6s on opacity
+  and visibility, with inactive slides `position: absolute; opacity: 0; visibility: hidden` but still
+  `display: block`. Bootstrap's own `.carousel-item` slides sideways and `display: none`s inactive
+  slides; the selectors are written `:host.carousel-item…` to out-rank it. Every slide stays rendered,
+  which `app-carousel`'s zoom lookup (a `viewChildren` indexed by slide) and Quick Scan's per-image
+  fields both rely on.
+- **`activeSlide` is a `model()`.** `app-carousel` two-way binds it to `currentlyShownImageIndex`
+  (which the receipt form reads), Quick Scan to `currentlySelectedIndex`. Navigation wraps; there is
+  no autoplay. Removing the shown slide keeps the index, so the next one shows; when the index then
+  points past the end, an `effect` resets it to 0 **and writes the model**, so the owner's index
+  follows. Quick Scan's "Remove Current Image" depends on that, as it did on ngx-bootstrap's
+  `activeSlideChange`.
+- **Keys act only while the carousel itself has focus** (`event.target === event.currentTarget`):
+  Enter/Space go to the next slide, the arrows go back and forward. ngx-bootstrap handled keydown from
+  anything inside it, so a space typed into a Quick Scan field was swallowed and switched images, and
+  Enter on Previous went forward.
+- `showIndicators` / `showControls` default on. Quick Scan turns both off and navigates from its
+  dialog header; it used to hide ngx-bootstrap's controls with a global `.carousel-control` rule.
+- **Test ids:** `carousel`, `carousel-previous`, `carousel-next`, `carousel-indicator`; callers tag
+  their own slides (`receipt-image-slide`, `quick-scan-slide`). `slide-carousel.component.spec.ts`
+  covers it under jsdom. `e2e/receipt-image-carousel.spec.ts` covers arrows, indicators, the keyboard
+  and fullscreen opening on the image being shown. `quick-scan-dialog-behavior.spec.ts` pins the
+  space-in-a-field regression. Both e2e regression checks fail with the focus check removed.
 
 
 ## Reports (Report Builder)

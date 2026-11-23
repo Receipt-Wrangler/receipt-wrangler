@@ -3,17 +3,18 @@ import { ImageViewerComponent } from "src/shared-ui/image-viewer/image-viewer.co
 import { FormMode } from "src/enums/form-mode.enum";
 import { ReceiptFileUploadCommand } from "../../interfaces";
 import { FileDataView } from "../../open-api";
-import { CarouselComponent as CarouselComponent_1, SlideComponent } from "ngx-bootstrap/carousel";
 import { NgTemplateOutlet } from "@angular/common";
 import { ButtonComponent } from "../../button/button/button.component";
 import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
+import { SlideCarouselComponent } from "../../shared-ui/slide-carousel/slide-carousel.component";
+import { CarouselSlideComponent } from "../../shared-ui/slide-carousel/carousel-slide.component";
 
 @Component({
     selector: "app-carousel",
     templateUrl: "./carousel.component.html",
     styleUrls: ["./carousel.component.scss"],
     encapsulation: ViewEncapsulation.None,
-    imports: [CarouselComponent_1, SlideComponent, NgTemplateOutlet, ImageViewerComponent, ButtonComponent, InputReadonlyPipe]
+    imports: [SlideCarouselComponent, CarouselSlideComponent, NgTemplateOutlet, ImageViewerComponent, ButtonComponent, InputReadonlyPipe]
 })
 export class CarouselComponent implements OnChanges {
   public readonly images = input<FileDataView[]>([]);
@@ -65,9 +66,5 @@ export class CarouselComponent implements OnChanges {
    */
   private activeViewer(): ImageViewerComponent | undefined {
     return this.viewers()[this.currentlyShownImageIndex];
-  }
-
-  public updateCurrentlyShownImage(index: number): void {
-    this.currentlyShownImageIndex = index;
   }
 }
