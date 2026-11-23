@@ -141,9 +141,9 @@ export async function selectImageGroup(
   scope: Locator,
   groupName: string,
 ): Promise<void> {
-  // The single-select autocomplete only renders a button (the X clear control)
-  // once a value is selected; clear it so the input becomes editable.
-  const clear = scope.locator('app-group-autocomplete').getByRole('button');
+  // The single-select autocomplete only renders its X (clear) control once a
+  // value is selected; clear it so the input becomes editable.
+  const clear = scope.getByTestId('quick-scan-group').getByTestId('autocomplete-clear');
   if (await clear.count()) {
     await clear.first().click();
   }

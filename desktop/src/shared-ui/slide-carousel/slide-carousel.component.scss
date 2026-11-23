@@ -1,0 +1,15 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+// Bootstrap takes the outline off the prev/next controls on every :focus,
+// keyboard included, and leaves only an opacity change, which the receipt
+// stage's .rw-carousel--fill pins at 1. Give keyboard focus the app's ring
+// (as on the notifications panel). Mouse focus doesn't match :focus-visible,
+// so clicking keeps the controls looking as they always have.
+.carousel-control-prev,
+.carousel-control-next {
+  &:focus-visible {
+    outline: 2px solid map.get(variables.$primary-palette, 600);
+    outline-offset: 2px;
+  }
+}

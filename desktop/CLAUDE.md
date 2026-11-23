@@ -2902,8 +2902,13 @@ ngx-bootstrap's carousel, the package's last use, and backs both carousels in th
   Enter on Previous went forward.
 - `showIndicators` / `showControls` default on. Quick Scan turns both off and navigates from its
   dialog header; it used to hide ngx-bootstrap's controls with a global `.carousel-control` rule.
+- **Prev/next show the app's `:focus-visible` ring** (2px primary-600, offset 2px, as on the
+  notifications panel), from `slide-carousel.component.scss`. Bootstrap removes their outline on
+  every `:focus` and `.rw-carousel--fill` pins their opacity, so keyboard focus had no cue at all;
+  ngx-bootstrap's controls had the same gap. A mouse click still shows nothing.
 - **Test ids:** `carousel`, `carousel-previous`, `carousel-next`, `carousel-indicator`; callers tag
-  their own slides (`receipt-image-slide`, `quick-scan-slide`). `slide-carousel.component.spec.ts`
+  their own slides (`receipt-image-slide`, `quick-scan-slide`), and Quick Scan's per-image group
+  field is `quick-scan-group` (its clear control is the shared `autocomplete-clear`). `slide-carousel.component.spec.ts`
   covers it under jsdom. `e2e/receipt-image-carousel.spec.ts` covers arrows, indicators, the keyboard
   and fullscreen opening on the image being shown. `quick-scan-dialog-behavior.spec.ts` pins the
   space-in-a-field regression. Both e2e regression checks fail with the focus check removed.

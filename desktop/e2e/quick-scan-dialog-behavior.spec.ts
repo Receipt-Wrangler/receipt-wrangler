@@ -446,7 +446,7 @@ test.describe('Quick scan dialog behavior', () => {
     await uploadQuickScanImages(dialog, 2);
 
     const slides = dialog.getByTestId('quick-scan-slide');
-    const clear = slides.nth(0).locator('app-group-autocomplete').getByRole('button');
+    const clear = slides.nth(0).getByTestId('quick-scan-group').getByTestId('autocomplete-clear');
     if (await clear.count()) {
       await clear.first().click();
     }

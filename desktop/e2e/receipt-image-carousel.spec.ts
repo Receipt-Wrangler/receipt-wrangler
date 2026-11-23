@@ -107,11 +107,23 @@ test.describe('Receipt image carousel', () => {
     await page.keyboard.press('Enter');
     await expectShowing(stage, 1);
 
-    // Enter on Previous goes back. The carousel used to treat every Enter
-    // inside it as "next", so this went forward.
-    await stage.getByTestId('carousel-previous').focus();
+    // Tab onto Previous: the control shows a focus ring (Bootstrap removes
+    // the outline on every focus), and Enter on it goes back. The carousel
+    // used to treat every Enter inside it as "next", so this went forward.
+    const previous = stage.getByTestId('carousel-previous');
+    await stage.getByTestId('carousel-indicator').last().focus();
+    await page.keyboard.press('Tab');
+    await expect(previous).toBeFocused();
+    await expect(previous).toHaveCSS('outline-style', 'solid');
     await page.keyboard.press('Enter');
     await expectShowing(stage, 0);
+
+    // Clicked with the mouse, a control shows no ring, as it never did.
+    const next = stage.getByTestId('carousel-next');
+    await next.click();
+    await expectShowing(stage, 1);
+    await expect(next).toBeFocused();
+    await expect(next).toHaveCSS('outline-style', 'none');
   });
 
   test('fullscreen opens on the image being shown', async ({ page }) => {

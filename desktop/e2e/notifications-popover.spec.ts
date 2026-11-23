@@ -149,9 +149,12 @@ test.describe('Header notifications popover', () => {
       await expect(panel.locator(':focus')).toHaveCount(1);
     }
 
-    // Escape from the panel itself: a control reached by Tab shows its tooltip,
-    // and Material's tooltip takes the first Escape to close itself.
-    await panel.focus();
+    // Tab 3 reached the notification's delete button, which shows a tooltip on
+    // keyboard focus; Tab 4 moved on and it fades out. While it is still up,
+    // Material's tooltip takes Escape to close itself, so wait for it to go.
+    // (Its accessible name comes from aria-label; the visible text is the
+    // tooltip's.)
+    await expect(page.getByText('Cancel', { exact: true })).toBeHidden();
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
     await expect(bellButton).toBeFocused();

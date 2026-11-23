@@ -22,6 +22,7 @@ import { CarouselSlideComponent, SLIDE_CAROUSEL } from "./carousel-slide.compone
 @Component({
   selector: "app-slide-carousel",
   templateUrl: "./slide-carousel.component.html",
+  styleUrl: "./slide-carousel.component.scss",
   providers: [{ provide: SLIDE_CAROUSEL, useExisting: SlideCarouselComponent }],
 })
 export class SlideCarouselComponent {

@@ -34,6 +34,7 @@
               [src]="preview.encodedImage || preview.url ?? ''"
             >
             <app-group-autocomplete
+              data-testid="quick-scan-group"
               [inputFormControl]="form | formGet : 'groupIds.' + i"
             ></app-group-autocomplete>
             @if (showPaidBy(i)) {
