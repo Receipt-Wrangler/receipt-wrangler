@@ -16,7 +16,7 @@
 
 // Opt-in: lets the image stage fill the column it sits in instead of using a
 // fixed height. Every link between this host and app-image-canvas is either
-// display:inline (this host, ngx-bootstrap's <carousel>, app-image-viewer) or
+// display:inline (this host, app-slide-carousel, app-image-viewer) or
 // height:auto, so a definite height has to be handed down explicitly.
 //
 // This file is global (ViewEncapsulation.None), which is exactly why the rules
@@ -26,20 +26,23 @@
   display: block;
   height: 100%;
 
-  // .carousel-item.active rather than `slide`, so the inactive slides - which
-  // ngx-bootstrap takes out of flow with position:absolute - stay out of it.
-  // These must stay `block`: `flex` would fight Bootstrap's float: left.
-  carousel,
-  .carousel.slide,
+  // Every slide, not just the active one: an image's canvas fits the image to
+  // its stage when it loads, and the hidden slides load too. Sized only while
+  // active, a hidden slide's stage is collapsed at that moment, and the image
+  // shows up mis-scaled when you navigate to it. (The ngx-bootstrap carousel
+  // this replaced got the same height onto every slide through its `.item`
+  // class.) Out-of-flow inactive slides resolve 100% against .carousel-inner.
+  // These must stay `block`: `flex` would fight the slides' float.
+  app-slide-carousel,
+  .carousel,
   .carousel-inner,
-  .carousel-item.active,
-  .item,
+  .carousel-item,
   app-image-viewer {
     display: block;
     height: 100%;
   }
 
-  // ngx-bootstrap's prev/next are `top: 0; bottom: 0; width: 15%` at z-index 1,
+  // Bootstrap's prev/next are `top: 0; bottom: 0; width: 15%` at z-index 1,
   // and they sit ABOVE the stage in hit-testing. Over a full-height canvas that
   // makes two full-height columns where pan, wheel zoom and double-click all die
   // - and where both the left and right corner handles live, which is exactly

@@ -38,7 +38,6 @@
     "date-fns": "^4.1.0",
     "material-icons": "^1.13.1",
     "ng2-charts": "^9.0.0",
-    "ngx-bootstrap": "21.0.1",
     "ngx-mask": "21.0.1",
     "pretty-print-json": "^3.0.1",
     "qrcode": "^1.5.4",

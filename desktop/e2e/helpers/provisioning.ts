@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import {
   type APIRequestContext,
   type APIResponse,
@@ -434,6 +436,33 @@ export async function apiCreateComment(
   }
   const comment = (await res.json()) as { id: number };
   return comment.id;
+}
+
+/**
+ * Uploads the image at [filePath] to [receiptId] and returns the new image's id.
+ * Images are kept in upload order, which is the order the receipt shows them.
+ */
+export async function apiUploadReceiptImage(
+  api: APIRequestContext,
+  opts: { receiptId: number; filePath: string },
+): Promise<number> {
+  const res = await api.post('/api/receiptImage/', {
+    multipart: {
+      file: {
+        name: basename(opts.filePath),
+        mimeType: 'image/png',
+        buffer: readFileSync(opts.filePath),
+      },
+      receiptId: String(opts.receiptId),
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `upload receipt image failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  const image = (await res.json()) as { id: number };
+  return image.id;
 }
 
 /**

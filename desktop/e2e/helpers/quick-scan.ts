@@ -126,24 +126,24 @@ export async function uploadQuickScanImages(dialog: Locator, count = 1): Promise
   await dialog
     .locator('app-upload-image input[type="file"]')
     .setInputFiles(Array.from({ length: count }, () => RECEIPT_PNG));
-  await expect(dialog.locator('slide')).toHaveCount(count);
+  await expect(dialog.getByTestId('quick-scan-slide')).toHaveCount(count);
 }
 
 /**
  * Selects a group on the given per-image scope (the whole dialog for a single
- * image, or the visible `slide` for the image being configured). If a group is
- * already selected the text input goes readonly, so its X (clear) button is
- * clicked first to make the field editable again — this is how a user switches
- * an image's group.
+ * image, or the visible `quick-scan-slide` for the image being configured). If
+ * a group is already selected the text input goes readonly, so its X (clear)
+ * button is clicked first to make the field editable again — this is how a user
+ * switches an image's group.
  */
 export async function selectImageGroup(
   page: Page,
   scope: Locator,
   groupName: string,
 ): Promise<void> {
-  // The single-select autocomplete only renders a button (the X clear control)
-  // once a value is selected; clear it so the input becomes editable.
-  const clear = scope.locator('app-group-autocomplete').getByRole('button');
+  // The single-select autocomplete only renders its X (clear) control once a
+  // value is selected; clear it so the input becomes editable.
+  const clear = scope.getByTestId('quick-scan-group').getByTestId('autocomplete-clear');
   if (await clear.count()) {
     await clear.first().click();
   }

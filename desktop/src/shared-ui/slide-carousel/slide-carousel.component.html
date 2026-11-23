@@ -1,0 +1,47 @@
+<div
+  class="carousel slide"
+  data-testid="carousel"
+  tabindex="0"
+  (keydown)="onKeydown($event)"
+>
+  @if (showIndicators() && slides().length > 1) {
+    <div class="carousel-indicators">
+      @for (slide of slides(); track slide; let i = $index) {
+        <button
+          type="button"
+          data-bs-target=""
+          data-testid="carousel-indicator"
+          [class.active]="i === activeSlide()"
+          [attr.aria-current]="i === activeSlide() ? 'true' : null"
+          [attr.aria-label]="'Slide ' + (i + 1)"
+          (click)="select(i)"
+        ></button>
+      }
+    </div>
+  }
+
+  <div class="carousel-inner">
+    <ng-content></ng-content>
+  </div>
+
+  @if (showControls() && slides().length > 1) {
+    <button
+      type="button"
+      class="carousel-control-prev"
+      data-testid="carousel-previous"
+      (click)="previous()"
+    >
+      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+      <span class="visually-hidden">Previous</span>
+    </button>
+    <button
+      type="button"
+      class="carousel-control-next"
+      data-testid="carousel-next"
+      (click)="next()"
+    >
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+      <span class="visually-hidden">Next</span>
+    </button>
+  }
+</div>

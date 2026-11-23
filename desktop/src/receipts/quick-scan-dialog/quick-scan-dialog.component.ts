@@ -15,7 +15,8 @@ import { QuickScanFieldConfig, resolveQuickScanFieldConfig } from "./quick-scan-
 import { receiptRequirementsFor } from "../../utils/receipt-requirements";
 import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
 import { MatProgressSpinner } from "@angular/material/progress-spinner";
-import { CarouselComponent, SlideComponent } from "ngx-bootstrap/carousel";
+import { SlideCarouselComponent } from "../../shared-ui/slide-carousel/slide-carousel.component";
+import { CarouselSlideComponent } from "../../shared-ui/slide-carousel/carousel-slide.component";
 import { GroupAutocompleteComponent } from "../../shared-ui/group-autocomplete/group-autocomplete.component";
 import { UserAutocompleteComponent } from "../../user-autocomplete/user-autocomplete/user-autocomplete.component";
 import { StatusSelectComponent } from "../../shared-ui/status-select/status-select.component";
@@ -45,7 +46,7 @@ const commentRequiredValidator = trimmedRequiredValidator();
     templateUrl: "./quick-scan-dialog.component.html",
     styleUrls: ["./quick-scan-dialog.component.scss"],
     encapsulation: ViewEncapsulation.None,
-    imports: [DialogComponent, ReactiveFormsModule, UploadImageComponent, MatProgressSpinner, CarouselComponent, SlideComponent, GroupAutocompleteComponent, UserAutocompleteComponent, StatusSelectComponent, CategoryAutocompleteComponent, TagAutocompleteComponent, TextareaComponent, DialogFooterComponent, ButtonComponent, DeleteButtonComponent, FormGetPipe]
+    imports: [DialogComponent, ReactiveFormsModule, UploadImageComponent, MatProgressSpinner, SlideCarouselComponent, CarouselSlideComponent, GroupAutocompleteComponent, UserAutocompleteComponent, StatusSelectComponent, CategoryAutocompleteComponent, TagAutocompleteComponent, TextareaComponent, DialogFooterComponent, ButtonComponent, DeleteButtonComponent, FormGetPipe]
 })
 export class QuickScanDialogComponent implements OnInit {
   public readonly uploadImageComponent = viewChild.required(UploadImageComponent);

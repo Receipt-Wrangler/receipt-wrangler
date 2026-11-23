@@ -286,7 +286,7 @@ test.describe('Quick scan dialog behavior', () => {
 
     // Image 0 -> group A: status shown+required, paid-by hidden. Fill its status
     // so only image 1 is left missing a required field.
-    const slide0 = dialog.locator('slide').nth(0);
+    const slide0 = dialog.getByTestId('quick-scan-slide').nth(0);
     await selectImageGroup(page, slide0, groupA.name);
     await expect(slide0.getByRole('combobox', { name: 'Status' })).toBeVisible();
     await expect(slide0.getByRole('combobox', { name: 'Paid By' })).toHaveCount(0);
@@ -295,7 +295,7 @@ test.describe('Quick scan dialog behavior', () => {
 
     // Image 1 -> group B: paid-by shown+required, status hidden. Leave paid-by empty.
     await dialog.getByTestId('quick-scan-nav-right').getByRole('button').click();
-    const slide1 = dialog.locator('slide').nth(1);
+    const slide1 = dialog.getByTestId('quick-scan-slide').nth(1);
     await expect(slide1.getByRole('combobox', { name: 'Group' })).toBeVisible();
     await selectImageGroup(page, slide1, groupB.name);
     await expect(slide1.getByRole('combobox', { name: 'Paid By' })).toBeVisible();
@@ -436,5 +436,26 @@ test.describe('Quick scan dialog behavior', () => {
     await selectImageGroup(page, dialog, groupA.name);
 
     await expect(dialog.getByTestId('quick-scan-comment')).toHaveCount(0);
+  });
+
+  // The carousel under the images used to act on keys from anything inside it:
+  // a space typed into an image's field was swallowed and switched images.
+  test('typing a space into an image field keeps the space and the image', async ({ page }) => {
+    await injectQuickScanAppData(page);
+    const dialog = await openQuickScanDialog(page, groupA.id);
+    await uploadQuickScanImages(dialog, 2);
+
+    const slides = dialog.getByTestId('quick-scan-slide');
+    const clear = slides.nth(0).getByTestId('quick-scan-group').getByTestId('autocomplete-clear');
+    if (await clear.count()) {
+      await clear.first().click();
+    }
+    const groupField = slides.nth(0).getByRole('combobox', { name: 'Group' });
+    await groupField.click();
+    await page.keyboard.type('a b');
+
+    await expect(groupField).toHaveValue('a b');
+    await expect(slides.nth(1)).toBeHidden();
+    await expect(slides.nth(0)).toBeVisible();
   });
 });

@@ -155,6 +155,7 @@
               @if (images() && (images().length > 0 || filesToUpload().length > 0) && showImages) {
                 <div
                   class="rw-images-pane__stage"
+                  data-testid="receipt-image-stage"
                 >
                   <app-carousel
                     class="rw-carousel--fill"
@@ -437,6 +438,7 @@
       (clicked)="toggleShowImages()"
     ></app-button>
     <app-button
+      data-testid="receipt-image-fullscreen"
       matButtonType="iconButton"
       icon="fullscreen"
       tooltip="Show Fullscreen Image"

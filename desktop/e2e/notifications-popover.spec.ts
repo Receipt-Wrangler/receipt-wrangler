@@ -138,6 +138,9 @@ test.describe('Header notifications popover', () => {
     await expect(panel).toBeFocused();
     // Opened from the keyboard, the focused panel shows a ring.
     await expect(panel).toHaveCSS('outline-style', 'solid');
+    // The list loads after the panel opens. Until it has, there is nothing to
+    // Tab to, and focus rightly stays on the panel itself.
+    await expect(panel.getByText(receiptName)).toBeVisible();
 
     // The overlay renders at the end of <body>; without the trap, Tab would
     // leave the panel for whatever follows it in the document.
@@ -146,6 +149,12 @@ test.describe('Header notifications popover', () => {
       await expect(panel.locator(':focus')).toHaveCount(1);
     }
 
+    // Tab 3 reached the notification's delete button, which shows a tooltip on
+    // keyboard focus; Tab 4 moved on and it fades out. While it is still up,
+    // Material's tooltip takes Escape to close itself, so wait for it to go.
+    // (Its accessible name comes from aria-label; the visible text is the
+    // tooltip's.)
+    await expect(page.getByText('Cancel', { exact: true })).toBeHidden();
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
     await expect(bellButton).toBeFocused();
@@ -161,6 +170,8 @@ test.describe('Header notifications popover', () => {
     await expect(panel).toBeFocused();
 
     const markAllRead = panel.getByRole('button', { name: 'Mark all as read' });
+    // Enabled once the list has loaded with something to mark read.
+    await expect(markAllRead).toBeEnabled();
     await page.keyboard.press('Tab');
     await expect(markAllRead).toBeFocused();
     await page.keyboard.press('Enter');
