@@ -404,6 +404,9 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   `bulk-delete-result-dialog`. Do not hand-build a Close row. The cancel button is icon-only, so it
   passes its tooltip as `ariaLabel` (an `app-button` input that sets `aria-label` on an icon button);
   an icon-only `app-button` has no accessible name without one, since `mat-icon` is `aria-hidden`.
+  For a button that opens a popup, pass `ariaHasPopup` / `ariaExpanded` (`app-button` inputs that
+  land on the native `<button>`), never `aria-haspopup` / `[attr.aria-expanded]` on the host: the
+  host has no role, so state set there is never read. The header bell and the month stepper do this.
 - **Confirming an action:** the shared **`ConfirmationDialogComponent`**
   (`src/shared-ui/confirmation-dialog/`). Open it with `matDialog.open(ConfirmationDialogComponent)`,
   call `setDialogInputs(dialogRef, { headerText, dialogContent })` (two signal inputs — it does
@@ -486,7 +489,7 @@ report builder's dropdowns and picked rows, and the receipts table's Configure C
 Three things about it are load-bearing:
 
 - **The class is `.rw-badge`, NOT `.badge`.** Bootstrap is a global stylesheet here
-  (`angular.json` builds `bootstrap-scss/bootstrap.scss`) and defines an unscoped `.badge` with its
+  (`angular.json` builds `bootstrap/scss/bootstrap.scss`) and defines an unscoped `.badge` with its
   own `line-height`, `text-align`, `white-space` and a **white** `color`. A component rule only
   overrides what it *declares*, so everything else leaks — measured as a ~44% height change — and
   Bootstrap's badge is genuinely used elsewhere (`dashboard/pie-chart`), so it can't just be dropped.
@@ -2043,10 +2046,10 @@ that makes the `FocusKeyManager`'s item list empty, so arrow keys are no-ops, an
 when the overlay is destroyed. The year pager's old `$event.stopPropagation()` is gone with it — it
 only existed because a menu closes on any click inside itself.
 
-The same rule applies to the two house alternatives, which is why neither was used: `cdkMenu` (the
-`filtered-stateful-menu` precedent) has the identical empty-key-manager problem, and `ngbPopover`
-(the header notifications precedent) hard-codes `role="tooltip"` on `NgbPopoverWindow`'s host, which
-is equally wrong for interactive content and cannot be overridden. `e2e/receipt-quick-date-filter.spec.ts`
+The same rule applies to `cdkMenu` (the `filtered-stateful-menu` precedent), which has the identical
+empty-key-manager problem, so it was not used either. (The header notifications panel was an
+`ngbPopover`, which hard-codes `role="tooltip"`; it is now a CDK overlay too — see **Header
+notifications panel** below.) `e2e/receipt-quick-date-filter.spec.ts`
 pins the keyboard path — it fails against a `mat-menu` implementation. A month is written
 as `BETWEEN [startOfMonth, endOfMonth]` — the one operation that can express *any* month, which is
 why this feature needed no API change. Picking a month **overwrites** whatever that field held.
@@ -2257,6 +2260,43 @@ The chips row is inline markup (`mat-chip-set` / `matChipRemove`) with every lab
 above. An id the caller cannot resolve (a category outside their grants,
 a group they have left) renders as the raw id rather than dropping the chip, so a filter that is
 actively removing rows is never invisible.
+
+## Header notifications panel
+
+The bell in `src/layout/header/` opens `app-notifications-list` in a `cdkConnectedOverlay`, the
+same building block as the month stepper. It replaced an `ngbPopover`, and `@ng-bootstrap/ng-bootstrap`
+(with its `@popperjs/core` and `@angular/localize` peers) left the app with it. These choices in it
+differ from the month stepper on purpose:
+
+- **No backdrop.** `(overlayOutsideClick)` closes it, so a click on another header control both
+  closes the panel and does what that control does, as the popover did. A transparent backdrop
+  would swallow that first click. The CDK leaves the origin (the bell) out of outside-clicks, so the
+  bell toggles.
+- **Focus is moved and restored by hand, not with `cdkTrapFocusAutoCapture`.** The overlay renders
+  at the end of `<body>`, so Tab from the bell never reaches it; `toggleNotifications()` focuses the
+  panel (`tabindex="-1"`) after render and `cdkTrapFocus` keeps Tab inside. Auto-capture would also
+  restore focus on **every** close, pulling it off the control the user just clicked outside. So only
+  Escape returns focus to the bell (`onNotificationsKeydown`); the overlay's own Escape handling
+  detaches it.
+- **Tab is guarded too, because the trap has no fallback.** `cdkTrapFocus` (CDK 21.2.x) can only send
+  Tab to something tabbable *inside* the panel. An empty list has nothing ("Mark all as read" is
+  disabled), so Tab walked out of the open panel, and deleting a notification drops focus to
+  `<body>`. `onNotificationsKeydown` therefore keeps focus on the panel when it has nothing tabbable
+  or focus is outside it, using the trap's own `InteractivityChecker` test. Making the panel
+  `tabindex="0"` instead is a trap: the CDK returns the root first, so Shift+Tab could never wrap
+  backwards.
+- **The panel shows a `:focus-visible` ring and no `:focus` one**, so a keyboard open is visible and a
+  mouse open looks exactly as the popover did.
+- **It reproduces the old Bootstrap `.popover` look**, arrow included, from Bootstrap's CSS custom
+  properties (`--bs-border-color-translucent`, `--bs-border-radius-lg`, `--bs-font-sans-serif`, …),
+  so it is pixel-identical to the popover it replaced. The arrow's offset assumes the 48px icon
+  button it is end-aligned to.
+
+E2E: `e2e/notifications-popover.spec.ts` (serial, provisioned account so its notification list is
+known). It covers the toggle, a click elsewhere landing (fails if a backdrop is added), the
+keyboard path (fails without the focus trap), the ring showing only for a keyboard open, and Tab
+staying on an emptied panel (fails without the Tab guard). That last case empties the account's list,
+so it runs last.
 
 ## System tasks table filtering
 

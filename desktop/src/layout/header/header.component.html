@@ -31,6 +31,7 @@
         color="accent"
         class="nav-button"
         matTooltip="Receipt List"
+        data-testid="header-receipts-link"
         routerLinkActive="active-link"
         [routerLink]="receiptHeaderLink()"
       >
@@ -55,19 +56,48 @@
         *hasAppPermission="Permission.AppReceiptsSearch"
         class="receipt-searchbar w-100 me-2"
       ></app-searchbar>
-      <app-button
-        *hasAppPermission="Permission.AppNotificationsRead"
-        class="ms-4"
-        #notificationsPopover="ngbPopover"
-        matButtonType="iconButton"
-        icon="notifications"
-        triggers="click:clickouside"
-        autoClose="outside"
-        placement="bottom-end"
-        [matBadgeContent]="notificationCount()"
-        [ngbPopover]="notifications"
-        (clicked)="notificationsPopover.open()"
-      ></app-button>
+      <ng-container *hasAppPermission="Permission.AppNotificationsRead">
+        <app-button
+          cdkOverlayOrigin
+          #notificationsOrigin="cdkOverlayOrigin"
+          class="ms-4"
+          data-testid="header-notifications-button"
+          matButtonType="iconButton"
+          icon="notifications"
+          ariaHasPopup="dialog"
+          [ariaExpanded]="notificationsOpen()"
+          [matBadgeContent]="notificationCount()"
+          (clicked)="toggleNotifications()"
+        ></app-button>
+
+        <!--
+          No backdrop: a click outside closes the panel AND still lands on what
+          was clicked. Escape is handled by the overlay itself (it detaches);
+          overlayKeydown returns focus on Escape and keeps Tab in the panel.
+        -->
+        <ng-template
+          cdkConnectedOverlay
+          [cdkConnectedOverlayOrigin]="notificationsOrigin"
+          [cdkConnectedOverlayOpen]="notificationsOpen()"
+          [cdkConnectedOverlayPositions]="notificationsPositions"
+          (overlayKeydown)="onNotificationsKeydown($event)"
+          (overlayOutsideClick)="closeNotifications()"
+          (detach)="closeNotifications()"
+        >
+          <div
+            #notificationsPanel
+            class="notifications-panel"
+            role="dialog"
+            aria-label="Notifications"
+            tabindex="-1"
+            data-testid="header-notifications-panel"
+            cdkTrapFocus
+          >
+            <span class="notifications-panel__arrow" aria-hidden="true"></span>
+            <app-notifications-list (notificationCountChanged)="notificationCount.set($event)"></app-notifications-list>
+          </div>
+        </ng-template>
+      </ng-container>
 
       <img
         class="mx-4"
@@ -95,8 +125,4 @@
   >
     <img [src]="srcPath"/>
   </button>
-</ng-template>
-
-<ng-template #notifications>
-  <app-notifications-list (notificationCountChanged)="notificationCount.set($event)"></app-notifications-list>
 </ng-template>

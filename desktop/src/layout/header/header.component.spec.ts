@@ -1,3 +1,5 @@
+import { InteractivityChecker } from "@angular/cdk/a11y";
+import { OverlayContainer } from "@angular/cdk/overlay";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
@@ -5,7 +7,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { Store } from "@ngxs/store";
-import { NgbPopoverModule } from "@ng-bootstrap/ng-bootstrap";
 import { of } from "rxjs";
 import { ToggleIsSidebarOpen } from "src/store/layout.state.actions";
 import { ApiModule, NotificationsService } from "../../open-api";
@@ -55,7 +56,6 @@ describe("HeaderComponent", () => {
     imports: [ApiModule,
         MatDialogModule,
         MatSnackBarModule,
-        NgbPopoverModule,
         HeaderComponent,],
     providers: [provideTestStore(), provideRouter([]), provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()],
     schemas: [NO_ERRORS_SCHEMA],
@@ -149,5 +149,135 @@ describe("HeaderComponent", () => {
 
     expect(countSpy).toHaveBeenCalledTimes(1);
     expect(component.notificationCount()).toBe(3);
+  });
+
+  describe("notifications panel", () => {
+    let overlayContainer: OverlayContainer;
+
+    const bellButton = (): HTMLButtonElement =>
+      fixture.nativeElement.querySelector('[data-testid="header-notifications-button"] button');
+
+    const panel = (): HTMLElement | null =>
+      overlayContainer
+        .getContainerElement()
+        .querySelector('[data-testid="header-notifications-panel"]');
+
+    const clickBell = async () => {
+      bellButton().click();
+      await fixture.whenStable();
+    };
+
+    // The overlay's keyboard dispatcher reads the legacy keyCode, which jsdom
+    // leaves at 0 unless it is defined explicitly.
+    const pressEscape = async (target: HTMLElement) => {
+      const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
+      Object.defineProperty(event, "keyCode", { get: () => 27 });
+      target.dispatchEvent(event);
+      await fixture.whenStable();
+    };
+
+    beforeEach(async () => {
+      overlayContainer = TestBed.inject(OverlayContainer);
+      jest.spyOn(notificationsService, "getNotificationCount").mockReturnValue(of(0) as any);
+      jest.spyOn(notificationsService, "getNotificationsForuser").mockReturnValue(of([]) as any);
+
+      logIn();
+      grantNotificationsRead();
+      await fixture.whenStable();
+    });
+
+    it("opens from the bell, and a second click closes it", async () => {
+      expect(panel()).toBeNull();
+
+      await clickBell();
+
+      expect(panel()).not.toBeNull();
+      expect(panel()!.textContent).toContain("All caught up!");
+      expect(bellButton().getAttribute("aria-expanded")).toBe("true");
+
+      await clickBell();
+
+      expect(panel()).toBeNull();
+      expect(bellButton().getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("moves focus into the panel when it opens", async () => {
+      bellButton().focus();
+
+      await clickBell();
+
+      expect(document.activeElement).toBe(panel());
+    });
+
+    it("closes on Escape and returns focus to the bell", async () => {
+      bellButton().focus();
+      await clickBell();
+
+      await pressEscape(panel()!);
+
+      expect(panel()).toBeNull();
+      expect(component.notificationsOpen()).toBe(false);
+      expect(document.activeElement).toBe(bellButton());
+    });
+
+    describe("Tab", () => {
+      const pressTab = async (target: HTMLElement): Promise<KeyboardEvent> => {
+        const event = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+        target.dispatchEvent(event);
+        await fixture.whenStable();
+        return event;
+      };
+
+      // jsdom lays nothing out, so the checker finds nothing visible and hence
+      // nothing tabbable; a spec that needs tabbable content says so.
+      const treatEverythingAsTabbable = () => {
+        const checker = TestBed.inject(InteractivityChecker);
+        jest.spyOn(checker, "isFocusable").mockReturnValue(true);
+        jest.spyOn(checker, "isTabbable").mockReturnValue(true);
+      };
+
+      it("stays on the panel when nothing in it is tabbable", async () => {
+        await clickBell();
+
+        const event = await pressTab(panel()!);
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(panel());
+      });
+
+      it("brings focus back to the panel once it has fallen to the body", async () => {
+        treatEverythingAsTabbable();
+        await clickBell();
+        panel()!.blur();
+        expect(document.activeElement).toBe(document.body);
+
+        const event = await pressTab(document.body);
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(panel());
+      });
+
+      it("is left to the focus trap while focus is inside and there is somewhere to go", async () => {
+        treatEverythingAsTabbable();
+        await clickBell();
+
+        const event = await pressTab(panel()!);
+
+        expect(event.defaultPrevented).toBe(false);
+      });
+    });
+
+    // Whether the click also reaches what is under it needs real hit-testing,
+    // which jsdom does not do: e2e/notifications-popover.spec.ts covers that.
+    it("closes when something else in the header is clicked", async () => {
+      const dispatch = jest.spyOn(store, "dispatch");
+      await clickBell();
+
+      fixture.nativeElement.querySelector('[data-testid="sidebar-toggle"]').click();
+      await fixture.whenStable();
+
+      expect(panel()).toBeNull();
+      expect(dispatch).toHaveBeenCalledWith(new ToggleIsSidebarOpen());
+    });
   });
 });
