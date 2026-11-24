@@ -27,7 +27,7 @@ describe("SearchbarComponent", () => {
         MatInputModule,
         NoopAnimationsModule, SearchbarComponent],
     providers: [
-        { provide: Router, useValue: { navigateByUrl: jest.fn().mockResolvedValue(true) } },
+        { provide: Router, useValue: { navigateByUrl: vi.fn().mockResolvedValue(true) } },
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting()
     ]
@@ -43,7 +43,7 @@ describe("SearchbarComponent", () => {
   });
 
   it("should attempt to navigate to result", () => {
-    const spy = jest.spyOn(TestBed.inject(Router), "navigateByUrl");
+    const spy = vi.spyOn(TestBed.inject(Router), "navigateByUrl");
     const result: SearchResult = {
       id: 1,
       groupId: 1,
@@ -58,7 +58,7 @@ describe("SearchbarComponent", () => {
   });
 
   it("should do nothing when there is an invalid type", () => {
-    const spy = jest.spyOn(TestBed.inject(Router), "navigateByUrl");
+    const spy = vi.spyOn(TestBed.inject(Router), "navigateByUrl");
     const result: SearchResult = {
       id: 1,
       groupId: 1,
@@ -73,7 +73,7 @@ describe("SearchbarComponent", () => {
   });
 
   it("should attempt to call the search service", () => {
-    const spy = jest.spyOn(TestBed.inject(SearchService), "receiptSearch");
+    const spy = vi.spyOn(TestBed.inject(SearchService), "receiptSearch");
     spy.mockReturnValue(
       of([
         {

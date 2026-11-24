@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
@@ -51,12 +52,12 @@ describe("ReportConfigPanelComponent", () => {
   let component: ReportConfigPanelComponent;
   let form: FormGroup;
   let formBuilder: FormBuilder;
-  let dialog: { open: jest.Mock };
-  let customFieldService: { getPagedCustomFields: jest.Mock };
+  let dialog: { open: Mock };
+  let customFieldService: { getPagedCustomFields: Mock };
 
   beforeEach(async () => {
-    dialog = { open: jest.fn() };
-    customFieldService = { getPagedCustomFields: jest.fn(() => of({ data: [], totalCount: 0 })) };
+    dialog = { open: vi.fn() };
+    customFieldService = { getPagedCustomFields: vi.fn(() => of({ data: [], totalCount: 0 })) };
 
     await TestBed.configureTestingModule({
       imports: [ReportConfigPanelComponent],

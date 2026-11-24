@@ -34,7 +34,7 @@ describe("FilteredReceiptsComponent", () => {
   });
 
   it("should get data", () => {
-    const serviceSpy = jest.spyOn(
+    const serviceSpy = vi.spyOn(
       TestBed.inject(ReceiptFilterService),
       "getPagedReceiptsForGroups"
     ).mockReturnValue(of({ data: [], totalCount: 0 } as any));
@@ -64,7 +64,7 @@ describe("FilteredReceiptsComponent", () => {
   });
 
   it("should get next page of data", () => {
-    const serviceSpy = jest.spyOn(
+    const serviceSpy = vi.spyOn(
       TestBed.inject(ReceiptFilterService),
       "getPagedReceiptsForGroups"
     ).mockReturnValue(of({ data: [{} as any] } as any));
@@ -103,7 +103,7 @@ describe("FilteredReceiptsComponent", () => {
   });
 
   it("should not get next page of data", () => {
-    const serviceSpy = jest.spyOn(
+    const serviceSpy = vi.spyOn(
       TestBed.inject(ReceiptFilterService),
       "getPagedReceiptsForGroups"
     ).mockReturnValue(of({ data: [{} as any] } as any));

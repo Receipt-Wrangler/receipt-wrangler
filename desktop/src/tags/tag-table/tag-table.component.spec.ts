@@ -1,3 +1,4 @@
+import type { Mocked } from "vitest";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
@@ -18,12 +19,12 @@ describe("TagsListComponent", () => {
   let component: TagTableComponent;
   let fixture: ComponentFixture<TagTableComponent>;
   let store: Store;
-  let tagService: jest.Mocked<TagService>;
+  let tagService: Mocked<TagService>;
 
   beforeEach(() => {
     const tagServiceSpy = {
-      getPagedTags: jest.fn(),
-      deleteTag: jest.fn()
+      getPagedTags: vi.fn(),
+      deleteTag: vi.fn()
     };
     tagServiceSpy.getPagedTags.mockReturnValue(of({
       data: [],
@@ -44,7 +45,7 @@ describe("TagsListComponent", () => {
 });
     fixture = TestBed.createComponent(TagTableComponent);
     store = TestBed.inject(Store);
-    tagService = TestBed.inject(TagService) as jest.Mocked<TagService>;
+    tagService = TestBed.inject(TagService) as Mocked<TagService>;
     component = fixture.componentInstance;
   });
 
@@ -140,7 +141,7 @@ describe("TagsListComponent", () => {
   });
 
   it("should open edit dialog and refresh data when after closed with true", () => {
-    const dialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open");
+    const dialogSpy = vi.spyOn(TestBed.inject(MatDialog), "open");
     dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
     const tagView: any = {};
@@ -154,7 +155,7 @@ describe("TagsListComponent", () => {
   });
 
   it("should open edit dialog and not refresh data when after closed with false", () => {
-    const dialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open");
+    const dialogSpy = vi.spyOn(TestBed.inject(MatDialog), "open");
     dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(false) }) as any);
 
     const tagView: any = {};
@@ -168,7 +169,7 @@ describe("TagsListComponent", () => {
   });
 
   it("should open confirmation dialog and refresh data when after closed with true", () => {
-    const dialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open");
+    const dialogSpy = vi.spyOn(TestBed.inject(MatDialog), "open");
     tagService.deleteTag.mockReturnValue(of(undefined as any));
     dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
@@ -183,7 +184,7 @@ describe("TagsListComponent", () => {
   });
 
   it("should open confirmation dialog and not refresh data when after closed with false", () => {
-    const dialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open");
+    const dialogSpy = vi.spyOn(TestBed.inject(MatDialog), "open");
     dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(false) }) as any);
 
     const tagView: any = {};
@@ -197,7 +198,7 @@ describe("TagsListComponent", () => {
   });
 
   it("should open add dialog and refresh data when after closed with true", () => {
-    const dialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open");
+    const dialogSpy = vi.spyOn(TestBed.inject(MatDialog), "open");
     dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
     component.openAddDialog();
@@ -210,7 +211,7 @@ describe("TagsListComponent", () => {
   });
 
   it("should open add dialog and not refresh data when after closed with false", () => {
-    const dialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open");
+    const dialogSpy = vi.spyOn(TestBed.inject(MatDialog), "open");
     dialogSpy.mockReturnValue(mockDialogRef({ afterClosed: of(false) }) as any);
 
     component.openAddDialog();

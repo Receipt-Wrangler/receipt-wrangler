@@ -73,7 +73,7 @@ describe("HeaderComponent", () => {
   });
 
   it("should toggle sidebar", () => {
-    const store = jest.spyOn(TestBed.inject(Store), "dispatch");
+    const store = vi.spyOn(TestBed.inject(Store), "dispatch");
     component.toggleSidebar();
 
     expect(store).toHaveBeenCalledWith(new ToggleIsSidebarOpen());
@@ -127,9 +127,9 @@ describe("HeaderComponent", () => {
   });
 
   it("should not fetch the notification count without app.notifications.read", async () => {
-    const countSpy = jest
+    const countSpy = vi
       .spyOn(notificationsService, "getNotificationCount")
-      .mockReturnValue(of(0));
+      .mockReturnValue(of(0) as any);
 
     logIn();
     await fixture.whenStable();
@@ -138,9 +138,9 @@ describe("HeaderComponent", () => {
   });
 
   it("should fetch the notification count once permission is present", async () => {
-    const countSpy = jest
+    const countSpy = vi
       .spyOn(notificationsService, "getNotificationCount")
-      .mockReturnValue(of(3));
+      .mockReturnValue(of(3) as any);
 
     logIn();
     grantNotificationsRead();
@@ -178,8 +178,8 @@ describe("HeaderComponent", () => {
 
     beforeEach(async () => {
       overlayContainer = TestBed.inject(OverlayContainer);
-      jest.spyOn(notificationsService, "getNotificationCount").mockReturnValue(of(0) as any);
-      jest.spyOn(notificationsService, "getNotificationsForuser").mockReturnValue(of([]) as any);
+      vi.spyOn(notificationsService, "getNotificationCount").mockReturnValue(of(0) as any);
+      vi.spyOn(notificationsService, "getNotificationsForuser").mockReturnValue(of([]) as any);
 
       logIn();
       grantNotificationsRead();
@@ -232,8 +232,8 @@ describe("HeaderComponent", () => {
       // nothing tabbable; a spec that needs tabbable content says so.
       const treatEverythingAsTabbable = () => {
         const checker = TestBed.inject(InteractivityChecker);
-        jest.spyOn(checker, "isFocusable").mockReturnValue(true);
-        jest.spyOn(checker, "isTabbable").mockReturnValue(true);
+        vi.spyOn(checker, "isFocusable").mockReturnValue(true);
+        vi.spyOn(checker, "isTabbable").mockReturnValue(true);
       };
 
       it("stays on the panel when nothing in it is tabbable", async () => {
@@ -270,7 +270,7 @@ describe("HeaderComponent", () => {
     // Whether the click also reaches what is under it needs real hit-testing,
     // which jsdom does not do: e2e/notifications-popover.spec.ts covers that.
     it("closes when something else in the header is clicked", async () => {
-      const dispatch = jest.spyOn(store, "dispatch");
+      const dispatch = vi.spyOn(store, "dispatch");
       await clickBell();
 
       fixture.nativeElement.querySelector('[data-testid="sidebar-toggle"]').click();

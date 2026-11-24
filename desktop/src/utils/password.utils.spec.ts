@@ -25,7 +25,7 @@ describe("generateSecurePassword", () => {
   // Without the integer guard, Infinity spins the fill loop forever and NaN
   // falls through it, returning only the class-guaranteed characters.
   it.each([Infinity, -Infinity, NaN, 20.5])(
-    "throws for the non-integer length %p",
+    "throws for the non-integer length %s",
     (length) => {
       expect(() => generateSecurePassword(length)).toThrow(RangeError);
     }
@@ -68,8 +68,8 @@ describe("generateSecurePassword", () => {
   });
 
   it("sources randomness from crypto and not Math.random", () => {
-    const getRandomValues = jest.spyOn(crypto, "getRandomValues");
-    const random = jest.spyOn(Math, "random");
+    const getRandomValues = vi.spyOn(crypto, "getRandomValues");
+    const random = vi.spyOn(Math, "random");
 
     try {
       generateSecurePassword();
@@ -88,7 +88,7 @@ describe("generateSecurePassword", () => {
     // `% 25` implementation would consume them instead of rejecting them.
     const scriptedBytes = [250, 251, 252, 253, 254, 255];
     let call = 0;
-    const getRandomValues = jest
+    const getRandomValues = vi
       .spyOn(crypto, "getRandomValues")
       .mockImplementation((array: any) => {
         array[0] = call < scriptedBytes.length ? scriptedBytes[call] : 5;

@@ -85,7 +85,7 @@ describe("UploadImageComponent", () => {
 
   it("stays processing while a PDF converts and stops once it is emitted", () => {
     const conversion = new Subject<any>();
-    jest.spyOn(receiptImageService, "convertToJpg").mockReturnValue(conversion as any);
+    vi.spyOn(receiptImageService, "convertToJpg").mockReturnValue(conversion as any);
 
     pick(pdf());
 
@@ -101,7 +101,7 @@ describe("UploadImageComponent", () => {
 
   it("stops processing when the conversion fails", () => {
     const conversion = new Subject<any>();
-    jest.spyOn(receiptImageService, "convertToJpg").mockReturnValue(conversion as any);
+    vi.spyOn(receiptImageService, "convertToJpg").mockReturnValue(conversion as any);
 
     pick(pdf());
     const errors = swallowUnhandledRxjsErrors(() => conversion.error(new Error("conversion failed")));
@@ -121,7 +121,7 @@ describe("UploadImageComponent", () => {
   });
 
   it("reports a plain image as processing until it is emitted", () => {
-    const convertSpy = jest.spyOn(receiptImageService, "convertToJpg");
+    const convertSpy = vi.spyOn(receiptImageService, "convertToJpg");
 
     pick(png());
 
@@ -133,7 +133,7 @@ describe("UploadImageComponent", () => {
   it("emits once each way for a batch, after the last file is done", () => {
     const first = new Subject<any>();
     const second = new Subject<any>();
-    jest
+    vi
       .spyOn(receiptImageService, "convertToJpg")
       .mockReturnValueOnce(first as any)
       .mockReturnValueOnce(second as any);

@@ -165,7 +165,7 @@ describe("ReceiptHistoryEntryComponent", () => {
 
   describe("View JSON", () => {
     it("fetches the snapshots once, and toggles them", async () => {
-      const spy = jest
+      const spy = vi
         .spyOn(receiptService, "getReceiptHistorySnapshots")
         .mockReturnValue(of({ before: '{"name":"Old"}', after: '{"name":"New"}' }) as any);
       await render(buildEntry());
@@ -193,7 +193,7 @@ describe("ReceiptHistoryEntryComponent", () => {
     });
 
     it("shows the created receipt alone for a creation entry", async () => {
-      jest.spyOn(receiptService, "getReceiptHistorySnapshots").mockReturnValue(of({ after: '{"name":"New"}' }) as any);
+      vi.spyOn(receiptService, "getReceiptHistorySnapshots").mockReturnValue(of({ after: '{"name":"New"}' }) as any);
       await render(buildEntry({ action: "CREATED" }));
 
       await click("receipt-history-json-toggle");
@@ -208,7 +208,7 @@ describe("ReceiptHistoryEntryComponent", () => {
     });
 
     it("reports a failed load and retries on the next open", async () => {
-      const spy = jest
+      const spy = vi
         .spyOn(receiptService, "getReceiptHistorySnapshots")
         .mockReturnValueOnce(throwError(() => new Error("boom")))
         .mockReturnValueOnce(of({ after: "{}" }) as any);

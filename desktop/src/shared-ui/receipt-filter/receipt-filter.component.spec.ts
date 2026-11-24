@@ -157,11 +157,11 @@ describe("ReceiptFilterComponent", () => {
   });
 
   it("should set form in state and close dialog", () => {
-    const dialogRefSpy = jest.spyOn(
+    const dialogRefSpy = vi.spyOn(
       TestBed.inject(MatDialogRef<ReceiptFilterComponent>),
       "close"
     );
-    const storeRefSpy = jest.spyOn(store, "dispatch").mockReturnValue(of(undefined));
+    const storeRefSpy = vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
 
     component.submitButtonClicked();
 
@@ -211,7 +211,7 @@ describe("ReceiptFilterComponent", () => {
   });
 
   it("should close dialog on cancel", () => {
-    const dialogRefSpy = jest.spyOn(
+    const dialogRefSpy = vi.spyOn(
       TestBed.inject(MatDialogRef<ReceiptFilterComponent>),
       "close"
     );

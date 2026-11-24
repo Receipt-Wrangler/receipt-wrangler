@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { CommonModule } from "@angular/common";
 import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
@@ -13,7 +14,7 @@ import { provideRouter } from "@angular/router";
 describe("ReceiptUpdateDiffDialogComponent", () => {
   let fixture: ComponentFixture<ReceiptUpdateDiffDialogComponent>;
   let component: ReceiptUpdateDiffDialogComponent;
-  let dialogRef: { close: jest.Mock };
+  let dialogRef: { close: Mock };
 
   // Enough unchanged keys around the edit that "Changes only" has lines to hide.
   const before = {
@@ -42,7 +43,7 @@ describe("ReceiptUpdateDiffDialogComponent", () => {
   };
 
   const create = async (snapshots: ReceiptUpdateSnapshots) => {
-    dialogRef = { close: jest.fn() };
+    dialogRef = { close: vi.fn() };
     await TestBed.configureTestingModule({
       imports: [AppDatePipe, CommonModule, NgxsModule.forRoot([SystemSettingsState]), ReceiptUpdateDiffDialogComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],

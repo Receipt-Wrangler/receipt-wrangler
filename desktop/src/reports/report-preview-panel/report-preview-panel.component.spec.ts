@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection, DestroyRef } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormBuilder, FormControl, FormGroup } from "@angular/forms";
@@ -10,11 +11,11 @@ import { ReportPreviewPanelComponent } from "./report-preview-panel.component";
 describe("ReportPreviewPanelComponent", () => {
   let fixture: ComponentFixture<ReportPreviewPanelComponent>;
   let component: ReportPreviewPanelComponent;
-  let dialog: { open: jest.Mock };
+  let dialog: { open: Mock };
   let form: FormGroup;
 
   beforeEach(async () => {
-    dialog = { open: jest.fn() };
+    dialog = { open: vi.fn() };
     await TestBed.configureTestingModule({
       imports: [ReportPreviewPanelComponent],
       providers: [provideZonelessChangeDetection(), FormBuilder, { provide: MatDialog, useValue: dialog }],

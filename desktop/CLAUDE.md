@@ -8,8 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm start` - Start development server with proxy configuration (serves on localhost:4200, proxies /api to localhost:8081)
 - `npm run build` - Build production application
 - `npm run watch` - Build in watch mode for development
-- `npm test` - Run unit tests with coverage
-- `npm test:ci` - Run tests in CI mode with ChromeHeadless
+- `npm test` - Run the unit tests once (Vitest, through `ng test`; see **Unit tests (Vitest)** below)
+- `npm run test:watch` - Run the unit tests in watch mode
+- `npm run test:ci` - Run the unit tests with coverage, exactly as CI does (`test:coverage` is the same with progress output)
+- `npm test -- --include <file-or-folder>` - Run only the specs under a path (e.g. `src/about`)
 - `npm run e2e` - Run Playwright end-to-end tests (see **E2E Testing** below)
 - `npm run e2e:ui` - Run Playwright tests in interactive UI mode
 - `npm run e2e:install` - Install Playwright browser binaries (one-time setup)
@@ -156,10 +158,11 @@ Receipt Wrangler Desktop is an Angular 21 application built from standalone comp
 - `src/open-api/` - Generated API client (auto-generated, do not edit)
 
 ### Testing Strategy
-- Unit tests use Jasmine/Karma framework
+- Unit tests run on Vitest through Angular's `@angular/build:unit-test` builder, in jsdom (see
+  **Unit tests (Vitest)** below)
 - Code coverage reporting with minimum thresholds
 - Tests exclude auto-generated API code (`src/open-api/`)
-- CI tests run in headless Chrome
+- End-to-end tests run on Playwright (see **E2E Testing** below)
 
 ### Development Environment
 - Angular CLI 21 with TypeScript 5.9
@@ -179,18 +182,16 @@ do not undo them without re-checking `npm audit`:
     `@ts-morph/common@0.22` pulls `fast-glob` → `micromatch` → `braces`. The plugin never imports
     ts-morph (its tarball has no schematics), so the override is runtime-inert; NGXS 22 relaxes the
     peer to `>=21`. This one sits in the **production** tree, not just dev.
-  - `js-yaml` (`^4.1.1`) — `babel-plugin-istanbul` (every version, via jest) →
-    `@istanbuljs/load-nyc-config` → `js-yaml@3` → `argparse@1` → `sprintf-js`. load-nyc-config only
-    calls `js-yaml.load()`, which v4 keeps. Global form, not nested, so it dedupes with cosmiconfig's.
   - Drop an override once it does nothing — its target has left the tree, or every range still
     declaring it already admits the floor (`npm ls <name>` shows who declares it). Dead ones mislead.
     `http-proxy-middleware` and `uuid` left with build-angular; `qs` was only there to lift express 4's
     `~6.15` cap, and the express 5 / body-parser 2 left behind already accept the fixed 6.16.x.
+    `js-yaml` left with Jest: its only dependent was `babel-plugin-istanbul` → `@istanbuljs/load-nyc-config`
+    → `js-yaml@3` → `argparse@1` → `sprintf-js`.
 - **When an advisory has no patched release, remove the path — don't bump.** `braces` (`<=3.0.3`) and
-  `sprintf-js` (`<=1.1.3`) both have *no* fixed version, so no floor can clear them; the `ts-morph` /
-  `js-yaml` overrides above and the builder switch below each cut the edge that pulled them in.
-  `npm audit`'s own suggestion for these (`@ngxs/storage-plugin@22`, `jest-preset-angular@14`) is a
-  major jump or a downgrade — ignore it.
+  `sprintf-js` (`<=1.1.3`) both have *no* fixed version, so no floor can clear them; the `ts-morph`
+  override above, the builder switch below and the move off Jest each cut the edge that pulled them in.
+  `npm audit`'s own suggestion here (`@ngxs/storage-plugin@22`) is a major jump — ignore it.
 - **Builders are `@angular/build:*`, not `@angular-devkit/build-angular`.** The app was already on the
   esbuild `application` builder, so build-angular was only a wrapper — but it hard-pinned
   `webpack-dev-server` and `http-proxy-middleware` (both → `braces`) plus ~400 more webpack-era
@@ -241,7 +242,7 @@ lockfile is written by the same npm that later runs `npm ci` on it.
 python3 - <<'EOF'
 import json, re
 NAMESPACES = ('@angular/', '@angular-devkit/', '@ngtools/')   # the peer-coupled family
-OVERRIDES  = ('@babel/core', 'esbuild', 'js-yaml',
+OVERRIDES  = ('@babel/core', 'esbuild',
               'ts-morph', 'undici')                            # keep in sync with package.json
 STALE      = ()                                                # e.g. ('handlebars', 'shell-quote')
 pat = re.compile(
@@ -273,7 +274,8 @@ fixed versions. Repeat until a pass changes nothing.
 `#loadPeerSet`), a freshly published package's peer set is inconsistent — npm bug, not ours. Seen
 when re-placing `@angular/build`: its optional peer `vitest@4.1.12` (published 2026-10-15) pins
 every sibling peer at `4.1.12` except `@vitest/browser-webdriverio: ^4.1.11`, and npm 10.8.2 and
-10.9.4 both crash placing that set. Confirm with the publish times (`npm view <pkg> time`), then
+10.9.4 both crash placing that set (CI's npm 11.19.1 places it fine: it did when vitest became a
+direct dependency). Confirm with the publish times (`npm view <pkg> time`), then
 resolve with `npm install --before=<ISO time just before it>` — the cutoff only constrains entries
 being re-resolved, and nothing about it persists. Check every fixed version you need predates it.
 
@@ -455,7 +457,7 @@ Three things about it are load-bearing:
   left the field blurred would make removing several chips take an extra click each.
 
 The panel handling runs inside the existing `setTimeout(…, 0)` in `optionSelected()`, so the two
-tests in `autocomlete.component.spec.ts` that call `jest.runAllTimers()` are the only ones that
+tests in `autocomlete.component.spec.ts` that call `vi.runAllTimers()` are the only ones that
 exercise it at all — every other `optionSelected` case stops at the `FormArray` push. They stub both
 required view children (`textarea.component.spec.ts` is the precedent): `#inputMultiple` sits behind
 `@if (multiple)`, which the fixture never renders, and the real `MatAutocompleteTrigger` drives a CDK
@@ -466,7 +468,7 @@ needs `AuthState` registered** — `NgxsModule.forRoot([AuthState])`. That cover
 `category-autocomplete` / `tag-autocomplete` / `grant-picker` specs, and `system-settings-form`
 (which registered only `SystemSettingsState`).
 
-`desktop/e2e/chip-select-close-on-select.spec.ts` is the wire test: the Jest specs drive the
+`desktop/e2e/chip-select-close-on-select.spec.ts` is the wire test: the unit specs drive the
 component against a mocked store, so only the e2e proves the checkbox reaches the picker through
 `PUT /userPreferences` -> the stored column -> AppData -> `AuthState`. It **provisions its own
 account**, because the preference is per-user and global and the suite runs `fullyParallel` —
@@ -1050,7 +1052,7 @@ Custom Fields** `app-form-section` on `src/group/group-receipt-settings/` (betwe
   in **both** branches, so a default toggled off and back on is user-owned forever after.
 
 **E2E:** `e2e/group-default-custom-fields.spec.ts` (serial, admin storageState) covers the two
-delivery paths, which the Jest specs cannot — they inject settings into a mocked store:
+delivery paths, which the unit specs cannot — they inject settings into a mocked store:
 - The **settings page** round-trips a set and the ingest toggle through a save, asserted after a
   re-navigation so the values have to come back out of `GET /group/{id}` (`groupResolverFn`), and
   shrinking the set persists too (the command carries the whole id list).
@@ -1664,6 +1666,83 @@ Angular no longer uses zone.js. Change detection is triggered ONLY by:
 - `provideTestStore()` (`src/store/test-store.ts`) is the shared NGXS store most component specs run
   against; it goes in `providers`.
 
+## Unit tests (Vitest)
+
+`ng test` runs the specs through Angular's **`@angular/build:unit-test`** builder on **Vitest 4** in
+**jsdom**. The builder compiles them with the same esbuild/AOT pipeline as `ng build`; Vitest only
+runs the output. It replaced Jest + `jest-preset-angular` in 2026-11 (270 files and 2255 tests
+before and after).
+
+**Where the configuration lives.** The `test` target in `angular.json` holds the spec globs,
+`setupFiles` (`src/test-setup.ts`, the jsdom canvas stub), `providersFile` (`src/test-providers.ts`)
+and **every coverage option**. `vitest.config.ts` holds only what the builder cannot express:
+`isolate`, `environment`, `execArgv` and the coverage `reportsDirectory`.
+
+Things that are different from Jest and will bite:
+
+- **Every spec is type-checked, AOT, on every run.** `strictTemplates` applies to spec host
+  components too. One type error in **any** spec fails the build, including a single-file
+  `--include` run. Jest only transpiled; the switch surfaced and fixed 44 latent errors in 13 specs.
+- **`vi.mock` of a relative import throws** (`"…not supported for relative imports…"`). The builder
+  bundles app code into the spec, so there is no module boundary to intercept. Packages are external,
+  so `vi.mock("qrcode", …)` works (about, auth-form and login-qr specs). To fake app code, provide a
+  double through TestBed. To fake a plain function, stub what it touches. `captureDownloads()`
+  (`src/testing/download.testing.ts`) does this for `downloadFile`: it records each
+  `{ blob, filename }` off `URL.createObjectURL` and the anchor click. It only intercepts anchors
+  pointing at an object URL it made, so other link clicks in the same test still go through.
+- **Use the global `vi`; never `import { vi } from "vitest"`.** esbuild can rename an imported
+  binding, and Vitest only hoists `vi.mock` called on something literally named `vi`. Types are
+  imports: `import type { Mock, Mocked, MockInstance } from "vitest"`. `vi.fn` takes a single
+  function type, as in `vi.fn<(text: string) => Promise<void>>()`.
+- **No `done` callbacks.** Make the test `async` and `await firstValueFrom(obs$)`. For a Subject that
+  fires later, take the promise before triggering. Use
+  `await expect(firstValueFrom(obs$)).rejects…` for the error path.
+- **`isolate: true` is deliberate.** The builder defaults to sharing one module graph and jsdom
+  across spec files. Specs here patch globals: fake timers left on in `autocomlete.component.spec.ts`,
+  a non-configurable `navigator.clipboard`, `localStorage` via the NGXS storage plugin. Measured with
+  isolation off, 10 tests in `input.component.spec.ts` failed, depending on file order. Isolation
+  roughly doubles the run (~190s vs ~90s on 4 cores). Fix the leaks before turning it off.
+  **`--debug` turns isolation off anyway**: the builder forces `isolate: false` and
+  `fileParallelism: false` so a single inspector session covers the run. Always pair `--debug` with
+  an `--include` naming one spec file, or leaks from other files can change its outcome.
+- **TestBed is initialized by the builder**, zoneless because `polyfills` is empty. It sets
+  `errorOnUnknownElements` / `errorOnUnknownProperties` to **true**. Opt out per spec with
+  `configureTestingModule({ errorOnUnknownElements: false, … })` only when you mean it.
+  `src/test-providers.ts` adds an `ErrorHandler` that rethrows, as jest-preset-angular did. Without
+  it, an error reported straight to `ErrorHandler` (NGXS's unhandled action errors) would only log.
+- **`buildTarget` is `build:production,unit-test`, on purpose.** `production` keeps `environment.ts`
+  (`isProd: true`), which the specs were written against. It also keeps `namedChunks` off, and the
+  coverage patterns below rely on the `chunk-*.js` names. The builder still turns optimization and
+  budgets off. The `unit-test` build configuration only empties `styles`: jsdom never loads the
+  global stylesheets (the builder links them only into Vitest's browser mode), and compiling
+  Bootstrap's SCSS printed 300+ Sass deprecation warnings on every run. Component styles are
+  unaffected. The NG8102/NG8107/NG8114 template warnings that still print come from app templates,
+  and `ng build` shows them too.
+- **Coverage options go in `angular.json`, never in `vitest.config.ts`.** The builder adds the
+  bundle patterns (`spec-*.js`, `chunk-*.js`) only to `coverageInclude`. An `include` in the Vitest
+  config filters out every executed bundle and produces an empty report that fails the thresholds.
+  `reportsDirectory` is the one exception: it keeps CI's `coverage/receipt-wrangler-desktop/cobertura-coverage.xml`
+  path. Coverage uses V8, which counts differently from Jest's Istanbul. At the switch it read 83.5%
+  lines where Istanbul read 85.6%.
+- **Fake timers:** Vitest does not fake `queueMicrotask` / `nextTick` (Jest did). `runAllTimers`
+  stops at 10,000 timers. Calling `run*` / `advance*` without fake timers installed throws, where
+  Jest only warned.
+- **Unhandled errors fail the run**, even when every test passed, including an error thrown after
+  its test finished. That makes a leaked RxJS error a hard failure:
+  `swallowUnhandledRxjsErrors` (`src/testing/rxjs-unhandled-errors.ts`) is how a spec drives a
+  deliberately unhandled error.
+- **Node 25+ has its own `localStorage` global**, and Vitest's jsdom environment leaves it in place
+  of jsdom's. Without a backing file it is unusable, which failed 20 tests (the header and
+  token-refresh specs) on Node 26. Node 26 is the current LTS and what `docker/dev/Dockerfile`
+  installs via NodeSource. `vitest.config.ts` passes `--no-experimental-webstorage` to the test
+  workers whenever Node defines that global, so the suite runs the same on Node 24 (CI) and 26.
+- **Editors show Vitest's globals everywhere.** The root `tsconfig.json` loads `vitest/globals` and
+  `node` types for editors, so `expect` / `vi` / `NodeJS` resolve in app and e2e code in the editor
+  even though `ng build` and Playwright don't provide them. An e2e spec must import `expect` from
+  `@playwright/test` itself. A solution-style root was tried and dropped: `tsserver` assigns files by
+  `include` patterns, and `tsconfig.app.json` lists only `src/main.ts`, so app files then landed in
+  the wrong project.
+
 ## E2E Testing
 
 End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angular UI against a real Go API. Config is `playwright.config.ts`.
@@ -2082,7 +2161,7 @@ why this feature needed no API change. Picking a month **overwrites** whatever t
   on calendar fields (day 1, same year+month, `getDaysInMonth` on the end) rather than on the
   serialized text, which also makes it tolerate the local-midnight pair the dialog's datepickers
   write. Get this wrong and the label silently degrades to "Custom" after every refresh —
-  `e2e/receipt-quick-date-filter.spec.ts` covers it because the Jest specs cannot.
+  `e2e/receipt-quick-date-filter.spec.ts` covers it because the unit specs cannot.
 - **`WITHIN_CURRENT_MONTH` is a no-op on the backend for `date` today.** `BuildGormFilterQuery` guards
   every field with `if Filter.Date.Value != nil` and the dialog stores `value: null` for that
   operation, so it never reaches the query builder — the badge counts it and nothing is filtered.
@@ -2157,7 +2236,7 @@ for the wire contract.
   `role="presentation"`, so clicking it in a test does nothing.
 - A configured status matching no receipt still renders, as a **muted zero row**, so the block keeps
   its shape as the filter narrows and a legitimate zero does not read as a bug.
-- **E2E: `e2e/receipt-summary.spec.ts`** (serial, admin `storageState`). The Jest specs inject group
+- **E2E: `e2e/receipt-summary.spec.ts`** (serial, admin `storageState`). The unit specs inject group
   settings into a mocked store, so they prove nothing about the wire; this covers the settings form
   round-tripping through a real `GET /group/{id}`, the figures off a real decimal fold, a filter
   recomputing every row, and the All-group chip pick surviving a reload. Two locator traps it
@@ -2189,7 +2268,7 @@ for the wire contract.
     with the toggle and the status checkboxes — it reads no catalog, and gating it would lock an
     admin without `app.custom-fields.read` out of deciding where their own summary goes.
   - **Placement is asserted as DOCUMENT ORDER, and only in e2e.** The block renders at both
-    positions, so "is it visible" passes whichever anchor is wrong. The Jest spec asserts the
+    positions, so "is it visible" passes whichever anchor is wrong. The unit spec asserts the
     derivation only: `receipts-table.component.spec.ts` never renders the template — every case
     there drives the component class, and `app-table` resolves to a custom element under
     `CUSTOM_ELEMENTS_SCHEMA`, so the `viewChild.required` in `ngAfterViewInit` cannot resolve.
@@ -2197,7 +2276,7 @@ for the wire contract.
   belongs to whose summary is enabled, and the suite runs `fullyParallel` against a shared backend,
   so a group leaked by a crashed earlier run would break an exact-count assertion — and, sorting
   earlier, would even win the alphabetical auto-select. Assert chips **by testid** and drive the
-  switch by clicking; the auto-select rule is pinned deterministically in the Jest specs instead.
+  switch by clicking; the auto-select rule is pinned deterministically in the unit specs instead.
 
 ### The overflow menu
 
@@ -2360,7 +2439,7 @@ dialog. `SystemTaskTableState.filter` is the single slice all three read and wri
 **E2E:** `e2e/system-task-filter.spec.ts` (serial, admin storageState). It seeds a deterministic row
 by creating and deleting an API key (`apiRecordApiKeyDeletedSystemTask` — system tasks are only ever
 written as a side effect of real work, so there is no endpoint that creates one), then asserts what
-the Jest specs cannot: the server narrows (`totalCount` included, which is what proves the predicates
+the unit specs cannot: the server narrows (`totalCount` included, which is what proves the predicates
 land before the count), the "System" sentinel matches unattributed rows, a Started At of the task's
 own day matches while the previous day does not, and the filter survives a reload. It also creates a
 receipt through `POST /api/receipt` in a throwaway group and asserts its Receipt Uploaded task comes
@@ -2427,7 +2506,7 @@ row summary, the old/new name on the correct sides, and the "Changes only" colla
 keeps an unchanged item across the update under test, so the summary assertion also proves the
 server-side item recreation is not reported as an edit (it fails if only `updatedAt` is ignored).
 It also asserts the stored row carries `version: 2` and that the dialog shows no notice. The current
-API cannot write a version 1 row, so that path is covered by the Go service tests and the Jest specs. It narrows the
+API cannot write a version 1 row, so that path is covered by the Go service tests and the unit specs. It narrows the
 paged response to its own task with `page.route` + `route.fetch()`, so the row is still the real
 server's output while other specs' tasks stay out of the way.
 

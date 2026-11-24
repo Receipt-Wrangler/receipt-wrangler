@@ -13,7 +13,7 @@ import {
 } from './helpers/provisioning';
 
 // Group default custom fields, end to end (see desktop/CLAUDE.md → "Per-group default custom
-// fields"). The Jest specs cover the swap rules exhaustively against a mocked store; what only an
+// fields"). The unit specs cover the swap rules exhaustively against a mocked store; what only an
 // e2e can prove is that the two delivery paths agree with the server:
 //
 //   - the settings page reads GET /group/{id} through groupResolverFn, so test 1 is a real

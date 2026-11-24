@@ -86,7 +86,7 @@ describe("QuickScanDialogComponent", () => {
     // app-upload-image is an unknown element under CUSTOM_ELEMENTS_SCHEMA, so the
     // (processingChange) binding is a plain DOM listener on its host.
     it("wires the upload control's processingChange to imagesProcessing", () => {
-      const set = jest.spyOn(component.imagesProcessing, "set");
+      const set = vi.spyOn(component.imagesProcessing, "set");
 
       fixture.nativeElement
         .querySelector("app-upload-image")
@@ -111,7 +111,7 @@ describe("QuickScanDialogComponent", () => {
 
   it("should push fileData into images when loaded", () => {
     const originalCreateObjectURL = URL.createObjectURL;
-    URL.createObjectURL = jest.fn().mockReturnValue("awesome");
+    URL.createObjectURL = vi.fn().mockReturnValue("awesome");
     const fileData = {} as ReceiptFileUploadCommand;
     component.fileLoaded(fileData);
 
@@ -120,7 +120,7 @@ describe("QuickScanDialogComponent", () => {
   });
 
   it("should close the dialog", () => {
-    const dialogSpy = jest.spyOn(TestBed.inject(MatDialogRef), "close");
+    const dialogSpy = vi.spyOn(TestBed.inject(MatDialogRef), "close");
 
     component.cancelButtonClicked();
 
@@ -128,7 +128,7 @@ describe("QuickScanDialogComponent", () => {
   });
 
   it("should show error if no image has been selected", () => {
-    const snackbarSpy = jest.spyOn(TestBed.inject(SnackbarService), "error");
+    const snackbarSpy = vi.spyOn(TestBed.inject(SnackbarService), "error");
 
     component.submitButtonClicked();
 
@@ -362,7 +362,7 @@ describe("QuickScanDialogComponent", () => {
   it("should send category and tag ids per image on submit", () => {
     const originalCreateObjectURL = URL.createObjectURL;
     try {
-      URL.createObjectURL = jest.fn().mockReturnValue("blob");
+      URL.createObjectURL = vi.fn().mockReturnValue("blob");
 
       const group = {
         id: 2,
@@ -386,7 +386,7 @@ describe("QuickScanDialogComponent", () => {
       });
 
       const receiptService = TestBed.inject(ReceiptService);
-      const serviceSpy = jest
+      const serviceSpy = vi
         .spyOn(receiptService, "quickScanReceipt")
         .mockReturnValue(of({} as any));
 
@@ -608,7 +608,7 @@ describe("QuickScanDialogComponent", () => {
     it("should send the comment per image on submit", () => {
       const originalCreateObjectURL = URL.createObjectURL;
       try {
-        URL.createObjectURL = jest.fn().mockReturnValue("blob");
+        URL.createObjectURL = vi.fn().mockReturnValue("blob");
         seedStore({
           quickScanPaidByEnabled: false,
           quickScanStatusEnabled: false,
@@ -617,7 +617,7 @@ describe("QuickScanDialogComponent", () => {
         });
 
         const receiptService = TestBed.inject(ReceiptService);
-        const serviceSpy = jest
+        const serviceSpy = vi
           .spyOn(receiptService, "quickScanReceipt")
           .mockReturnValue(of({} as any));
 

@@ -1,11 +1,12 @@
+import type { Mock } from "vitest";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { provideStore, Store } from "@ngxs/store";
 import * as QRCode from "qrcode";
 
-jest.mock("qrcode", () => ({
+vi.mock("qrcode", () => ({
   __esModule: true,
-  toDataURL: jest.fn(),
+  toDataURL: vi.fn(),
 }));
 
 import { AboutComponent } from "./about.component";
@@ -19,7 +20,7 @@ describe("AboutComponent", () => {
   let fixture: ComponentFixture<AboutComponent>;
 
   beforeEach(async () => {
-    (QRCode.toDataURL as jest.Mock).mockReset();
+    (QRCode.toDataURL as Mock).mockReset();
 
     await TestBed.configureTestingModule({
       imports: [AboutComponent],
@@ -47,7 +48,7 @@ describe("AboutComponent", () => {
   });
 
   it("renders the mobile app setup QR when loginQrUrl is set", async () => {
-    (QRCode.toDataURL as jest.Mock).mockResolvedValue(
+    (QRCode.toDataURL as Mock).mockResolvedValue(
       "data:image/png;base64,QR"
     );
 

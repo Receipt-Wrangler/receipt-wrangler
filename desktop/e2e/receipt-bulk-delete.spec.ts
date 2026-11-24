@@ -16,7 +16,7 @@ import { openReceiptsOverflowMenu } from './helpers/receipts-table';
 // each receipt in its own group and refuses the rest without refusing the
 // others; the desktop names each refusal in a results dialog.
 //
-// Only an e2e proves this: the Jest specs mock the response, so they cannot
+// Only an e2e proves this: the unit specs mock the response, so they cannot
 // show the server deleting one receipt while keeping its neighbour.
 //
 // e2e-user is a Legacy Viewer (no group.receipts.delete) in one provisioned

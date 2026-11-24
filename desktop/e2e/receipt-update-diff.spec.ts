@@ -14,7 +14,7 @@ import {
 //
 // The API stores a RECEIPT_UPDATED description double-encoded (each of
 // before/after is itself a JSON string), which the generic pretty-json pipe
-// could not parse, so the row showed the raw escaped text. The Jest specs build
+// could not parse, so the row showed the raw escaped text. The unit specs build
 // that format by hand; this proves the desktop reads what the real server
 // writes, and that the before/after diff puts each side where it belongs.
 //

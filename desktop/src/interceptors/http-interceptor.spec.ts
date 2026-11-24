@@ -1,3 +1,4 @@
+import type { MockInstance } from "vitest";
 import { HttpClient, provideHttpClient, withInterceptors } from "@angular/common/http";
 import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
 import { TestBed } from "@angular/core/testing";
@@ -14,7 +15,7 @@ describe("httpInterceptor", () => {
   let httpTestingController: HttpTestingController;
   let httpClient: HttpClient;
   let snackbarService: SnackbarService;
-  let errorSpy: jest.SpyInstance;
+  let errorSpy: MockInstance;
   let isLoggedIn: boolean;
   let activatedRouteStub: { snapshot: { queryParams: Record<string, unknown> } };
 
@@ -35,7 +36,7 @@ describe("httpInterceptor", () => {
     httpTestingController = TestBed.inject(HttpTestingController);
     httpClient = TestBed.inject(HttpClient);
     snackbarService = TestBed.inject(SnackbarService);
-    errorSpy = jest.spyOn(snackbarService, "error").mockImplementation(() => {});
+    errorSpy = vi.spyOn(snackbarService, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {

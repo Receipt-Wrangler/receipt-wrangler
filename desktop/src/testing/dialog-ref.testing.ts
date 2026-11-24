@@ -17,11 +17,11 @@ export function mockDialogRef(
     inputs,
     componentInstance: options.componentInstance ?? {},
     componentRef: {
-      setInput: jest.fn((name: string, value: unknown) => {
+      setInput: vi.fn((name: string, value: unknown) => {
         inputs[name] = value;
       }),
     },
     afterClosed: () => options.afterClosed ?? of(undefined),
-    close: jest.fn(),
+    close: vi.fn(),
   };
 }

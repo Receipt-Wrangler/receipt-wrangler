@@ -1,7 +1,7 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { TestBed } from "@angular/core/testing";
 import { NgxsModule, Store } from "@ngxs/store";
-import { of } from "rxjs";
+import { firstValueFrom, of } from "rxjs";
 import { ApiModule, FilterOperation, ReceiptService, ReceiptSummary } from "../open-api";
 import { buildDefaultReceiptFilter, ReceiptTableState } from "../store/receipt-table.state";
 import { SetReceiptFilterData } from "../store/receipt-table.actions";
@@ -50,7 +50,7 @@ describe("ReceiptFilterService", () => {
     }
 
     it("forwards the active filter from the store", () => {
-      const spy = jest
+      const spy = vi
         .spyOn(receiptService, "getReceiptSummaryForGroup")
         .mockReturnValue(of({} as ReceiptSummary) as any);
 
@@ -63,7 +63,7 @@ describe("ReceiptFilterService", () => {
     });
 
     it("converts the group id to a number", () => {
-      const spy = jest
+      const spy = vi
         .spyOn(receiptService, "getReceiptSummaryForGroup")
         .mockReturnValue(of({} as ReceiptSummary) as any);
 
@@ -76,7 +76,7 @@ describe("ReceiptFilterService", () => {
     });
 
     it("preserves a configurationGroupId that differs from the group id", () => {
-      const spy = jest
+      const spy = vi
         .spyOn(receiptService, "getReceiptSummaryForGroup")
         .mockReturnValue(of({} as ReceiptSummary) as any);
 
@@ -86,16 +86,15 @@ describe("ReceiptFilterService", () => {
       expect((spy.mock.calls[0][1] as any).configurationGroupId).toBe(42);
     });
 
-    it("returns the summary from the client untouched", (done) => {
+    it("returns the summary from the client untouched", async () => {
       const summary = { enabled: true, configurationGroupId: 1 } as ReceiptSummary;
-      jest
+      vi
         .spyOn(receiptService, "getReceiptSummaryForGroup")
         .mockReturnValue(of(summary) as any);
 
-      service.getReceiptSummaryForGroup("1", 1).subscribe((result) => {
-        expect(result).toBe(summary);
-        done();
-      });
+      const result = await firstValueFrom(service.getReceiptSummaryForGroup("1", 1));
+
+      expect(result).toBe(summary);
     });
   });
 
@@ -123,13 +122,14 @@ describe("ReceiptFilterService", () => {
 
       expect(command.filter.createdAt.value).toEqual(["2026-09-01", "2026-09-30"]);
       expect(command.filter.date.value).toBe("2026-09-15");
-      expect(store.selectSnapshot(ReceiptTableState.filterData).filter.createdAt.value[0]).toEqual(
+      const stored = store.selectSnapshot(ReceiptTableState.filterData) as any;
+      expect(stored.filter.createdAt.value[0]).toEqual(
         new Date(2026, 8, 1)
       );
     });
 
     it("sends the same days on the summary request", () => {
-      const spy = jest
+      const spy = vi
         .spyOn(receiptService, "getReceiptSummaryForGroup")
         .mockReturnValue(of({} as ReceiptSummary) as any);
       seedMonthFilter();

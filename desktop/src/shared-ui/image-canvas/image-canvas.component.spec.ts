@@ -90,9 +90,9 @@ describe("ImageCanvasComponent", () => {
     Object.defineProperty(host, "clientWidth", { value: STAGE_WIDTH, configurable: true });
     Object.defineProperty(host, "clientHeight", { value: STAGE_HEIGHT, configurable: true });
     host.getBoundingClientRect = () => ({ left: 0, top: 0, width: STAGE_WIDTH, height: STAGE_HEIGHT }) as DOMRect;
-    host.setPointerCapture = jest.fn();
-    host.releasePointerCapture = jest.fn();
-    host.hasPointerCapture = jest.fn().mockReturnValue(true);
+    host.setPointerCapture = vi.fn();
+    host.releasePointerCapture = vi.fn();
+    host.hasPointerCapture = vi.fn().mockReturnValue(true);
     Object.defineProperty(image, "naturalWidth", { value: NATURAL_WIDTH, configurable: true });
     Object.defineProperty(image, "naturalHeight", { value: NATURAL_HEIGHT, configurable: true });
 

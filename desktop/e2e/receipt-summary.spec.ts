@@ -14,11 +14,11 @@ import {
 import { gotoReceiptsTable } from './helpers/receipts-table';
 
 // The receipt summary, end to end (see desktop/CLAUDE.md → "Receipt summary (the totals under the
-// table)"). The Jest specs cover the aggregation rules and the refresh split against a MOCKED
+// table)"). The unit specs cover the aggregation rules and the refresh split against a MOCKED
 // service, and the Go tests cover the endpoint — what only an e2e can prove is that the three
 // pieces agree across the wire:
 //
-//   - the settings form's command actually persists (the Jest spec asserts the command's shape,
+//   - the settings form's command actually persists (the unit spec asserts the command's shape,
 //     never the round-trip), so a field missing from the API's update assignment block fails here
 //     and nowhere else;
 //   - the configured set reaches a different consumer over a different endpoint — the receipts
@@ -199,7 +199,7 @@ test.describe('Receipt summary', () => {
     );
   }
 
-  // Gap 1: the Jest spec asserts the command's SHAPE against a mocked service. Only this proves the
+  // Gap 1: the unit spec asserts the command's SHAPE against a mocked service. Only this proves the
   // three pieces survive a real PUT and come back out of GET /group/{id} through the resolver.
   test('round-trips the summary configuration through the settings form', async ({ page }) => {
     await page.goto(`/groups/${off.id}/receipt-settings/edit`);
@@ -374,7 +374,7 @@ test.describe('Receipt summary', () => {
     // Assert the chips BY TESTID and never by count or position: the row lists every group the
     // admin belongs to whose summary is enabled, and a group leaked by a crashed earlier run would
     // otherwise break an exact-count assertion. Auto-select-alphabetically-first is covered
-    // deterministically in the Jest util spec and deliberately not asserted here.
+    // deterministically in the util's unit spec and deliberately not asserted here.
     const primaryChip = page.getByTestId(`receipt-totals-config-group-${primary.id}`);
     const secondaryChip = page.getByTestId(`receipt-totals-config-group-${secondary.id}`);
     await expect(primaryChip).toBeVisible();
@@ -407,7 +407,7 @@ test.describe('Receipt summary', () => {
   });
 
   /**
-   * Placement is the one thing no Jest spec can prove. The component spec asserts the derivation
+   * Placement is the one thing no unit spec can prove. The component spec asserts the derivation
    * against a mocked response and the totals spec asserts the modifier class, but neither renders
    * the receipts page, so neither can see WHERE the block lands. This walks the whole path:
    * settings form -> PUT -> DB -> summary response -> the two template anchors.
@@ -484,7 +484,7 @@ test.describe('Receipt summary', () => {
   });
 
   // The summary rides its own refresh stream precisely so paging and sorting do not re-request an
-  // unpaged aggregate. The Jest spec proves the split against a mocked service; only this proves it
+  // unpaged aggregate. The unit spec proves the split against a mocked service; only this proves it
   // on the wire.
   test('does not re-request the summary when only the sort changes', async ({ page }) => {
     await gotoGroupTable(page, primary.id);

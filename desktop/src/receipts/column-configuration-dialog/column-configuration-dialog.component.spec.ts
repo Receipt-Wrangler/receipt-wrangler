@@ -1,3 +1,4 @@
+import type { Mocked } from "vitest";
 import { CdkDragDrop } from "@angular/cdk/drag-drop";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
@@ -12,7 +13,7 @@ import { ColumnConfigurationDialogComponent } from "./column-configuration-dialo
 describe("ColumnConfigurationDialogComponent", () => {
   let component: ColumnConfigurationDialogComponent;
   let fixture: ComponentFixture<ColumnConfigurationDialogComponent>;
-  let mockDialogRef: jest.Mocked<MatDialogRef<ColumnConfigurationDialogComponent>>;
+  let mockDialogRef: Mocked<MatDialogRef<ColumnConfigurationDialogComponent>>;
   let mockDialogData: {
     currentColumns?: ReceiptTableColumnConfig[];
     customFields?: CustomField[];
@@ -38,7 +39,7 @@ describe("ColumnConfigurationDialogComponent", () => {
 
   beforeEach(async () => {
     // Create spy for MatDialogRef
-    mockDialogRef = { close: jest.fn() } as unknown as jest.Mocked<MatDialogRef<ColumnConfigurationDialogComponent>>;
+    mockDialogRef = { close: vi.fn() } as unknown as Mocked<MatDialogRef<ColumnConfigurationDialogComponent>>;
 
     // Initialize mock dialog data
     mockDialogData = {
@@ -87,7 +88,7 @@ describe("ColumnConfigurationDialogComponent", () => {
     });
 
     it("should initialize columns on ngOnInit", () => {
-      jest.spyOn(component as any, "initializeColumns");
+      vi.spyOn(component as any, "initializeColumns");
 
       component.ngOnInit();
 

@@ -43,10 +43,10 @@ describe("resolvePeriodRange", () => {
 // hint resolves "today" in the app zone, as the server does.
 describe("resolvePeriodRange in the app time zone", () => {
   beforeEach(() => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date("2026-10-01T01:00:00Z"));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T01:00:00Z"));
   });
-  afterEach(() => jest.useRealTimers());
+  afterEach(() => vi.useRealTimers());
 
   const resolve = (preset: ReportPeriod.PresetEnum, zone: string) =>
     formatPeriodRange(resolvePeriodRange(preset, null, null, zone));

@@ -61,14 +61,14 @@ describe("ReportGenerateBarComponent", () => {
   });
 
   it("emits generate on request", () => {
-    const spy = jest.fn();
+    const spy = vi.fn();
     component.generate.subscribe(spy);
     component.onGenerate();
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("emits saveTemplate on request", () => {
-    const spy = jest.fn();
+    const spy = vi.fn();
     component.saveTemplate.subscribe(spy);
     component.onSaveTemplate();
     expect(spy).toHaveBeenCalledTimes(1);

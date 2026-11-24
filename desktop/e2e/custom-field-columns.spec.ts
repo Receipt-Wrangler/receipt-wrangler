@@ -25,7 +25,7 @@ test.describe.configure({ mode: 'serial' });
 /**
  * Custom fields as receipts-table columns.
  *
- * The Jest specs inject a column configuration into a mocked store, so they prove
+ * The unit specs inject a column configuration into a mocked store, so they prove
  * nothing about the wire. What only an e2e can show: the field catalog reaching
  * the table through its resolver, a CURRENCY cell formatted by the configured
  * currency display, and - the part with a real backend behind it - the

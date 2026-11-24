@@ -31,7 +31,7 @@ describe("GroupDashboardsComponent", () => {
   // navigateByUrl keeps a real (routeless) Router from producing rejected
   // navigations, and lets the navigation tests assert the target url.
   const spyNavigate = () =>
-    jest
+    vi
       .spyOn(TestBed.inject(Router), "navigateByUrl")
       .mockResolvedValue(true as any);
 
@@ -87,6 +87,9 @@ describe("GroupDashboardsComponent", () => {
     fixture.detectChanges();
   });
 
+  // The navigation tests run on fake timers; put the real ones back even if one fails.
+  afterEach(() => vi.useRealTimers());
+
   it("should create", () => {
     expect(component).toBeTruthy();
   });
@@ -139,7 +142,7 @@ describe("GroupDashboardsComponent", () => {
   });
 
   it("auto-selects and navigates to the first dashboard once a cold group's data lands", () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     const navSpy = spyNavigate();
     seed({ selectedGroupId: "1", selectedDashboardId: "" }, { "1": [dashboard(7)] });
 
@@ -147,13 +150,12 @@ describe("GroupDashboardsComponent", () => {
 
     expect(store.selectSnapshot(GroupState.selectedDashboardId)).toBe("7");
 
-    jest.runOnlyPendingTimers();
+    vi.runOnlyPendingTimers();
     expect(navSpy).toHaveBeenCalledWith("/dashboard/group/1/7");
-    jest.useRealTimers();
   });
 
   it("navigates to the already-selected dashboard when data lands (warm/deep-link)", () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     const navSpy = spyNavigate();
     seed(
       { selectedGroupId: "1", selectedDashboardId: "5" },
@@ -161,28 +163,26 @@ describe("GroupDashboardsComponent", () => {
     );
 
     TestBed.flushEffects();
-    jest.runOnlyPendingTimers();
+    vi.runOnlyPendingTimers();
 
     expect(navSpy).toHaveBeenCalledWith("/dashboard/group/1/5");
     expect(store.selectSnapshot(GroupState.selectedDashboardId)).toBe("5");
-    jest.useRealTimers();
   });
 
   it("does not navigate when the group has no dashboards and none is selected", () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     const navSpy = spyNavigate();
     seed({ selectedGroupId: "1", selectedDashboardId: "" }, {});
 
     TestBed.flushEffects();
-    jest.runOnlyPendingTimers();
+    vi.runOnlyPendingTimers();
 
     expect(navSpy).not.toHaveBeenCalled();
-    jest.useRealTimers();
   });
 
   it("should set selected dashboard id", () => {
     const store = TestBed.inject(Store);
-    const storeSpy = jest.spyOn(store, "dispatch");
+    const storeSpy = vi.spyOn(store, "dispatch");
 
     component.setSelectedDashboardId(1);
 

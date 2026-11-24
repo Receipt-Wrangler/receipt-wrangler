@@ -68,12 +68,12 @@ describe("CategoryForm", () => {
   });
 
   it("should submit form with correct data, when editing", () => {
-    const categoryServiceSpy = jest.spyOn(
+    const categoryServiceSpy = vi.spyOn(
       TestBed.inject(CategoryService),
       "updateCategory"
     );
     categoryServiceSpy.mockReturnValue(of({} as any));
-    const nameValidateSpy = jest.spyOn(
+    const nameValidateSpy = vi.spyOn(
       TestBed.inject(CategoryService),
       "getCategoryCountByName"
     ).mockReturnValue(of(0) as any);
@@ -99,11 +99,11 @@ describe("CategoryForm", () => {
   });
 
   it("should submit form with correct data, when creating", () => {
-    const nameValidateSpy = jest.spyOn(
+    const nameValidateSpy = vi.spyOn(
       TestBed.inject(CategoryService),
       "getCategoryCountByName"
     ).mockReturnValue(of(0) as any);
-    const categoryServiceSpy = jest.spyOn(
+    const categoryServiceSpy = vi.spyOn(
       TestBed.inject(CategoryService),
       "createCategory"
     );

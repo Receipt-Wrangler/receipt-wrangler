@@ -6,8 +6,8 @@ import { FilterMonth } from "../../utils/receipt-date-filter";
 import { MonthStepperComponent } from "./month-stepper.component";
 
 /**
- * Expectations are derived from the real clock rather than a frozen one: jest's
- * fake timers stall `fixture.whenStable()` under zoneless change detection.
+ * Expectations are derived from the real clock rather than a frozen one: fake
+ * timers stall `fixture.whenStable()` under zoneless change detection.
  */
 function monthRelativeToToday(delta: number): FilterMonth {
   const today = new Date();
@@ -140,12 +140,12 @@ describe("MonthStepperComponent", () => {
     // 9PM Sep 30 in New York is Oct 1 in UTC: "this month" is the app zone's.
     // Fake timers are safe here because nothing below awaits whenStable().
     describe("in the app time zone", () => {
-      afterEach(() => jest.useRealTimers());
+      afterEach(() => vi.useRealTimers());
 
       const atLateSep30Eastern = (zone: string): void => {
         fixture.componentRef.setInput("timeZone", zone);
-        jest.useFakeTimers();
-        jest.setSystemTime(new Date("2026-10-01T01:00:00Z"));
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-10-01T01:00:00Z"));
       };
 
       it("seeds the shortcuts from the zone's today", () => {

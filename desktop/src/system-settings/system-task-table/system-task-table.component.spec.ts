@@ -84,8 +84,8 @@ describe("SystemTaskTableComponent", () => {
       type: { operation: FilterOperation.Contains, value: ["QUICK_SCAN"] },
     } as any));
 
-    const dispatchSpy = jest.spyOn(store, "dispatch");
-    jest.spyOn(component, "refresh").mockImplementation(() => {});
+    const dispatchSpy = vi.spyOn(store, "dispatch");
+    vi.spyOn(component, "refresh").mockImplementation(() => {});
 
     component.filterChipCleared("type");
 

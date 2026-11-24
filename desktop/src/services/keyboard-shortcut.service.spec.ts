@@ -1,4 +1,5 @@
 import { TestBed } from "@angular/core/testing";
+import { filter, firstValueFrom } from "rxjs";
 import { KEYBOARD_SHORTCUT_ACTIONS } from "../constants/keyboard-shortcuts.constant";
 import { KeyboardShortcutEvent, KeyboardShortcutService } from "./keyboard-shortcut.service";
 
@@ -53,20 +54,19 @@ describe("KeyboardShortcutService", () => {
   });
 
   describe("handleKeyboardEvent", () => {
-    it("should trigger action for matching shortcut", (done) => {
+    it("should trigger action for matching shortcut", async () => {
       const event = new KeyboardEvent("keydown", {
         key: "i",
         ctrlKey: true
       });
-
-      service.shortcutTriggered.subscribe((shortcutEvent: KeyboardShortcutEvent) => {
-        expect(shortcutEvent.action).toBe(KEYBOARD_SHORTCUT_ACTIONS.ADD_ITEM);
-        expect(shortcutEvent.event).toBe(event);
-        done();
-      });
+      const triggered = firstValueFrom(service.shortcutTriggered);
 
       const handled = service.handleKeyboardEvent(event);
       expect(handled).toBe(true);
+
+      const shortcutEvent: KeyboardShortcutEvent = await triggered;
+      expect(shortcutEvent.action).toBe(KEYBOARD_SHORTCUT_ACTIONS.ADD_ITEM);
+      expect(shortcutEvent.event).toBe(event);
     });
 
     it("should not trigger action for non-matching shortcut", () => {
@@ -90,7 +90,7 @@ describe("KeyboardShortcutService", () => {
         key: "i",
         ctrlKey: true
       });
-      jest.spyOn(event, "preventDefault");
+      vi.spyOn(event, "preventDefault");
 
       service.handleKeyboardEvent(event);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -132,13 +132,13 @@ describe("KeyboardShortcutService", () => {
 
           // Fast-forward the timeout
           try {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
           } catch (e) {
             // Clock already installed, continue
           }
-          jest.advanceTimersByTime(2001);
+          vi.advanceTimersByTime(2001);
           try {
-            jest.useRealTimers();
+            vi.useRealTimers();
           } catch (e) {
             // Clock not installed, continue
           }
@@ -165,15 +165,12 @@ describe("KeyboardShortcutService", () => {
   });
 
   describe("clearHintTimeout", () => {
-    it("should clear hint and emit false", (done) => {
-      service.showHint.subscribe((show: boolean) => {
-        if (!show) {
-          expect(show).toBe(false);
-          done();
-        }
-      });
+    it("should clear hint and emit false", async () => {
+      const hidden = firstValueFrom(service.showHint.pipe(filter((show) => !show)));
 
       service.clearHintTimeout();
+
+      expect(await hidden).toBe(false);
     });
   });
 

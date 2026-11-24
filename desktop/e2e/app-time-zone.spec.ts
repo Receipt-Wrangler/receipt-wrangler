@@ -13,7 +13,7 @@ import { addGroupToScopeByName, gotoReportBuilder, openComboboxAndPick } from '.
 
 // The app time zone System Setting, end to end.
 //
-// The Jest specs cover the picker, the payload and the appDate pipe against a
+// The unit specs cover the picker, the payload and the appDate pipe against a
 // mocked store; what only an e2e can prove is the wire: the zone picked in the
 // typeahead is persisted by the server, comes back on AppData, and every
 // instant the app renders moves with it — without a server restart, and in

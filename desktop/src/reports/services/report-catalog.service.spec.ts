@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { provideZonelessChangeDetection } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { of, throwError } from "rxjs";
@@ -6,10 +7,10 @@ import { ReportCatalogService } from "./report-catalog.service";
 
 describe("ReportCatalogService", () => {
   let service: ReportCatalogService;
-  let customFieldService: { getPagedCustomFields: jest.Mock };
+  let customFieldService: { getPagedCustomFields: Mock };
 
   beforeEach(() => {
-    customFieldService = { getPagedCustomFields: jest.fn() };
+    customFieldService = { getPagedCustomFields: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),

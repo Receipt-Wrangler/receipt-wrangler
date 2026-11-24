@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -13,9 +14,9 @@ import * as QRCode from 'qrcode';
 import { ApiModule, AppData, AuthService } from '../../open-api';
 import { SetFeatureConfig } from '../../store/feature-config.state.actions';
 
-jest.mock('qrcode', () => ({
+vi.mock('qrcode', () => ({
   __esModule: true,
-  toDataURL: jest.fn(),
+  toDataURL: vi.fn(),
 }));
 import { FeatureDirective } from '../../directives/feature.directive';
 import { AppInitService } from '../../services/app-init.service';
@@ -124,8 +125,8 @@ describe('AuthForm', () => {
     } as unknown as AppData;
 
     const logIn = async (navigation: Promise<boolean>) => {
-      jest.spyOn(TestBed.inject(AuthService), 'login').mockReturnValue(of(appData) as any);
-      const navigateSpy = jest.spyOn(TestBed.inject(Router), 'navigate').mockReturnValue(navigation);
+      vi.spyOn(TestBed.inject(AuthService), 'login').mockReturnValue(of(appData) as any);
+      const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockReturnValue(navigation);
       component.form.setValue({ username: 'wrangler', password: 'right-password' });
       component.submit();
       await fixture.whenStable();
@@ -182,7 +183,7 @@ describe('AuthForm', () => {
 
   it('surfaces a sign-up field validation error, which the interceptor ignores', async () => {
     const httpTesting = TestBed.inject(HttpTestingController);
-    const errorSpy = jest
+    const errorSpy = vi
       .spyOn(TestBed.inject(SnackbarService), 'error')
       .mockImplementation(() => {});
     await enterSignUpMode(httpTesting);
@@ -205,7 +206,7 @@ describe('AuthForm', () => {
 
   it('leaves an errorMsg sign-up failure to the interceptor', async () => {
     const httpTesting = TestBed.inject(HttpTestingController);
-    const errorSpy = jest
+    const errorSpy = vi
       .spyOn(TestBed.inject(SnackbarService), 'error')
       .mockImplementation(() => {});
     await enterSignUpMode(httpTesting);
@@ -263,7 +264,7 @@ describe('AuthForm', () => {
   // A full-page navigation, not an HttpClient call: the browser has to follow
   // the redirect chain to the identity provider itself.
   it('navigates the whole page to the provider login URL', () => {
-    const navigateSpy = jest
+    const navigateSpy = vi
       .spyOn(component as any, 'navigateToUrl')
       .mockImplementation(() => undefined);
 
@@ -280,7 +281,7 @@ describe('AuthForm', () => {
 
   it('surfaces an oidcError query param as a snackbar', () => {
     const snackbarService = TestBed.inject(SnackbarService);
-    const errorSpy = jest.spyOn(snackbarService, 'error').mockImplementation(() => undefined as any);
+    const errorSpy = vi.spyOn(snackbarService, 'error').mockImplementation(() => undefined as any);
     const route = TestBed.inject(ActivatedRoute) as any;
     route.snapshot.queryParams = { oidcError: 'no_account' };
 
@@ -296,7 +297,7 @@ describe('AuthForm', () => {
     'falls back to the default copy for the inherited key %s',
     (code) => {
       const snackbarService = TestBed.inject(SnackbarService);
-      const errorSpy = jest
+      const errorSpy = vi
         .spyOn(snackbarService, 'error')
         .mockImplementation(() => undefined as any);
       const route = TestBed.inject(ActivatedRoute) as any;
@@ -313,7 +314,7 @@ describe('AuthForm', () => {
   );
 
   it('renders the login QR when loginQrUrl is set', async () => {
-    (QRCode.toDataURL as jest.Mock).mockResolvedValue(
+    (QRCode.toDataURL as Mock).mockResolvedValue(
       'data:image/png;base64,QR'
     );
     const store = TestBed.inject(Store);

@@ -66,7 +66,7 @@ describe("CarouselComponent", () => {
     const viewers = fixture.debugElement
       .queryAll(By.directive(ImageViewerComponent))
       .map((viewer) => viewer.componentInstance as ImageViewerComponent);
-    const zoomIns = viewers.map((viewer) => jest.spyOn(viewer, "zoomIn").mockImplementation());
+    const zoomIns = viewers.map((viewer) => vi.spyOn(viewer, "zoomIn").mockImplementation(() => {}));
 
     component.zoomIn();
 

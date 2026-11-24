@@ -33,7 +33,7 @@ describe("PromptFormComponent", () => {
                 }
             }
         },
-        { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting()
     ]
@@ -96,9 +96,9 @@ describe("PromptFormComponent", () => {
     const router = TestBed.inject(Router);
     const snackbarService = TestBed.inject(SnackbarService);
 
-    const createPromptSpy = jest.spyOn(promptService, "createPrompt").mockReturnValue(of({} as any));
-    const routerNavigateSpy = jest.spyOn(router, "navigate");
-    const snackbarServiceSpy = jest.spyOn(snackbarService, "success");
+    const createPromptSpy = vi.spyOn(promptService, "createPrompt").mockReturnValue(of({} as any));
+    const routerNavigateSpy = vi.spyOn(router, "navigate");
+    const snackbarServiceSpy = vi.spyOn(snackbarService, "success");
 
     component.ngOnInit();
     component.originalPrompt = undefined;
@@ -120,9 +120,9 @@ describe("PromptFormComponent", () => {
     const router = TestBed.inject(Router);
     const snackbarService = TestBed.inject(SnackbarService);
 
-    const updatePromptSpy = jest.spyOn(promptService, "updatePromptById").mockReturnValue(of({} as any));
-    const routerNavigateSpy = jest.spyOn(router, "navigate");
-    const snackbarServiceSpy = jest.spyOn(snackbarService, "success");
+    const updatePromptSpy = vi.spyOn(promptService, "updatePromptById").mockReturnValue(of({} as any));
+    const routerNavigateSpy = vi.spyOn(router, "navigate");
+    const snackbarServiceSpy = vi.spyOn(snackbarService, "success");
 
     component.ngOnInit();
     component.originalPrompt = {

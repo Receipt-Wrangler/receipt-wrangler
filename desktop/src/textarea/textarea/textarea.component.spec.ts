@@ -62,7 +62,7 @@ describe("TextareaComponent", () => {
     fixture.detectChanges();
 
     // Mock the matAutocompleteTrigger closePanel
-    jest.spyOn(component.matAutocompleteTrigger(), "closePanel").mockImplementation(() => {});
+    vi.spyOn(component.matAutocompleteTrigger(), "closePanel").mockImplementation(() => {});
 
     // Mock the textarea viewChild with a fake nativeElement to track selectionEnd
     const fakeNativeElement = { selectionEnd: 6 };

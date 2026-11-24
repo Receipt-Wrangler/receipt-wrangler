@@ -110,7 +110,7 @@ describe("DashboardComponent", () => {
   // re-fetch. Proven here with the (non-report) GROUP_SUMMARY widget, whose effect
   // calls UserService.getAmountOwedForUser.
   it("fetches a widget's data only once when the dashboards slice re-emits with the same widget id", async () => {
-    const owedSpy = jest
+    const owedSpy = vi
       .spyOn(TestBed.inject(UserService), "getAmountOwedForUser")
       .mockReturnValue(of({}) as any);
 

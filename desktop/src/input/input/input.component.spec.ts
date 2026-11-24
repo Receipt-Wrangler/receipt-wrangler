@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { CommonModule } from "@angular/common";
 import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
@@ -21,11 +22,11 @@ const GENERATED_PASSWORD = "Fixed-Pass-1";
 describe("InputComponent", () => {
   let component: InputComponent;
   let fixture: ComponentFixture<InputComponent>;
-  let passwordGeneratorService: { generateAndCopy: jest.Mock };
+  let passwordGeneratorService: { generateAndCopy: Mock };
 
   beforeEach(async () => {
     passwordGeneratorService = {
-      generateAndCopy: jest.fn().mockReturnValue(GENERATED_PASSWORD),
+      generateAndCopy: vi.fn().mockReturnValue(GENERATED_PASSWORD),
     };
 
     await TestBed.configureTestingModule({

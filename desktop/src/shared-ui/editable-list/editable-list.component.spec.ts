@@ -23,13 +23,13 @@ describe("EditableListComponent", () => {
   });
 
   it("should emit editButtonClicked event when handleEditButtonClicked is called", () => {
-    jest.spyOn(component.editButtonClicked, "emit");
+    vi.spyOn(component.editButtonClicked, "emit");
     component.handleEditButtonClicked(1);
     expect(component.editButtonClicked.emit).toHaveBeenCalledWith(1);
   });
 
   it("should emit deleteButtonClicked event when handleDeleteButtonClicked is called", () => {
-    jest.spyOn(component.deleteButtonClicked, "emit");
+    vi.spyOn(component.deleteButtonClicked, "emit");
     component.handleDeleteButtonClicked(1);
     expect(component.deleteButtonClicked.emit).toHaveBeenCalledWith(1);
   });

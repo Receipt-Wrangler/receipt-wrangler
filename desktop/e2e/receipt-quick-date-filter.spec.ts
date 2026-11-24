@@ -12,7 +12,7 @@ import { gotoReceiptsTable } from './helpers/receipts-table';
 
 // The receipts table's quick date filter and its filter chips, end to end.
 //
-// The Jest specs cover the month<->filter translation and the chip labels
+// The unit specs cover the month<->filter translation and the chip labels
 // exhaustively, but they all run against a mocked store, so what only an e2e
 // can prove is the wire:
 //
@@ -219,7 +219,7 @@ test.describe('Receipts quick date filter', () => {
   });
 
   // The stepper's target field is selectable, and only an e2e proves a chosen
-  // field reaches the SERVER as a different column — the Jest specs assert
+  // field reaches the SERVER as a different column — the unit specs assert
   // against a mocked store. It also pins the pointer's persistence, the same
   // reload trap the month itself has.
   test('filters on the chosen date field and keeps it across a reload', async ({ page }) => {

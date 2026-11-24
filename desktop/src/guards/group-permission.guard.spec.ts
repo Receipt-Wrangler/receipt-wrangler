@@ -1,3 +1,4 @@
+import type { MockInstance } from "vitest";
 import { provideZonelessChangeDetection } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { ActivatedRouteSnapshot, CanActivateFn, Router } from "@angular/router";
@@ -12,7 +13,7 @@ describe("groupPermissionGuard", () => {
   const executeGuard: CanActivateFn = (...params) =>
     TestBed.runInInjectionContext(() => groupPermissionGuard(...params));
   let store: Store;
-  let navigateSpy: jest.SpyInstance;
+  let navigateSpy: MockInstance;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -21,7 +22,7 @@ describe("groupPermissionGuard", () => {
     });
 
     store = TestBed.inject(Store);
-    navigateSpy = jest
+    navigateSpy = vi
       .spyOn(TestBed.inject(Router), "navigate")
       .mockResolvedValue(true);
   });

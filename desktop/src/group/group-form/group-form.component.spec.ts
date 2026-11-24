@@ -74,7 +74,7 @@ describe("GroupFormComponent", () => {
       groupId: "1",
       groupRoleId: 10,
     });
-    jest.spyOn(matDialog, "open").mockReturnValue({
+    vi.spyOn(matDialog, "open").mockReturnValue({
       afterClosed: () => of(formGroup),
       componentInstance: { currentGroupMembers: [] },
     } as any);
@@ -96,7 +96,7 @@ describe("GroupFormComponent", () => {
       formGroup.patchValue({ userId, groupId: "1", groupRoleId: 10 });
       return formGroup;
     };
-    const openSpy = jest.spyOn(matDialog, "open");
+    const openSpy = vi.spyOn(matDialog, "open");
     component.ngOnInit();
     component.ngAfterViewInit();
 
@@ -128,7 +128,7 @@ describe("GroupFormComponent", () => {
       userId: 3,
       groupId: 1,
     });
-    jest.spyOn(matDialog, "open").mockReturnValue({
+    vi.spyOn(matDialog, "open").mockReturnValue({
       afterClosed: () => of(formGroup),
       componentInstance: { currentGroupMembers: [] },
     } as any);
@@ -195,10 +195,10 @@ describe("GroupFormComponent", () => {
   });
 
   it("should create group", () => {
-    const createSpy = jest.spyOn(TestBed.inject(GroupsService), "createGroup");
-    const storeSpy = jest.spyOn(TestBed.inject(Store), "dispatch");
-    const routerSpy = jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
-    jest.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
+    const createSpy = vi.spyOn(TestBed.inject(GroupsService), "createGroup");
+    const storeSpy = vi.spyOn(TestBed.inject(Store), "dispatch");
+    const routerSpy = vi.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
 
     const group: Group = {
       id: 1,
@@ -249,10 +249,10 @@ describe("GroupFormComponent", () => {
   });
 
   it("should update group", () => {
-    const updateSpy = jest.spyOn(TestBed.inject(GroupsService), "updateGroup");
-    const storeSpy = jest.spyOn(TestBed.inject(Store), "dispatch");
-    const routerSpy = jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
-    jest.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
+    const updateSpy = vi.spyOn(TestBed.inject(GroupsService), "updateGroup");
+    const storeSpy = vi.spyOn(TestBed.inject(Store), "dispatch");
+    const routerSpy = vi.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
 
     const group: Group = {
       id: 1,
@@ -341,9 +341,9 @@ describe("GroupFormComponent", () => {
   });
 
   it("includes isolateMembers in the create payload when enabled", () => {
-    const createSpy = jest.spyOn(TestBed.inject(GroupsService), "createGroup");
-    jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
-    jest.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
+    const createSpy = vi.spyOn(TestBed.inject(GroupsService), "createGroup");
+    vi.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
 
     const route = TestBed.inject(ActivatedRoute);
     route.snapshot.data = {
@@ -391,9 +391,9 @@ describe("GroupFormComponent", () => {
     // The legacy "must have at least one owner" guard was removed with the
     // group-role enums; the backend no longer enforces an owner, so the client
     // must save a non-owner-only membership without blocking.
-    const updateSpy = jest.spyOn(TestBed.inject(GroupsService), "updateGroup");
-    jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
-    jest.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
+    const updateSpy = vi.spyOn(TestBed.inject(GroupsService), "updateGroup");
+    vi.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
 
     const route = TestBed.inject(ActivatedRoute);
     route.snapshot.data = {
@@ -409,7 +409,7 @@ describe("GroupFormComponent", () => {
     component.ngOnInit();
     component.ngAfterViewInit();
 
-    updateSpy.mockReturnValue(of({ id: 1 } as Group));
+    updateSpy.mockReturnValue(of({ id: 1 } as Group) as any);
 
     component.submit();
 

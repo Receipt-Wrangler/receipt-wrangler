@@ -124,7 +124,7 @@ describe("CustomFieldTableComponent", () => {
     ) => {
       const dialogRef = mockDialogRef({ afterClosed: of(false) });
       const matDialog = TestBed.inject(MatDialog);
-      jest.spyOn(matDialog, "open").mockReturnValue(dialogRef as any);
+      vi.spyOn(matDialog, "open").mockReturnValue(dialogRef as any);
 
       store.dispatch(new SetPermissions(appPermissions, {}));
       component.openCustomFieldDialog(field, mode);

@@ -1,3 +1,4 @@
+import type { Mocked } from "vitest";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
@@ -13,7 +14,7 @@ import { provideNgxMask } from "ngx-mask";
 describe("ItemAddFormComponent", () => {
   let component: ItemAddFormComponent;
   let fixture: ComponentFixture<ItemAddFormComponent>;
-  let keyboardShortcutService: jest.Mocked<KeyboardShortcutService>;
+  let keyboardShortcutService: Mocked<KeyboardShortcutService>;
   let shortcutTriggered$: Subject<any>;
   let showHint$: Subject<boolean>;
 
@@ -22,7 +23,7 @@ describe("ItemAddFormComponent", () => {
     showHint$ = new Subject();
 
     const keyboardSpy = {
-      handleKeyboardEvent: jest.fn(),
+      handleKeyboardEvent: vi.fn(),
       shortcutTriggered: shortcutTriggered$.asObservable(),
       showHint: showHint$.asObservable()
     };
@@ -39,7 +40,7 @@ describe("ItemAddFormComponent", () => {
 
     fixture = TestBed.createComponent(ItemAddFormComponent);
     component = fixture.componentInstance;
-    keyboardShortcutService = TestBed.inject(KeyboardShortcutService) as jest.Mocked<KeyboardShortcutService>;
+    keyboardShortcutService = TestBed.inject(KeyboardShortcutService) as Mocked<KeyboardShortcutService>;
   });
 
   it("should create", () => {
@@ -82,9 +83,9 @@ describe("ItemAddFormComponent", () => {
       Object.defineProperty(component.newItemFormGroup, 'valid', {
         get: () => true
       });
-      jest.spyOn(component, "onSubmitAndContinue");
-      jest.spyOn(component, "onSubmitAndFinish");
-      jest.spyOn(component, "onCancel");
+      vi.spyOn(component, "onSubmitAndContinue");
+      vi.spyOn(component, "onSubmitAndFinish");
+      vi.spyOn(component, "onCancel");
     });
 
     it("should handle SUBMIT_AND_CONTINUE action", () => {
@@ -116,7 +117,7 @@ describe("ItemAddFormComponent", () => {
     });
 
     it("should emit submitAndContinue event with item data", () => {
-      jest.spyOn(component.submitAndContinue, "emit");
+      vi.spyOn(component.submitAndContinue, "emit");
 
       component.onSubmitAndContinue();
 
@@ -131,7 +132,7 @@ describe("ItemAddFormComponent", () => {
     });
 
     it("should emit submitAndFinish event with item data", () => {
-      jest.spyOn(component.submitAndFinish, "emit");
+      vi.spyOn(component.submitAndFinish, "emit");
 
       component.onSubmitAndFinish();
 
@@ -145,7 +146,7 @@ describe("ItemAddFormComponent", () => {
     });
 
     it("should not submit if form is invalid", () => {
-      jest.spyOn(component.submitAndContinue, "emit");
+      vi.spyOn(component.submitAndContinue, "emit");
       component.newItemFormGroup.patchValue({ name: "" }); // Make form invalid
 
       component.onSubmitAndContinue();
@@ -155,7 +156,7 @@ describe("ItemAddFormComponent", () => {
   });
 
   it("should emit cancelled event on cancel", () => {
-    jest.spyOn(component.cancelled, "emit");
+    vi.spyOn(component.cancelled, "emit");
 
     component.onCancel();
 
@@ -166,15 +167,15 @@ describe("ItemAddFormComponent", () => {
     beforeEach(() => {
       component.ngOnInit();
       // Mock focus methods to prevent actual DOM access
-      jest.spyOn(component as any, "focusAmountField").mockImplementation(() => {});
-      jest.spyOn(component as any, "focusCategoryField").mockImplementation(() => {});
-      jest.spyOn(component as any, "focusTagField").mockImplementation(() => {});
-      jest.spyOn(component, "onSubmitAndContinue");
+      vi.spyOn(component as any, "focusAmountField").mockImplementation(() => {});
+      vi.spyOn(component as any, "focusCategoryField").mockImplementation(() => {});
+      vi.spyOn(component as any, "focusTagField").mockImplementation(() => {});
+      vi.spyOn(component, "onSubmitAndContinue");
     });
 
     it("should focus amount field on name enter", () => {
       const event = new Event("keydown");
-      jest.spyOn(event, "preventDefault");
+      vi.spyOn(event, "preventDefault");
 
       component.onNameEnter(event);
 
@@ -230,8 +231,8 @@ describe("ItemAddFormComponent", () => {
 
   it("should cleanup on destroy", () => {
     component.ngOnInit();
-    jest.spyOn(component["destroy$"], "next");
-    jest.spyOn(component["destroy$"], "complete");
+    vi.spyOn(component["destroy$"], "next");
+    vi.spyOn(component["destroy$"], "complete");
 
     component.ngOnDestroy();
 

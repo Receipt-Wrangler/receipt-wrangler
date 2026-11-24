@@ -1,4 +1,4 @@
-import { of } from "rxjs";
+import { firstValueFrom, of } from "rxjs";
 import { Group, GroupsService, Role } from "../../open-api";
 import { GrantSelection } from "./grant-picker.component";
 import {
@@ -180,39 +180,39 @@ describe("member-grant-assignment", () => {
 
     beforeEach(() => {
       groupsService = {
-        updateGroupMemberGrants: jest.fn().mockReturnValue(of({})),
+        updateGroupMemberGrants: vi.fn().mockReturnValue(of({})),
       };
     });
 
-    const row = {
+    const row: MemberGrantRow = {
       groupId: 100,
       groupName: "Agency",
       roleName: "Foster Parent",
       ceiling: null,
       current: { categoryIds: [1], tagIds: [] },
+      requiresIndividualCategories: false,
+      requiresIndividualTags: false,
     };
 
-    it("writes nothing when no edit was made", (done) => {
-      saveChangedMemberGrants(groupsService, 7, [row], new Map()).subscribe(() => {
-        expect(groupsService.updateGroupMemberGrants).not.toHaveBeenCalled();
-        done();
-      });
+    it("writes nothing when no edit was made", async () => {
+      await firstValueFrom(saveChangedMemberGrants(groupsService, 7, [row], new Map()));
+
+      expect(groupsService.updateGroupMemberGrants).not.toHaveBeenCalled();
     });
 
-    it("writes nothing when the edit matches what is already stored", (done) => {
+    it("writes nothing when the edit matches what is already stored", async () => {
       // Opening and closing a form must not rewrite assignments — a needless write
       // could also trip the endpoint's ceiling check on a since-narrowed role.
       const edited = new Map<number, GrantSelection>([
         [100, { categoryIds: [1], tagIds: [] }],
       ]);
 
-      saveChangedMemberGrants(groupsService, 7, [row], edited).subscribe(() => {
-        expect(groupsService.updateGroupMemberGrants).not.toHaveBeenCalled();
-        done();
-      });
+      await firstValueFrom(saveChangedMemberGrants(groupsService, 7, [row], edited));
+
+      expect(groupsService.updateGroupMemberGrants).not.toHaveBeenCalled();
     });
 
-    it("ignores id ordering when deciding whether something changed", (done) => {
+    it("ignores id ordering when deciding whether something changed", async () => {
       const unordered = {
         ...row,
         current: { categoryIds: [2, 1], tagIds: [] },
@@ -221,13 +221,12 @@ describe("member-grant-assignment", () => {
         [100, { categoryIds: [1, 2], tagIds: [] }],
       ]);
 
-      saveChangedMemberGrants(groupsService, 7, [unordered], edited).subscribe(() => {
-        expect(groupsService.updateGroupMemberGrants).not.toHaveBeenCalled();
-        done();
-      });
+      await firstValueFrom(saveChangedMemberGrants(groupsService, 7, [unordered], edited));
+
+      expect(groupsService.updateGroupMemberGrants).not.toHaveBeenCalled();
     });
 
-    it("writes only the groups whose assignment actually changed", (done) => {
+    it("writes only the groups whose assignment actually changed", async () => {
       const secondRow = {
         ...row,
         groupId: 200,
@@ -239,27 +238,25 @@ describe("member-grant-assignment", () => {
         [200, { categoryIds: [5], tagIds: [] }],
       ]);
 
-      saveChangedMemberGrants(groupsService, 7, [row, secondRow], edited).subscribe(() => {
-        expect(groupsService.updateGroupMemberGrants).toHaveBeenCalledTimes(1);
-        expect(groupsService.updateGroupMemberGrants).toHaveBeenCalledWith(200, 7, {
-          categoryGrants: [5],
-          tagGrants: [],
-        });
-        done();
+      await firstValueFrom(saveChangedMemberGrants(groupsService, 7, [row, secondRow], edited));
+
+      expect(groupsService.updateGroupMemberGrants).toHaveBeenCalledTimes(1);
+      expect(groupsService.updateGroupMemberGrants).toHaveBeenCalledWith(200, 7, {
+        categoryGrants: [5],
+        tagGrants: [],
       });
     });
 
-    it("writes a cleared assignment", (done) => {
+    it("writes a cleared assignment", async () => {
       const edited = new Map<number, GrantSelection>([
         [100, { categoryIds: [], tagIds: [] }],
       ]);
 
-      saveChangedMemberGrants(groupsService, 7, [row], edited).subscribe(() => {
-        expect(groupsService.updateGroupMemberGrants).toHaveBeenCalledWith(100, 7, {
-          categoryGrants: [],
-          tagGrants: [],
-        });
-        done();
+      await firstValueFrom(saveChangedMemberGrants(groupsService, 7, [row], edited));
+
+      expect(groupsService.updateGroupMemberGrants).toHaveBeenCalledWith(100, 7, {
+        categoryGrants: [],
+        tagGrants: [],
       });
     });
   });

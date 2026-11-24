@@ -49,7 +49,7 @@ describe("SystemEmailFormComponent", () => {
             }
           }
         },
-        { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true), navigateByUrl: jest.fn().mockResolvedValue(true) } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true), navigateByUrl: vi.fn().mockResolvedValue(true) } },
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting()
       ]
@@ -99,7 +99,7 @@ describe("SystemEmailFormComponent", () => {
   });
 
   it("should call create", () => {
-    const serviceSpy = jest.spyOn(TestBed.inject(SystemEmailService), "createSystemEmail").mockReturnValue(of({ id: 7 } as any));
+    const serviceSpy = vi.spyOn(TestBed.inject(SystemEmailService), "createSystemEmail").mockReturnValue(of({ id: 7 } as any));
     component.formConfig = { mode: FormMode.add } as any;
     component.submit();
 
@@ -109,7 +109,7 @@ describe("SystemEmailFormComponent", () => {
 
   it("should call update", () => {
     component.originalSystemEmail = { id: 1 } as any;
-    const serviceSpy = jest.spyOn(TestBed.inject(SystemEmailService), "updateSystemEmailById").mockReturnValue(of({} as any));
+    const serviceSpy = vi.spyOn(TestBed.inject(SystemEmailService), "updateSystemEmailById").mockReturnValue(of({} as any));
     component.formConfig = { mode: FormMode.edit } as any;
     component.submit();
 
@@ -123,8 +123,8 @@ describe("SystemEmailFormComponent", () => {
       component.ngOnInit();
       component.originalSystemEmail = { id: 1 } as any;
       component.form.get("password")?.markAsDirty();
-      const matDialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue(mockDialogRef({ afterClosed: of(result) }) as any);
-      const updateSpy = jest.spyOn(TestBed.inject(SystemEmailService), "updateSystemEmailById").mockReturnValue(of({} as any));
+      const matDialogSpy = vi.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue(mockDialogRef({ afterClosed: of(result) }) as any);
+      const updateSpy = vi.spyOn(TestBed.inject(SystemEmailService), "updateSystemEmailById").mockReturnValue(of({} as any));
       component.formConfig = { mode: FormMode.edit } as any;
       component.submit();
       return { matDialogSpy, updateSpy };
