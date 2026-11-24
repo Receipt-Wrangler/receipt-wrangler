@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { stubTokenRefresh } from './helpers/auth';
 import {
   apiCreateGroup,
@@ -14,6 +14,16 @@ import {
 // (backend persistence is covered by the API repo tests).
 
 test.use({ storageState: 'e2e/.auth/admin.json' });
+
+// Picks [option] in the mat-select labelled [label]. After a pick the panel plays a short exit
+// animation, and its backdrop covers the page until it detaches, so a click in that window
+// (reopening the select, or Save) is swallowed. Waiting for the listbox to go keeps the next click
+// off it. While open, the listbox shares the field's label.
+async function pickOption(page: Page, label: string, option: string): Promise<void> {
+  await page.getByRole('combobox', { name: label, exact: true }).click();
+  await page.getByRole('option', { name: option, exact: true }).click();
+  await expect(page.getByRole('listbox', { name: label, exact: true })).toHaveCount(0);
+}
 
 test.describe('Quick scan group receipt settings', () => {
   test.describe.configure({ mode: 'serial' });
@@ -56,12 +66,10 @@ test.describe('Quick scan group receipt settings', () => {
     await expect(defaultPaidBy).toBeVisible();
 
     // "Specific user" reveals the member autocomplete; "Uploader" hides it again.
-    await defaultPaidBy.click();
-    await page.getByRole('option', { name: 'Specific user', exact: true }).click();
+    await pickOption(page, 'Default Paid By', 'Specific user');
     await expect(defaultPaidByUser).toBeVisible();
 
-    await defaultPaidBy.click();
-    await page.getByRole('option', { name: 'Uploader', exact: true }).click();
+    await pickOption(page, 'Default Paid By', 'Uploader');
     await expect(defaultPaidByUser).toHaveCount(0);
 
     // Status behaves the same way.
@@ -79,14 +87,12 @@ test.describe('Quick scan group receipt settings', () => {
     await page.getByTestId('quick-scan-paidby-require').getByRole('checkbox').uncheck();
 
     // "Specific user" with no user chosen → form invalid → Save is a no-op (stays on /edit).
-    await page.getByRole('combobox', { name: 'Default Paid By', exact: true }).click();
-    await page.getByRole('option', { name: 'Specific user', exact: true }).click();
+    await pickOption(page, 'Default Paid By', 'Specific user');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page).toHaveURL(/\/receipt-settings\/edit/);
 
     // Switch to "Uploader" (a complete default) → Save succeeds and navigates to the view page.
-    await page.getByRole('combobox', { name: 'Default Paid By', exact: true }).click();
-    await page.getByRole('option', { name: 'Uploader', exact: true }).click();
+    await pickOption(page, 'Default Paid By', 'Uploader');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page).toHaveURL(/\/receipt-settings\/view/);
   });

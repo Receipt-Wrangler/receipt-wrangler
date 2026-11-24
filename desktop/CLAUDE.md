@@ -1870,6 +1870,20 @@ allows it.
 - Forms use a custom `<app-input>` wrapper over `<mat-form-field>`. `page.getByLabel('Username')` resolves through the `<mat-label>` association.
 - Submit buttons use `<app-button>` rendering `<button>` with visible text — `page.getByRole('button', { name: '...' })` works directly.
 - Error feedback is often a Material snackbar (not inline `<mat-error>`). When asserting errors, locate the snackbar container or its text, not the form.
+- **After picking a `mat-select` option, wait for its listbox to be gone before the next click.**
+  The closed panel plays a ~100ms exit animation, and its transparent backdrop covers the whole page
+  until the overlay detaches. A click in that window lands on the backdrop and does nothing: reopening
+  the same select then never opens it, and the old panel's options are found and then detached, which
+  reads as a 60s "element was detached from the DOM" timeout under load. A swallowed Save click is
+  worse, because an assertion that the form did not save then passes for the wrong reason. The open
+  listbox shares the field's label, so wait on
+  `expect(page.getByRole('listbox', { name: label, exact: true })).toHaveCount(0)`, as
+  `pickOption` in `quick-scan-config.spec.ts` does.
+- **After picking in a multiple-mode `app-autocomlete`, wait for its input to clear before pressing
+  Tab or Escape.** The picker clears its filter and re-opens its panel on a zero-delay timer (see "The
+  chip picker's close-on-select preference"). A key pressed before that timer fires dismisses nothing,
+  and the re-opened panel is left covering the dialog. `expect(input).toHaveValue('')` waits for the
+  timer, as `receipt-summary.spec.ts` does.
 - **`getByLabel` matches substrings.** On any password field carrying the generate button, plain
   `getByLabel('Password')` resolves *two* elements — the input and the button, whose accessible name
   is "Generate password" — and fails on strict mode. Use `getByLabel('Password', { exact: true })`

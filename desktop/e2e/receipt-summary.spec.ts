@@ -296,6 +296,10 @@ test.describe('Receipt summary', () => {
     await status.click();
     await status.fill('OPEN');
     await page.getByRole('option', { name: 'Open', exact: true }).click();
+    // A multiple-mode picker clears its filter and re-opens its panel on a zero-delay timer after a
+    // pick. Wait for the cleared input, which that timer writes, or a Tab pressed before it fires
+    // closes nothing and the re-opened panel is left over Save.
+    await expect(status).toHaveValue('');
     // The panel stays open over Save and has to be dismissed, but NOT with Escape:
     // MatAutocomplete only consumes that while its panel is open, so on the runs where
     // the panel has already closed the same keypress reaches MatDialog and closes the
