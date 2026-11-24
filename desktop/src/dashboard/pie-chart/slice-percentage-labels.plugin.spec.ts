@@ -93,6 +93,18 @@ describe("slicePercentageLabelsPlugin", () => {
 
     expect(ctx.fillText).not.toHaveBeenCalled();
   });
+
+  // The hook runs on every animation frame, so a total taken per slice would make each frame
+  // quadratic in the number of slices.
+  it("totals each dataset once per draw, not once per slice", () => {
+    const data = [100, 200, 200, 300];
+    const reduce = vi.spyOn(data, "reduce");
+    const { chart } = fakePie(data);
+
+    draw(chart);
+
+    expect(reduce).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("getSlicePercentage", () => {

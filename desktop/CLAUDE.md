@@ -1879,11 +1879,21 @@ allows it.
   listbox shares the field's label, so wait on
   `expect(page.getByRole('listbox', { name: label, exact: true })).toHaveCount(0)`, as
   `pickOption` in `quick-scan-config.spec.ts` does.
-- **After picking in a multiple-mode `app-autocomlete`, wait for its input to clear before pressing
-  Tab or Escape.** The picker clears its filter and re-opens its panel on a zero-delay timer (see "The
-  chip picker's close-on-select preference"). A key pressed before that timer fires dismisses nothing,
-  and the re-opened panel is left covering the dialog. `expect(input).toHaveValue('')` waits for the
-  timer, as `receipt-summary.spec.ts` does.
+- **After picking in a multiple-mode `app-autocomlete`, wait for the picker's zero-delay timer before
+  pressing Tab or Escape.** The picker re-opens its panel on that timer (see "The chip picker's
+  close-on-select preference"). A key pressed before the timer fires dismisses nothing, and the
+  re-opened panel is left covering the dialog. Wait for something only a finished re-open produces:
+  - **Preference off (the default):** `expect(input).toHaveAttribute('aria-expanded', 'true')`, as
+    `receipt-summary.spec.ts` does. Material removed the panel on the click, so the attribute is
+    `"false"` until the re-open's change detection pass. That pass ends with the `afterNextRender`
+    callback in which `MatAutocompleteTrigger` starts listening for Tab, so a Tab sent after it
+    closes the panel.
+  - **Preference on:** the timer blurs the input instead, so `expect(input).not.toBeFocused()`.
+  - **Not `toHaveValue('')`.** Material writes the picker's `displayWith` result into the input on
+    the click itself, and the default `displayWith` returns `''`. So the input is empty before the
+    timer runs, whether or not anything was typed.
+  - **Not the listbox becoming visible either.** The re-open attaches the panel before that change
+    detection pass, so for a moment the panel is on screen but a Tab is still ignored.
 - **`getByLabel` matches substrings.** On any password field carrying the generate button, plain
   `getByLabel('Password')` resolves *two* elements — the input and the button, whose accessible name
   is "Generate password" — and fails on strict mode. Use `getByLabel('Password', { exact: true })`
