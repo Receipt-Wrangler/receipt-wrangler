@@ -296,18 +296,27 @@ test.describe('Receipt summary', () => {
     await status.click();
     await status.fill('OPEN');
     await page.getByRole('option', { name: 'Open', exact: true }).click();
-    // A multiple-mode picker re-opens its panel on a zero-delay timer after a pick, and a Tab sent
-    // before that panel is fully open closes nothing, leaving it over Save. Wait until the input
-    // reports it open (aria-expanded="true"). Two weaker waits each leave a gap:
-    // - The input value: Material writes the picker's displayWith result, '', on the click itself.
-    // - The listbox being visible: it is attached as soon as the timer runs, but Material starts
-    //   listening for Tab only in an afterNextRender callback. aria-expanded is set by the change
-    //   detection pass that ends with that callback.
-    // This test's account keeps the default close-on-select preference (off), which is what re-opens.
-    await expect(status).toHaveAttribute('aria-expanded', 'true');
-    // Dismiss it with Tab, which blurs the input and closes the panel. Not Escape: if the panel
-    // were somehow already closed, MatDialog would take the key and close the whole dialog
-    // (receipt-quick-date-filter.spec.ts asserts exactly that).
+    // A multiple-mode picker acts on a zero-delay timer after a pick, and a Tab sent before it
+    // finishes closes nothing. What the timer does depends on the user's close-on-select
+    // preference, which this spec does not control (it runs as the shared admin account):
+    // - Off (the default): it re-opens the panel, which is fully open once the input reports
+    //   aria-expanded="true". Waiting only for the listbox to be visible is not enough: it is
+    //   attached before Material starts listening for Tab.
+    // - On: it closes the panel and blurs the input.
+    // Before the timer, Material has focused the input and set aria-expanded to "false" on the
+    // click, so this waits for exactly one of the two outcomes. The input's value is no signal:
+    // Material writes the picker's displayWith result, '', into it on the click.
+    await expect
+      .poll(() =>
+        status.evaluate(
+          (input) => input.getAttribute('aria-expanded') === 'true' || document.activeElement !== input,
+        ),
+      )
+      .toBe(true);
+    // Dismiss the panel with Tab, which blurs the input and closes it; with the preference on there
+    // is nothing left to close, and Tab is harmless. Not Escape: with no panel to consume it,
+    // MatDialog would take the key and close the whole dialog (receipt-quick-date-filter.spec.ts
+    // asserts exactly that).
     await page.keyboard.press('Tab');
     await expect(page.getByRole('option', { name: 'Open', exact: true })).toBeHidden();
 

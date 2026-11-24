@@ -1880,15 +1880,22 @@ allows it.
   `expect(page.getByRole('listbox', { name: label, exact: true })).toHaveCount(0)`, as
   `pickOption` in `quick-scan-config.spec.ts` does.
 - **After picking in a multiple-mode `app-autocomlete`, wait for the picker's zero-delay timer before
-  pressing Tab or Escape.** The picker re-opens its panel on that timer (see "The chip picker's
-  close-on-select preference"). A key pressed before the timer fires dismisses nothing, and the
-  re-opened panel is left covering the dialog. Wait for something only a finished re-open produces:
-  - **Preference off (the default):** `expect(input).toHaveAttribute('aria-expanded', 'true')`, as
-    `receipt-summary.spec.ts` does. Material removed the panel on the click, so the attribute is
-    `"false"` until the re-open's change detection pass. That pass ends with the `afterNextRender`
-    callback in which `MatAutocompleteTrigger` starts listening for Tab, so a Tab sent after it
-    closes the panel.
-  - **Preference on:** the timer blurs the input instead, so `expect(input).not.toBeFocused()`.
+  pressing Tab or Escape.** The picker acts on that timer (see "The chip picker's close-on-select
+  preference"). A key pressed before the timer fires dismisses nothing, and a re-opened panel is left
+  covering the dialog. Wait for what the timer produces. On the click, Material focuses the input
+  and sets `aria-expanded` to `"false"`, so neither signal below can pass early:
+  - **Preference off (the default):** the panel re-opens. Wait for
+    `expect(input).toHaveAttribute('aria-expanded', 'true')`. That attribute is set by the change
+    detection pass that ends with the `afterNextRender` callback in which `MatAutocompleteTrigger`
+    starts listening for Tab, so a Tab sent after it closes the panel.
+  - **Preference on:** the timer blurs the input instead, so wait for `expect(input).not.toBeFocused()`.
+  - **A spec running as a shared account (`e2e-admin`, `e2e-user`) does not control that
+    preference**, so accept either outcome. `receipt-summary.spec.ts` polls for
+    `aria-expanded === 'true' || document.activeElement !== input`.
+  - **The pick must leave at least one option.** The picker filters out what is already selected, and
+    Material only reports the panel open while it has options. If the pick removes the last one, the
+    re-open shows nothing, so `aria-expanded` stays `"false"` and the input keeps focus. Seed another
+    option so there is something to wait for.
   - **Not `toHaveValue('')`.** Material writes the picker's `displayWith` result into the input on
     the click itself, and the default `displayWith` returns `''`. So the input is empty before the
     timer runs, whether or not anything was typed.
