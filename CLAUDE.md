@@ -179,7 +179,7 @@ See `api/CLAUDE.md` for detailed backend architecture and testing requirements.
 ```bash
 cd desktop
 npm start                         # Dev server with API proxy (localhost:4200)
-npm test                          # Run tests with coverage
+npm test                          # Run unit tests (Vitest, via ng test)
 npm run build                     # Production build
 ```
 
@@ -330,7 +330,7 @@ pieces have to agree:
   the login screen. See `desktop/CLAUDE.md` → "OIDC sign-in".
 
 **No e2e specs yet, deliberately.** The Go suite (with a local fake-IdP `httptest` server serving
-discovery, JWKS and a real RS256 ID token) plus the Jest and Flutter widget specs are the safety
+discovery, JWKS and a real RS256 ID token) plus the desktop unit (Vitest) and Flutter widget specs are the safety
 net; the flow has not been pinned against a real IdP or a real device. The two specs to add later
 are a Playwright provider-CRUD spec and a Flutter `integration_test` login-button spec — both
 mutate **global** System Settings, so they need `login-qr.spec.ts`'s capture-and-restore pattern

@@ -24,7 +24,7 @@ describe("ReceiptResolverService", () => {
   });
 
   it("should call receipt service", () => {
-    const serviceSpy = jest.spyOn(TestBed.inject(ReceiptService), "getReceiptById");
+    const serviceSpy = vi.spyOn(TestBed.inject(ReceiptService), "getReceiptById");
     executeResolver({ params: { id: 1 } } as any, {} as any);
     expect(serviceSpy).toHaveBeenCalledWith(1);
 

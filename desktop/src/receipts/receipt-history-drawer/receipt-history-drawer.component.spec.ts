@@ -1,3 +1,4 @@
+import type { Mock, MockInstance } from "vitest";
 import { provideHttpClient } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { provideZonelessChangeDetection } from "@angular/core";
@@ -30,8 +31,8 @@ const HISTORY: ReceiptHistory = {
 describe("ReceiptHistoryDrawerComponent", () => {
   let fixture: ComponentFixture<ReceiptHistoryDrawerComponent>;
   let component: ReceiptHistoryDrawerComponent;
-  let getReceiptHistory: jest.SpyInstance;
-  let closed: jest.Mock;
+  let getReceiptHistory: MockInstance;
+  let closed: Mock;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -49,7 +50,7 @@ describe("ReceiptHistoryDrawerComponent", () => {
       ],
     }).compileComponents();
 
-    getReceiptHistory = jest
+    getReceiptHistory = vi
       .spyOn(TestBed.inject(ReceiptService), "getReceiptHistory")
       .mockReturnValue(of(HISTORY) as any);
   });
@@ -63,7 +64,7 @@ describe("ReceiptHistoryDrawerComponent", () => {
   async function create({ waitForLoad = true } = {}): Promise<void> {
     fixture = TestBed.createComponent(ReceiptHistoryDrawerComponent);
     component = fixture.componentInstance;
-    closed = jest.fn();
+    closed = vi.fn();
     component.closed.subscribe(closed);
     fixture.componentRef.setInput("receiptId", 1042);
     if (waitForLoad) {
@@ -174,7 +175,7 @@ describe("ReceiptHistoryDrawerComponent", () => {
 
     it("stays open on Escape while a dialog is open", async () => {
       await create();
-      jest.spyOn(TestBed.inject(MatDialog), "openDialogs", "get").mockReturnValue([{} as any]);
+      vi.spyOn(TestBed.inject(MatDialog), "openDialogs", "get").mockReturnValue([{} as any]);
 
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
 
@@ -268,7 +269,7 @@ describe("ReceiptHistoryDrawerComponent", () => {
     let header: HTMLElement;
     let headerLeft: number;
     let drawerWidth: number;
-    let occupied: jest.Mock;
+    let occupied: Mock;
 
     beforeEach(() => {
       FakeResizeObserver.instances = [];
@@ -278,7 +279,7 @@ describe("ReceiptHistoryDrawerComponent", () => {
       header = document.createElement("app-header");
       header.getBoundingClientRect = () => ({ top: 0, bottom: 89, left: headerLeft, height: 89 }) as DOMRect;
       document.body.appendChild(header);
-      jest.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1440);
+      vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1440);
     });
 
     afterEach(() => {
@@ -286,7 +287,7 @@ describe("ReceiptHistoryDrawerComponent", () => {
     });
 
     async function createMeasured(): Promise<void> {
-      occupied = jest.fn();
+      occupied = vi.fn();
       fixture = TestBed.createComponent(ReceiptHistoryDrawerComponent);
       component = fixture.componentInstance;
       component.occupiedChange.subscribe(occupied);

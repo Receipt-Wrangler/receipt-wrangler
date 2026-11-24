@@ -54,14 +54,14 @@ describe("OidcCallbackComponent", () => {
 
     router = TestBed.inject(Router);
     userService = TestBed.inject(UserService);
-    jest.spyOn(router, "navigate").mockResolvedValue(true);
+    vi.spyOn(router, "navigate").mockResolvedValue(true);
 
     fixture = TestBed.createComponent(OidcCallbackComponent);
   }
 
   afterEach(() => {
     TestBed.resetTestingModule();
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   // This is the whole reason the route exists: AppInitService skips loading app
@@ -69,7 +69,7 @@ describe("OidcCallbackComponent", () => {
   // boot signed-out while holding perfectly valid cookies.
   it("loads app data and navigates to the dashboard", async () => {
     await setup();
-    const getAppData = jest
+    const getAppData = vi
       .spyOn(userService, "getAppData")
       .mockReturnValue(of(appData) as any);
 
@@ -82,7 +82,7 @@ describe("OidcCallbackComponent", () => {
 
   it("routes back to login when app data cannot be loaded", async () => {
     await setup();
-    jest
+    vi
       .spyOn(userService, "getAppData")
       .mockReturnValue(throwError(() => new Error("nope")) as any);
 
@@ -96,7 +96,7 @@ describe("OidcCallbackComponent", () => {
 
   it("forwards an error code to the login page without calling the API", async () => {
     await setup({ oidcError: "no_account" });
-    const getAppData = jest.spyOn(userService, "getAppData");
+    const getAppData = vi.spyOn(userService, "getAppData");
 
     fixture.detectChanges();
     await fixture.whenStable();

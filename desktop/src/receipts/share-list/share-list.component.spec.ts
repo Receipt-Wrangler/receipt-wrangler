@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { CurrencyPipe } from "@angular/common";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
@@ -144,7 +145,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should initialize with route data on ngOnInit", () => {
-      jest.spyOn(component, "setUserItemMap");
+      vi.spyOn(component, "setUserItemMap");
       component.ngOnInit();
 
       expect(component.originalReceipt).toEqual(mockReceipt);
@@ -167,7 +168,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should handle ngOnChanges when triggerAddMode changes to true", () => {
-      jest.spyOn(component, "initAddMode");
+      vi.spyOn(component, "initAddMode");
       const changes = {
         triggerAddMode: new SimpleChange(false, true, false)
       };
@@ -178,7 +179,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should not call initAddMode when triggerAddMode is false", () => {
-      jest.spyOn(component, "initAddMode");
+      vi.spyOn(component, "initAddMode");
       const changes = {
         triggerAddMode: new SimpleChange(true, false, false)
       };
@@ -189,7 +190,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should not call initAddMode when triggerAddMode is not in changes", () => {
-      jest.spyOn(component, "initAddMode");
+      vi.spyOn(component, "initAddMode");
       const changes = {
         someOtherProperty: new SimpleChange("old", "new", false)
       };
@@ -545,8 +546,8 @@ describe("ShareListComponent", () => {
     });
 
     it("should submit valid form in submitNewItemFormGroup", () => {
-      jest.spyOn(component.itemAdded, "emit");
-      jest.spyOn(component, "exitAddMode");
+      vi.spyOn(component.itemAdded, "emit");
+      vi.spyOn(component, "exitAddMode");
 
       component.initAddMode();
       component.newItemFormGroup.patchValue({
@@ -568,8 +569,8 @@ describe("ShareListComponent", () => {
     });
 
     it("should not submit invalid form in submitNewItemFormGroup", () => {
-      jest.spyOn(component.itemAdded, "emit");
-      jest.spyOn(component, "exitAddMode");
+      vi.spyOn(component.itemAdded, "emit");
+      vi.spyOn(component, "exitAddMode");
 
       component.initAddMode();
       component.newItemFormGroup.patchValue({
@@ -588,7 +589,7 @@ describe("ShareListComponent", () => {
 
   describe("Item Management", () => {
     it("should emit correct event in removeItem", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       const itemData = { item: mockItems[0], arrayIndex: 0 };
 
       component.removeItem(itemData);
@@ -602,7 +603,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should forward linkedItem metadata through removeItem", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       const linkedItemData = {
         item: { id: 99, name: "Linked", amount: "1.00", chargedToUserId: 2 } as Item,
         arrayIndex: 3,
@@ -622,7 +623,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should add inline item in edit mode", () => {
-      jest.spyOn(component.itemAdded, "emit");
+      vi.spyOn(component.itemAdded, "emit");
       component.mode = FormMode.edit;
 
       component.addInlineItem("2");
@@ -634,7 +635,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should add inline item in add mode", () => {
-      jest.spyOn(component.itemAdded, "emit");
+      vi.spyOn(component.itemAdded, "emit");
       component.mode = FormMode.add;
 
       component.addInlineItem("3");
@@ -646,7 +647,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should not add inline item in view mode", () => {
-      jest.spyOn(component.itemAdded, "emit");
+      vi.spyOn(component.itemAdded, "emit");
       component.mode = FormMode.view;
 
       component.addInlineItem("1");
@@ -655,9 +656,9 @@ describe("ShareListComponent", () => {
     });
 
     it("should stop event propagation in addInlineItem", () => {
-      jest.spyOn(component.itemAdded, "emit");
+      vi.spyOn(component.itemAdded, "emit");
       component.mode = FormMode.edit;
-      const mockEvent = { stopImmediatePropagation: jest.fn() } as any;
+      const mockEvent = { stopImmediatePropagation: vi.fn() } as any;
 
       component.addInlineItem("1", mockEvent);
 
@@ -666,7 +667,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should handle undefined event in addInlineItem", () => {
-      jest.spyOn(component.itemAdded, "emit");
+      vi.spyOn(component.itemAdded, "emit");
       component.mode = FormMode.edit;
 
       expect(() => component.addInlineItem("1", undefined)).not.toThrow();
@@ -675,8 +676,8 @@ describe("ShareListComponent", () => {
 
     // Simulates the parent ReceiptFormComponent.onItemAdded behavior so the
     // component under test can observe the resulting FormArray state.
-    function wireParentOnItemAdded(): jest.Mock {
-      const emitSpy = jest.fn();
+    function wireParentOnItemAdded(): Mock {
+      const emitSpy = vi.fn();
       component.itemAdded.subscribe((item: Item) => {
         emitSpy(item);
         const newFormGroup = buildItemForm(item, mockReceipt.id?.toString(), true, false);
@@ -839,7 +840,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should not add item on blur for non-last item", () => {
-      jest.spyOn(component, "addInlineItem");
+      vi.spyOn(component, "addInlineItem");
       component.mode = FormMode.edit;
       component.setUserItemMap();
 
@@ -869,7 +870,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should handle undefined user items in addInlineItemOnBlur", () => {
-      jest.spyOn(component, "addInlineItem");
+      vi.spyOn(component, "addInlineItem");
       component.userItemMap.set(new Map());
 
       component.addInlineItemOnBlur("999", 0);
@@ -878,7 +879,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should remove empty pristine items in checkLastInlineItem", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       component.mode = FormMode.edit;
 
       const multipleItemsUser = [
@@ -912,7 +913,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should remove empty pristine items with whitespace name", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       component.mode = FormMode.edit;
 
       const multipleItemsUser = [
@@ -943,7 +944,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should not remove items that are not pristine", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       component.mode = FormMode.edit;
 
       const multipleItemsUser = [
@@ -962,7 +963,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should not remove items with valid name", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       component.mode = FormMode.edit;
 
       const multipleItemsUser = [
@@ -981,7 +982,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should not remove items with valid amount", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       component.mode = FormMode.edit;
 
       const multipleItemsUser = [
@@ -1000,7 +1001,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should not remove when user has only one item", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       component.mode = FormMode.edit;
 
       const singleItemUser = [
@@ -1015,7 +1016,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should do nothing in view mode for checkLastInlineItem", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       component.mode = FormMode.view;
 
       component.checkLastInlineItem("1");
@@ -1024,7 +1025,7 @@ describe("ShareListComponent", () => {
     });
 
     it("should handle undefined user items in checkLastInlineItem", () => {
-      jest.spyOn(component.itemRemoved, "emit");
+      vi.spyOn(component.itemRemoved, "emit");
       component.mode = FormMode.edit;
       component.userItemMap.set(new Map());
 
@@ -1036,8 +1037,8 @@ describe("ShareListComponent", () => {
 
   describe("Resolution Features", () => {
     it("should update all items to resolved in resolveAllItemsClicked", () => {
-      jest.spyOn(component.allItemsResolved, "emit");
-      const mockEvent = { stopImmediatePropagation: jest.fn() } as any;
+      vi.spyOn(component.allItemsResolved, "emit");
+      const mockEvent = { stopImmediatePropagation: vi.fn() } as any;
 
       component.resolveAllItemsClicked(mockEvent, "1");
 
@@ -1115,8 +1116,8 @@ describe("ShareListComponent", () => {
         { id: 3, name: "I3", amount: "5.00", chargedToUserId: 2, status: ItemStatus.Open, receiptId: 1 } as Item,
       ];
       fixture.componentRef.setInput('form', createFormWithItems(mixedItems));
-      jest.spyOn(component.allItemsResolved, "emit");
-      const mockEvent = { stopImmediatePropagation: jest.fn() } as any;
+      vi.spyOn(component.allItemsResolved, "emit");
+      const mockEvent = { stopImmediatePropagation: vi.fn() } as any;
 
       component.resolveAllItemsClicked(mockEvent, "1");
 
@@ -1128,8 +1129,8 @@ describe("ShareListComponent", () => {
     });
 
     it("should still emit allItemsResolved for a user with no matching items", () => {
-      jest.spyOn(component.allItemsResolved, "emit");
-      const mockEvent = { stopImmediatePropagation: jest.fn() } as any;
+      vi.spyOn(component.allItemsResolved, "emit");
+      const mockEvent = { stopImmediatePropagation: vi.fn() } as any;
 
       expect(() => component.resolveAllItemsClicked(mockEvent, "999")).not.toThrow();
       expect(component.allItemsResolved.emit).toHaveBeenCalledWith("999");
@@ -1242,7 +1243,7 @@ describe("ShareListComponent", () => {
 
     it("should handle form mode transitions", () => {
       component.mode = FormMode.view;
-      jest.spyOn(component.itemAdded, "emit");
+      vi.spyOn(component.itemAdded, "emit");
 
       component.addInlineItem("1");
       expect(component.itemAdded.emit).not.toHaveBeenCalled();

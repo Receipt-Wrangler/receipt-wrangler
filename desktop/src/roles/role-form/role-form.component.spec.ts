@@ -1,3 +1,4 @@
+import type { Mock, MockInstance } from "vitest";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import {
@@ -59,10 +60,10 @@ const APP_KEYS = APP_DESCRIPTORS.map((d) => d.key);
 interface SetupResult {
   component: RoleFormComponent;
   fixture: ComponentFixture<RoleFormComponent>;
-  createRoleSpy: jest.SpyInstance;
-  updateRoleSpy: jest.SpyInstance;
-  navigateSpy: jest.SpyInstance;
-  snackbar: { success: jest.Mock; error: jest.Mock };
+  createRoleSpy: MockInstance;
+  updateRoleSpy: MockInstance;
+  navigateSpy: MockInstance;
+  snackbar: { success: Mock; error: Mock };
 }
 
 interface SetupOptions {
@@ -82,7 +83,7 @@ async function setup(
   options: SetupOptions = {},
 ): Promise<SetupResult> {
   TestBed.resetTestingModule();
-  const snackbar = { success: jest.fn(), error: jest.fn() };
+  const snackbar = { success: vi.fn(), error: vi.fn() };
 
   const params: Record<string, string> = {};
   if (options.routeId) {
@@ -123,7 +124,7 @@ async function setup(
     .compileComponents();
 
   const permissionService = TestBed.inject(PermissionService);
-  jest
+  vi
     .spyOn(permissionService, "getPermissions")
     .mockReturnValue(
       descriptors === "error"
@@ -140,25 +141,25 @@ async function setup(
     permissions: [],
   };
   const roleService = TestBed.inject(RoleService);
-  const createRoleSpy = jest
+  const createRoleSpy = vi
     .spyOn(roleService, "createRole")
     .mockReturnValue(of(createdRole) as any);
-  const updateRoleSpy = jest
+  const updateRoleSpy = vi
     .spyOn(roleService, "updateRole")
     .mockImplementation((_id: number, command: any) =>
       of({ id: 1, isDefault: false, isSystem: false, ...command } as Role) as any,
     );
-  jest
+  vi
     .spyOn(roleService, "getRoles")
     .mockReturnValue(of(options.roles ?? []) as any);
 
   const reportService = TestBed.inject(ReportService);
-  jest
+  vi
     .spyOn(reportService, "getReportTemplateOptions")
     .mockReturnValue(of(options.reportTemplateOptions ?? []) as any);
 
   const router = TestBed.inject(Router);
-  const navigateSpy = jest.spyOn(router, "navigate").mockResolvedValue(true);
+  const navigateSpy = vi.spyOn(router, "navigate").mockResolvedValue(true);
 
   const fixture = TestBed.createComponent(RoleFormComponent);
   const component = fixture.componentInstance;

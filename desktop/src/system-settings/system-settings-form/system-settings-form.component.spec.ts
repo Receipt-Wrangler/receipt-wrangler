@@ -57,7 +57,7 @@ describe("SystemSettingsFormComponent", () => {
                 }
             }
         },
-        { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting()
     ]
@@ -83,8 +83,8 @@ describe("SystemSettingsFormComponent", () => {
 
     it("hides the alert once the restart response arrives", async () => {
       const response = new Subject<void>();
-      jest.spyOn(TestBed.inject(SystemSettingsService), "restartTaskServer").mockReturnValue(response as any);
-      jest.spyOn(TestBed.inject(SnackbarService), "success").mockImplementation(() => undefined as any);
+      vi.spyOn(TestBed.inject(SystemSettingsService), "restartTaskServer").mockReturnValue(response as any);
+      vi.spyOn(TestBed.inject(SnackbarService), "success").mockImplementation(() => undefined as any);
 
       // Let ngAfterViewInit's deferred scroll run while the alert is still hidden.
       await new Promise((resolve) => setTimeout(resolve));
@@ -483,9 +483,9 @@ describe("SystemSettingsFormComponent", () => {
     const snackbarService = TestBed.inject(SnackbarService);
     const router = TestBed.inject(Router);
 
-    const updateSystemSettingsSpy = jest.spyOn(systemSettingsService, "updateSystemSettings").mockReturnValue(of(null as any));
-    const snackbarServiceSpy = jest.spyOn(snackbarService, "success");
-    const routerSpy = jest.spyOn(router, "navigate");
+    const updateSystemSettingsSpy = vi.spyOn(systemSettingsService, "updateSystemSettings").mockReturnValue(of(null as any));
+    const snackbarServiceSpy = vi.spyOn(snackbarService, "success");
+    const routerSpy = vi.spyOn(router, "navigate");
 
     component.originalSystemSettings.taskQueueConfigurations = [{
       name: QueueName.QuickScan,
@@ -673,9 +673,9 @@ describe("SystemSettingsFormComponent", () => {
     it("dispatches the saved zone once the save succeeds", () => {
       const systemSettingsService = TestBed.inject(SystemSettingsService);
       const featureConfigService = TestBed.inject(FeatureConfigService);
-      jest.spyOn(systemSettingsService, "updateSystemSettings").mockReturnValue(of(null as any));
-      jest.spyOn(featureConfigService, "getFeatureConfig").mockReturnValue(of({} as any));
-      const dispatchSpy = jest.spyOn(store, "dispatch");
+      vi.spyOn(systemSettingsService, "updateSystemSettings").mockReturnValue(of(null as any));
+      vi.spyOn(featureConfigService, "getFeatureConfig").mockReturnValue(of({} as any));
+      const dispatchSpy = vi.spyOn(store, "dispatch");
 
       setRouteSettings({ timeZone: "UTC" });
       component.ngOnInit();
@@ -691,10 +691,10 @@ describe("SystemSettingsFormComponent", () => {
 
     it("does not dispatch a zone the server rejected", () => {
       const systemSettingsService = TestBed.inject(SystemSettingsService);
-      jest
+      vi
         .spyOn(systemSettingsService, "updateSystemSettings")
         .mockReturnValue(throwError(() => new Error("400")) as any);
-      const dispatchSpy = jest.spyOn(store, "dispatch");
+      const dispatchSpy = vi.spyOn(store, "dispatch");
 
       component.ngOnInit();
       component.form.get("timeZone")!.setValue("America/New_York");

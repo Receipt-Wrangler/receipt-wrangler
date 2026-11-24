@@ -2,7 +2,14 @@ import { provideZonelessChangeDetection, DestroyRef } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { FormArray, FormBuilder } from "@angular/forms";
 import { DEFAULT_QUICK_DATE_FIELD, RECEIPT_DATE_FILTER_FIELDS } from "src/constants";
-import { FilterOperation, ReportColumn, ReportDetail, ReportPeriod, ReportRequestCommand } from "../../open-api";
+import {
+  FilterOperation,
+  ReceiptPagedRequestFilter,
+  ReportColumn,
+  ReportDetail,
+  ReportPeriod,
+  ReportRequestCommand,
+} from "../../open-api";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { ReportBuilderValue, toReportRequestCommand, toReportRequestCommandForSave } from "./report-command.mapper";
 import {
@@ -28,7 +35,8 @@ describe("buildReportFormFromCommand", () => {
   // emits, so round-tripping it through buildReceiptFilterForm is a fixpoint. Seed the
   // fixture's filter the same way so the deep-equal below isn't tripped by the sparse-
   // vs-canonical normalization.
-  const canonicalFilter = (seed: unknown): unknown => buildReceiptFilterForm(seed, destroyRef).getRawValue();
+  const canonicalFilter = (seed: unknown): ReceiptPagedRequestFilter =>
+    buildReceiptFilterForm(seed, destroyRef).getRawValue() as ReceiptPagedRequestFilter;
 
   function roundTrip(command: ReportRequestCommand): ReportRequestCommand {
     const form = buildReportFormFromCommand(fb, destroyRef, command);

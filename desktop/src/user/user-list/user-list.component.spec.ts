@@ -37,7 +37,7 @@ describe("UserListComponent", () => {
   });
 
   const mockPagedUsers = () =>
-    jest.spyOn(TestBed.inject(UserService), "getPagedUsers").mockReturnValue(
+    vi.spyOn(TestBed.inject(UserService), "getPagedUsers").mockReturnValue(
       of({ data: [{ id: 1, username: "admin" }], totalCount: 1 } as any)
     );
 
@@ -95,7 +95,7 @@ describe("UserListComponent", () => {
 
   it("should refetch the current page after deleting a user", () => {
     const serviceSpy = mockPagedUsers();
-    const deleteSpy = jest
+    const deleteSpy = vi
       .spyOn(TestBed.inject(UserService), "deleteUserById")
       .mockReturnValue(of({} as any));
 
@@ -104,7 +104,7 @@ describe("UserListComponent", () => {
       new MatTableDataSource<User>([{ id: 5, username: "victim" } as User])
     );
 
-    jest
+    vi
       .spyOn(TestBed.inject(MatDialog), "open")
       .mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
@@ -117,7 +117,7 @@ describe("UserListComponent", () => {
   it("should not corrupt datasource/total count when the fetch errors", () => {
     // getTableData delegates errors to the global HTTP interceptor (no component
     // handler), so RxJS reports the error as unhandled.
-    const serviceSpy = jest
+    const serviceSpy = vi
       .spyOn(TestBed.inject(UserService), "getPagedUsers")
       .mockReturnValue(throwError(() => new Error("boom")) as any);
 

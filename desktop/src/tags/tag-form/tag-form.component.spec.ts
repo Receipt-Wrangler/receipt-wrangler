@@ -66,9 +66,9 @@ describe("CategoryForm", () => {
   });
 
   it("should submit form with correct data, when editing", () => {
-    const tagServiceSpy = jest.spyOn(TestBed.inject(TagService), "updateTag");
+    const tagServiceSpy = vi.spyOn(TestBed.inject(TagService), "updateTag");
     tagServiceSpy.mockReturnValue(of({} as any));
-    const nameValidateSpy = jest.spyOn(
+    const nameValidateSpy = vi.spyOn(
       TestBed.inject(TagService),
       "getTagCountByName"
     ).mockReturnValue(of(0) as any);
@@ -93,11 +93,11 @@ describe("CategoryForm", () => {
   });
 
   it("should submit form with correct data, when creating", () => {
-    const nameValidateSpy = jest.spyOn(
+    const nameValidateSpy = vi.spyOn(
       TestBed.inject(TagService),
       "getTagCountByName"
     ).mockReturnValue(of(0) as any);
-    const tagServiceSpy = jest.spyOn(TestBed.inject(TagService), "createTag");
+    const tagServiceSpy = vi.spyOn(TestBed.inject(TagService), "createTag");
     tagServiceSpy.mockReturnValue(of({} as any));
 
     component.ngOnInit();

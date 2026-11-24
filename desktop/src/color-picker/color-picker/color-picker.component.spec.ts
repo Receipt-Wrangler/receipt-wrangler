@@ -47,7 +47,7 @@ describe('ColorPickerComponent', () => {
     const event: any = {
       preventDefault: () => {},
     };
-    const eventSpy = jest.spyOn(event, 'preventDefault');
+    const eventSpy = vi.spyOn(event, 'preventDefault');
 
     component.handleClick(event);
 
@@ -58,7 +58,7 @@ describe('ColorPickerComponent', () => {
     const event: any = {
       preventDefault: () => {},
     };
-    const eventSpy = jest.spyOn(event, 'preventDefault');
+    const eventSpy = vi.spyOn(event, 'preventDefault');
     fixture.componentRef.setInput("readonly", true);
     component.handleClick(event);
 

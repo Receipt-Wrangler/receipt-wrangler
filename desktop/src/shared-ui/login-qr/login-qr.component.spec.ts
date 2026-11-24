@@ -1,10 +1,11 @@
+import type { Mock } from "vitest";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { provideStore, Store } from "@ngxs/store";
 import * as QRCode from "qrcode";
 
-jest.mock("qrcode", () => ({
+vi.mock("qrcode", () => ({
   __esModule: true,
-  toDataURL: jest.fn(),
+  toDataURL: vi.fn(),
 }));
 
 import { FeatureConfigState } from "../../store/feature-config.state";
@@ -28,7 +29,7 @@ describe("LoginQrComponent", () => {
   };
 
   beforeEach(async () => {
-    (QRCode.toDataURL as jest.Mock).mockReset();
+    (QRCode.toDataURL as Mock).mockReset();
 
     await TestBed.configureTestingModule({
       imports: [LoginQrComponent],
@@ -52,7 +53,7 @@ describe("LoginQrComponent", () => {
   });
 
   it("renders a locally-generated QR when loginQrUrl is set", async () => {
-    (QRCode.toDataURL as jest.Mock).mockResolvedValue(
+    (QRCode.toDataURL as Mock).mockResolvedValue(
       "data:image/png;base64,QR"
     );
     const loginQrUrl = "https://receiptwrangler.io/app/setup#url=x";
@@ -73,7 +74,7 @@ describe("LoginQrComponent", () => {
   });
 
   it("renders the divider only when headerText is provided", async () => {
-    (QRCode.toDataURL as jest.Mock).mockResolvedValue(
+    (QRCode.toDataURL as Mock).mockResolvedValue(
       "data:image/png;base64,QR"
     );
 
@@ -94,7 +95,7 @@ describe("LoginQrComponent", () => {
   });
 
   it("renders the default caption, and an override when one is passed", async () => {
-    (QRCode.toDataURL as jest.Mock).mockResolvedValue(
+    (QRCode.toDataURL as Mock).mockResolvedValue(
       "data:image/png;base64,QR"
     );
 
@@ -120,7 +121,7 @@ describe("LoginQrComponent", () => {
     // Generate one successfully first, so this proves the catch CLEARS a
     // displayed QR — rejecting on the first generation would pass even with
     // the catch removed, since the signal starts null.
-    (QRCode.toDataURL as jest.Mock).mockResolvedValue(
+    (QRCode.toDataURL as Mock).mockResolvedValue(
       "data:image/png;base64,QR"
     );
     setLoginQrUrl("https://receiptwrangler.io/app/setup#url=ok");
@@ -128,7 +129,7 @@ describe("LoginQrComponent", () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector("img.login-qr-code")).toBeTruthy();
 
-    (QRCode.toDataURL as jest.Mock).mockRejectedValue(
+    (QRCode.toDataURL as Mock).mockRejectedValue(
       new Error("generation failed")
     );
     setLoginQrUrl("https://receiptwrangler.io/app/setup#url=bad");
@@ -143,7 +144,7 @@ describe("LoginQrComponent", () => {
   });
 
   it("hides the QR again when the feature is turned off", async () => {
-    (QRCode.toDataURL as jest.Mock).mockResolvedValue(
+    (QRCode.toDataURL as Mock).mockResolvedValue(
       "data:image/png;base64,QR"
     );
 
@@ -164,7 +165,7 @@ describe("LoginQrComponent", () => {
     // Hand out manually-resolved promises so the two generations can be
     // completed out of order.
     const resolvers: Array<(dataUrl: string) => void> = [];
-    (QRCode.toDataURL as jest.Mock).mockImplementation(
+    (QRCode.toDataURL as Mock).mockImplementation(
       () => new Promise<string>((resolve) => resolvers.push(resolve))
     );
 

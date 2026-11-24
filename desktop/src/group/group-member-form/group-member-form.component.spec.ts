@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
@@ -47,10 +48,10 @@ describe("GroupMemberFormComponent", () => {
 
   let component: GroupMemberFormComponent;
   let fixture: ComponentFixture<GroupMemberFormComponent>;
-  let getRolesMock: jest.Mock;
-  let dialogRefMock: { close: jest.Mock };
-  let getGroupByIdMock: jest.Mock;
-  let updateGrantsMock: jest.Mock;
+  let getRolesMock: Mock;
+  let dialogRefMock: { close: Mock };
+  let getGroupByIdMock: Mock;
+  let updateGrantsMock: Mock;
 
   const categoryPool = [
     { id: 1, name: "Child A" },
@@ -81,10 +82,10 @@ describe("GroupMemberFormComponent", () => {
   }
 
   beforeEach(async () => {
-    getRolesMock = jest.fn().mockReturnValue(of([] as Role[]));
-    dialogRefMock = { close: jest.fn() };
-    getGroupByIdMock = jest.fn().mockReturnValue(of({ id: 5, groupMembers: [] } as unknown as Group));
-    updateGrantsMock = jest.fn().mockReturnValue(of({}));
+    getRolesMock = vi.fn().mockReturnValue(of([] as Role[]));
+    dialogRefMock = { close: vi.fn() };
+    getGroupByIdMock = vi.fn().mockReturnValue(of({ id: 5, groupMembers: [] } as unknown as Group));
+    updateGrantsMock = vi.fn().mockReturnValue(of({}));
     await TestBed.configureTestingModule({
       imports: [
         NgxsModule.forRoot([AuthState, UserState]),
@@ -169,14 +170,16 @@ describe("GroupMemberFormComponent", () => {
     getRolesMock.mockReturnValue(of([defaultGroupRole]));
     await createComponent();
 
-    const openSpy = jest
+    const openSpy = vi
       .spyOn(TestBed.inject(MatDialog), "open")
       .mockReturnValue({ afterClosed: () => of(undefined) } as any);
 
     component.previewRole();
 
     expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy.mock.calls[0][1]?.data?.role).toEqual(defaultGroupRole);
+    expect(openSpy.mock.calls[0][1]?.data).toEqual(
+      expect.objectContaining({ role: defaultGroupRole })
+    );
   });
 
   describe("per-member category/tag assignment", () => {

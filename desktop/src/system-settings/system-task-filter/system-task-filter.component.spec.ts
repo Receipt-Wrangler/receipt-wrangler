@@ -128,8 +128,8 @@ describe("SystemTaskFilterComponent", () => {
   });
 
   it("dispatches the filter and closes with true on submit", () => {
-    const dispatchSpy = jest.spyOn(store, "dispatch").mockReturnValue(of({}));
-    const closeSpy = jest.spyOn(TestBed.inject(MatDialogRef<SystemTaskFilterComponent>), "close");
+    const dispatchSpy = vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
+    const closeSpy = vi.spyOn(TestBed.inject(MatDialogRef<SystemTaskFilterComponent>), "close");
 
     fixture.componentRef.setInput("parentForm", buildSystemTaskFilterForm(filledFilter, destroyRef));
     component.submitButtonClicked();
@@ -139,7 +139,7 @@ describe("SystemTaskFilterComponent", () => {
   });
 
   it("closes with false on cancel", () => {
-    const closeSpy = jest.spyOn(TestBed.inject(MatDialogRef<SystemTaskFilterComponent>), "close");
+    const closeSpy = vi.spyOn(TestBed.inject(MatDialogRef<SystemTaskFilterComponent>), "close");
 
     component.cancelButtonClicked();
 

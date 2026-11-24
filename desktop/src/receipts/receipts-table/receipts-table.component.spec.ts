@@ -1,3 +1,4 @@
+import type { MockInstance } from "vitest";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, ComponentFixtureAutoDetect, TestBed } from "@angular/core/testing";
@@ -334,13 +335,13 @@ describe("ReceiptsTableComponent", () => {
     expect(component.selectedReceiptIds()).toEqual([1, 2]);
   });
   describe("quick date filtering and filter chips", () => {
-    let refetch: jest.SpyInstance;
+    let refetch: MockInstance;
 
     const setFilter = (filter: Record<string, unknown>) =>
       store.dispatch(new SetReceiptFilter(filter as any));
 
     beforeEach(() => {
-      refetch = jest
+      refetch = vi
         .spyOn(TestBed.inject(ReceiptFilterService), "getPagedReceiptsForGroups")
         .mockReturnValue(of({ data: [], totalCount: 0 } as any));
     });
@@ -540,15 +541,15 @@ describe("ReceiptsTableComponent", () => {
     let router: Router;
 
     const stubDialog = (confirmed: boolean | undefined) =>
-      jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue(mockDialogRef({ afterClosed: of(confirmed) }) as any);
+      vi.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue(mockDialogRef({ afterClosed: of(confirmed) }) as any);
 
     beforeEach(() => {
       receiptService = TestBed.inject(ReceiptService);
       router = TestBed.inject(Router);
-      jest
+      vi
         .spyOn(receiptService, "duplicateReceipt")
         .mockReturnValue(of({ id: 9 } as Receipt) as any);
-      jest.spyOn(router, "navigateByUrl").mockResolvedValue(true);
+      vi.spyOn(router, "navigateByUrl").mockResolvedValue(true);
     });
 
     it("duplicates and navigates to the copy once confirmed", () => {
@@ -585,7 +586,7 @@ describe("ReceiptsTableComponent", () => {
     const fuel = { id: 2, name: "Fuel", groupId: 6 } as Receipt;
 
     const select = (receipts: Receipt[]) => {
-      const clear = jest.fn();
+      const clear = vi.fn();
       Object.defineProperty(component, "table", {
         value: () => ({
           selection: {
@@ -636,20 +637,20 @@ describe("ReceiptsTableComponent", () => {
       let receiptService: ReceiptService;
       let dialog: MatDialog;
       let snackbar: SnackbarService;
-      let refresh: jest.SpyInstance;
+      let refresh: MockInstance;
 
       const stubConfirmation = (confirmed: boolean | undefined) =>
-        jest.spyOn(dialog, "open").mockReturnValue(mockDialogRef({ afterClosed: of(confirmed) }) as any);
+        vi.spyOn(dialog, "open").mockReturnValue(mockDialogRef({ afterClosed: of(confirmed) }) as any);
 
       const stubResult = (result: BulkReceiptDeleteResult) =>
-        jest.spyOn(receiptService, "bulkDeleteReceipts").mockReturnValue(of(result) as any);
+        vi.spyOn(receiptService, "bulkDeleteReceipts").mockReturnValue(of(result) as any);
 
       beforeEach(() => {
         receiptService = TestBed.inject(ReceiptService);
         dialog = TestBed.inject(MatDialog);
         snackbar = TestBed.inject(SnackbarService);
-        jest.spyOn(snackbar, "success").mockImplementation(() => undefined);
-        refresh = jest.spyOn(component, "getFilteredReceipts").mockImplementation(() => undefined);
+        vi.spyOn(snackbar, "success").mockImplementation(() => undefined);
+        refresh = vi.spyOn(component, "getFilteredReceipts").mockImplementation(() => undefined);
       });
 
       it("deletes the selection, clears it and refreshes once confirmed", () => {
@@ -692,7 +693,7 @@ describe("ReceiptsTableComponent", () => {
       it("does nothing when the dialog is cancelled", () => {
         select([groceries]);
         stubConfirmation(false);
-        jest.spyOn(receiptService, "bulkDeleteReceipts");
+        vi.spyOn(receiptService, "bulkDeleteReceipts");
 
         component.deleteSelectedReceipts();
 
@@ -704,7 +705,7 @@ describe("ReceiptsTableComponent", () => {
       it("does nothing when the dialog is dismissed", () => {
         select([groceries]);
         stubConfirmation(undefined);
-        jest.spyOn(receiptService, "bulkDeleteReceipts");
+        vi.spyOn(receiptService, "bulkDeleteReceipts");
 
         component.deleteSelectedReceipts();
 
@@ -779,13 +780,13 @@ describe("ReceiptsTableComponent receipt summary", () => {
     receiptFilterService = TestBed.inject(ReceiptFilterService);
 
     summaryCalls = [];
-    jest
+    vi
       .spyOn(receiptFilterService, "getReceiptSummaryForGroup")
       .mockImplementation((groupId: string, configurationGroupId: number) => {
         summaryCalls.push({ groupId, configurationGroupId });
         return of(summaryResponse);
       });
-    jest
+    vi
       .spyOn(receiptFilterService, "getPagedReceiptsForGroups")
       .mockReturnValue(of({ data: [], totalCount: 0 } as any));
 
@@ -840,7 +841,7 @@ describe("ReceiptsTableComponent receipt summary", () => {
     store.dispatch(new SetGroups([summaryGroup(1, "Alpha", true)]));
     component.groupId = "1";
 
-    jest
+    vi
       .spyOn(receiptFilterService, "getReceiptSummaryForGroup")
       .mockReturnValueOnce(throwError(() => new Error("boom")))
       .mockReturnValue(of(summaryResponse));

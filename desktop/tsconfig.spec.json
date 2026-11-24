@@ -4,14 +4,13 @@
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
     "types": [
-      "jest"
-    ],
-    "isolatedModules": true,
-    "esModuleInterop": true
+      "vitest/globals"
+    ]
   },
   "include": [
     "src/**/*.spec.ts",
     "src/**/*.d.ts",
-    "setup-jest.ts"
+    "src/test-setup.ts",
+    "src/test-providers.ts"
   ]
 }

@@ -100,11 +100,11 @@ describe("DashboardFormComponent", () => {
       widgets: [],
     } as Dashboard;
 
-    const serviceSpy = jest.spyOn(
+    const serviceSpy = vi.spyOn(
       TestBed.inject(DashboardService),
       "createDashboard"
     ).mockImplementation(() => of(dashboard as any));
-    const snackbarSpy = jest.spyOn(SnackbarService.prototype, "success");
+    const snackbarSpy = vi.spyOn(SnackbarService.prototype, "success");
 
     store.reset({
       groups: {
@@ -129,7 +129,7 @@ describe("DashboardFormComponent", () => {
   });
 
   it("offers the Report widget type and loads viewable templates when the user can read reports", () => {
-    const listSpy = jest
+    const listSpy = vi
       .spyOn(TestBed.inject(ReportService), "getReportTemplates")
       .mockReturnValue(
         of({ data: [{ id: 3, name: "Monthly" }], totalCount: 1 } as any)
@@ -149,7 +149,7 @@ describe("DashboardFormComponent", () => {
   });
 
   it("hides the Report widget type and skips the template load without report-read", () => {
-    const listSpy = jest.spyOn(TestBed.inject(ReportService), "getReportTemplates");
+    const listSpy = vi.spyOn(TestBed.inject(ReportService), "getReportTemplates");
     store.reset({
       groups: { selectedGroupId: "1" },
       auth: { appPermissions: [] },

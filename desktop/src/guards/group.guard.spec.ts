@@ -1,3 +1,4 @@
+import type { MockInstance } from "vitest";
 import { TestBed } from "@angular/core/testing";
 import { Router } from "@angular/router";
 import { RouterTestingModule } from "@angular/router/testing";
@@ -8,14 +9,14 @@ import { GroupGuard } from "./group.guard";
 describe("GroupGuard", () => {
   let guard: GroupGuard;
   let store: Store;
-  let navigateSpy: jest.SpyInstance;
+  let navigateSpy: MockInstance;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [NgxsModule.forRoot([GroupState]), RouterTestingModule],
     });
 
-    navigateSpy = jest.spyOn(TestBed.inject(Router), "navigate");
+    navigateSpy = vi.spyOn(TestBed.inject(Router), "navigate");
     navigateSpy.mockReturnValue(Promise.resolve(true));
     store = TestBed.inject(Store);
     guard = TestBed.inject(GroupGuard);
@@ -37,7 +38,7 @@ describe("GroupGuard", () => {
 
   it("should return false", () => {
     store.reset({ groups: { groups: [{ id: "1" }] } });
-    let storeSpy = jest.spyOn(store, "dispatch");
+    let storeSpy = vi.spyOn(store, "dispatch");
 
     const result = guard.canActivate(
       {
@@ -56,7 +57,7 @@ describe("GroupGuard", () => {
 
   it("should reset selected dashboard id", () => {
     store.reset({ groups: { groups: [{ id: "1" }], selectedGroupId: "3" } });
-    let storeSpy = jest.spyOn(store, "dispatch");
+    let storeSpy = vi.spyOn(store, "dispatch");
 
     const result = guard.canActivate(
       {
@@ -76,7 +77,7 @@ describe("GroupGuard", () => {
 
   it("should reset selected dashboard id when group not found", () => {
     store.reset({ groups: { groups: [{ id: "1" }], selectedGroupId: "3" } });
-    let storeSpy = jest.spyOn(store, "dispatch");
+    let storeSpy = vi.spyOn(store, "dispatch");
 
     const result = guard.canActivate(
       {
@@ -96,7 +97,7 @@ describe("GroupGuard", () => {
 
   it("should not reset selected dashboard id when group not found", () => {
     store.reset({ groups: { groups: [{ id: "1" }], selectedGroupId: "70" } });
-    let storeSpy = jest.spyOn(store, "dispatch");
+    let storeSpy = vi.spyOn(store, "dispatch");
 
     const result = guard.canActivate(
       {

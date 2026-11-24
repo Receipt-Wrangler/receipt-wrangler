@@ -1,11 +1,10 @@
+import type { Mock } from "vitest";
 import { provideZonelessChangeDetection } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { of } from "rxjs";
 import { PagedRequestCommand, ReportRequestCommand, ReportService } from "../../open-api";
-import { downloadFile } from "../../utils/file";
+import { captureDownloads } from "../../testing/download.testing";
 import { ReportRunnerService, reportFilename } from "./report-runner.service";
-
-jest.mock("../../utils/file", () => ({ downloadFile: jest.fn() }));
 
 function command(name: string, formats: ReportRequestCommand.FormatsEnum[]): ReportRequestCommand {
   return {
@@ -38,30 +37,29 @@ describe("reportFilename", () => {
 
 describe("ReportRunnerService", () => {
   let reportService: {
-    createReportTemplate: jest.Mock;
-    updateReportTemplate: jest.Mock;
-    getReportTemplates: jest.Mock;
-    getReportTemplate: jest.Mock;
-    duplicateReportTemplate: jest.Mock;
-    deleteReportTemplate: jest.Mock;
-    generateReport: jest.Mock;
-    generateReportFromTemplate: jest.Mock;
-    renderReportTemplate: jest.Mock;
+    createReportTemplate: Mock;
+    updateReportTemplate: Mock;
+    getReportTemplates: Mock;
+    getReportTemplate: Mock;
+    duplicateReportTemplate: Mock;
+    deleteReportTemplate: Mock;
+    generateReport: Mock;
+    generateReportFromTemplate: Mock;
+    renderReportTemplate: Mock;
   };
   let service: ReportRunnerService;
 
   beforeEach(() => {
-    (downloadFile as jest.Mock).mockClear();
     reportService = {
-      createReportTemplate: jest.fn(() => of({ id: 1 })),
-      updateReportTemplate: jest.fn(() => of({ id: 2 })),
-      getReportTemplates: jest.fn(() => of({ data: [], totalCount: 0 })),
-      getReportTemplate: jest.fn(() => of({ id: 3 })),
-      duplicateReportTemplate: jest.fn(() => of({ id: 4 })),
-      deleteReportTemplate: jest.fn(() => of(undefined)),
-      generateReport: jest.fn(() => of(new Blob())),
-      generateReportFromTemplate: jest.fn(() => of(new Blob())),
-      renderReportTemplate: jest.fn(() => of({ html: "", receiptCount: 0 })),
+      createReportTemplate: vi.fn(() => of({ id: 1 })),
+      updateReportTemplate: vi.fn(() => of({ id: 2 })),
+      getReportTemplates: vi.fn(() => of({ data: [], totalCount: 0 })),
+      getReportTemplate: vi.fn(() => of({ id: 3 })),
+      duplicateReportTemplate: vi.fn(() => of({ id: 4 })),
+      deleteReportTemplate: vi.fn(() => of(undefined)),
+      generateReport: vi.fn(() => of(new Blob())),
+      generateReportFromTemplate: vi.fn(() => of(new Blob())),
+      renderReportTemplate: vi.fn(() => of({ html: "", receiptCount: 0 })),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -114,9 +112,10 @@ describe("ReportRunnerService", () => {
       configuration: command("Run", ["pdf"]),
       configurationVersion: 1,
     };
+    const downloads = captureDownloads();
     service.generateFromTemplateById(template).subscribe();
     expect(reportService.generateReportFromTemplate).toHaveBeenCalledWith(7);
-    expect(downloadFile).toHaveBeenCalledWith(expect.any(Blob), "Run.pdf");
+    expect(downloads).toEqual([{ blob: expect.any(Blob), filename: "Run.pdf" }]);
   });
 
   it("renderTemplate delegates to renderReportTemplate", () => {
@@ -135,10 +134,12 @@ describe("ReportRunnerService", () => {
       })
     );
 
+    const downloads = captureDownloads();
+
     service.downloadTemplateById(9).subscribe();
 
     expect(reportService.getReportTemplate).toHaveBeenCalledWith(9);
     expect(reportService.generateReportFromTemplate).toHaveBeenCalledWith(9);
-    expect(downloadFile).toHaveBeenCalledWith(expect.any(Blob), "Widget.csv");
+    expect(downloads).toEqual([{ blob: expect.any(Blob), filename: "Widget.csv" }]);
   });
 });

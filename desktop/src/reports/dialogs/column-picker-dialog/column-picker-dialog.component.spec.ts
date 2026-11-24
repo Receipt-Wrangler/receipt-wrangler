@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder } from "@angular/forms";
@@ -11,9 +12,9 @@ import { provideNgxMask } from "ngx-mask";
 function configure(data: ColumnPickerDialogData): {
   fixture: ComponentFixture<ColumnPickerDialogComponent>;
   component: ColumnPickerDialogComponent;
-  close: jest.Mock;
+  close: Mock;
 } {
-  const close = jest.fn();
+  const close = vi.fn();
   TestBed.configureTestingModule({
     imports: [ColumnPickerDialogComponent],
     providers: [

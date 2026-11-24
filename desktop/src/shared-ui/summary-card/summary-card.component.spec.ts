@@ -50,7 +50,7 @@ describe("SummaryCardComponent", () => {
 
   it("should set user data correctly when there is data", async () => {
     const usersService = TestBed.inject(UserService);
-    jest.spyOn(usersService, "getAmountOwedForUser").mockReturnValue(
+    vi.spyOn(usersService, "getAmountOwedForUser").mockReturnValue(
       of({
         "1": 200,
         "2": -500,

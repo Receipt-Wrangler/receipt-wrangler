@@ -39,7 +39,7 @@ describe("QueueStartMenuComponent", () => {
   });
 
   it("should init queue with receipt ids", () => {
-    const receiptQueueServiceSpy = jest.spyOn(TestBed.inject(ReceiptQueueService), "initQueueAndNavigate").mockImplementation(() => {});
+    const receiptQueueServiceSpy = vi.spyOn(TestBed.inject(ReceiptQueueService), "initQueueAndNavigate").mockImplementation(() => {});
 
     fixture.componentRef.setInput('receiptIds', [1, 2, 3]);
     component.initQueue(QueueMode.VIEW);
@@ -48,7 +48,7 @@ describe("QueueStartMenuComponent", () => {
   });
 
   it("should init queue with receipt ids from receipts", () => {
-    const receiptQueueServiceSpy = jest.spyOn(TestBed.inject(ReceiptQueueService), "initQueueAndNavigate").mockImplementation(() => {});
+    const receiptQueueServiceSpy = vi.spyOn(TestBed.inject(ReceiptQueueService), "initQueueAndNavigate").mockImplementation(() => {});
 
     fixture.componentRef.setInput('receipts', [
       { id: 1 } as any,

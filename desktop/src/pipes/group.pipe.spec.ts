@@ -36,7 +36,7 @@ describe("GroupPipe", () => {
   });
 
   it("should call group state", () => {
-    const spy = jest.spyOn(store, "selectSnapshot");
+    const spy = vi.spyOn(store, "selectSnapshot");
     pipe.transform("hello");
 
     expect(spy).toHaveBeenCalled();

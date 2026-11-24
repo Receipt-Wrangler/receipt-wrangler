@@ -85,6 +85,36 @@
           "options": {
             "buildTarget": "receipt-wrangler:build"
           }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "receipt-wrangler:build:production",
+            "tsConfig": "tsconfig.spec.json",
+            "runnerConfig": "vitest.config.ts",
+            "include": ["src/**/*.spec.ts"],
+            "exclude": ["src/open-api/**"],
+            "setupFiles": ["src/test-setup.ts"],
+            "providersFile": "src/test-providers.ts",
+            "coverageInclude": ["src/**/*.ts"],
+            "coverageExclude": [
+              "src/**/*.d.ts",
+              "src/**/*.spec.ts",
+              "src/main.ts",
+              "src/open-api/**",
+              "src/environments/**",
+              "src/testing/**",
+              "src/test-setup.ts",
+              "src/test-providers.ts"
+            ],
+            "coverageReporters": ["html", "lcov", "cobertura", "text-summary"],
+            "coverageThresholds": {
+              "statements": 1,
+              "branches": 1,
+              "functions": 1,
+              "lines": 1
+            }
+          }
         }
       }
     }

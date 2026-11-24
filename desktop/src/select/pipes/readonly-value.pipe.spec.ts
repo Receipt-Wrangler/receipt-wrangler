@@ -27,7 +27,7 @@ describe("ReadonlyValuePipe", () => {
       { id: 3, name: "Option 3" }
     ];
 
-    jest.spyOn(optionDisplayPipe, "transform").mockReturnValue("Option 2");
+    vi.spyOn(optionDisplayPipe, "transform").mockReturnValue("Option 2");
 
     const result = pipe.transform(2, options, "name", "id");
 
@@ -42,7 +42,7 @@ describe("ReadonlyValuePipe", () => {
       { id: "c", name: "Option C" }
     ];
 
-    jest.spyOn(optionDisplayPipe, "transform").mockReturnValue("Option B");
+    vi.spyOn(optionDisplayPipe, "transform").mockReturnValue("Option B");
 
     const result = pipe.transform("b", options, "name", "id");
 
@@ -53,7 +53,7 @@ describe("ReadonlyValuePipe", () => {
   it("should handle options without optionValueKey", () => {
     const options = ["Option 1", "Option 2", "Option 3"];
 
-    jest.spyOn(optionDisplayPipe, "transform").mockReturnValue("Option 2");
+    vi.spyOn(optionDisplayPipe, "transform").mockReturnValue("Option 2");
 
     const result = pipe.transform("Option 2", options, "name");
 
@@ -69,7 +69,7 @@ describe("ReadonlyValuePipe", () => {
     ];
     const optionsDisplayArray = ["Display 1", "Display 2", "Display 3"];
 
-    jest.spyOn(optionDisplayPipe, "transform").mockReturnValue("Display 2");
+    vi.spyOn(optionDisplayPipe, "transform").mockReturnValue("Display 2");
 
     const result = pipe.transform(2, options, "name", "id", optionsDisplayArray);
 
@@ -85,7 +85,7 @@ describe("ReadonlyValuePipe", () => {
     ];
     const optionsDisplayArray = ["Display 1", "Display 2", "Display 3"];
 
-    jest.spyOn(optionDisplayPipe, "transform").mockReturnValue("Display 2");
+    vi.spyOn(optionDisplayPipe, "transform").mockReturnValue("Display 2");
 
     const result = pipe.transform(5, options, "name", "id", optionsDisplayArray);
 

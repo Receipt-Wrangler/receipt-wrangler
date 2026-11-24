@@ -46,7 +46,7 @@ describe("DialogFooterComponent", () => {
       .componentInstance;
     expect(cancel.tooltip()).toBe("Close");
 
-    const cancelled = jest.fn();
+    const cancelled = vi.fn();
     component.cancelClicked.subscribe(cancelled);
     cancel.clicked.emit();
 

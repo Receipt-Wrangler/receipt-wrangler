@@ -139,13 +139,13 @@ describe("GroupTableComponent", () => {
     it("refetches the current page instead of swapping in the caller's own groups", () => {
       // The table is server-paged and may be showing the all-groups filter, so
       // the post-delete refresh has to go back to the server.
-      const deleteSpy = jest
+      const deleteSpy = vi
         .spyOn(TestBed.inject(GroupsService), "deleteGroup")
         .mockReturnValue(of({} as any));
-      const refetchSpy = jest
+      const refetchSpy = vi
         .spyOn(component, "getTableData")
         .mockImplementation(() => {});
-      jest
+      vi
         .spyOn(TestBed.inject(MatDialog), "open")
         .mockReturnValue(mockDialogRef({ afterClosed: of(true) }) as any);
 
@@ -161,8 +161,8 @@ describe("GroupTableComponent", () => {
     });
 
     it("does nothing when deletion is disabled", () => {
-      const deleteSpy = jest.spyOn(TestBed.inject(GroupsService), "deleteGroup");
-      const dialogSpy = jest.spyOn(TestBed.inject(MatDialog), "open");
+      const deleteSpy = vi.spyOn(TestBed.inject(GroupsService), "deleteGroup");
+      const dialogSpy = vi.spyOn(TestBed.inject(MatDialog), "open");
 
       store.dispatch(new SetGroups([{ id: 1 } as Group]));
       store.dispatch(new SetPermissions([], {}));

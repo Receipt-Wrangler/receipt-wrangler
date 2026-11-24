@@ -12,16 +12,11 @@ import { SystemTaskTypePipe } from "../../shared-ui/task-table/system-task-type.
 import { AuthState } from "../../store/auth.state";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { GroupState } from "../../store/group.state";
-import { downloadFile } from "../../utils/file";
+import { captureDownloads } from "../../testing/download.testing";
 import { DashboardListComponent } from "../dashboard-list/dashboard-list.component";
 
 import { ActivityComponent } from "./activity.component";
 import { provideRouter } from "@angular/router";
-
-jest.mock("../../utils/file", () => ({
-  ...jest.requireActual("../../utils/file"),
-  downloadFile: jest.fn(),
-}));
 
 // The widget renders activities for one group, but on the "All" dashboard that
 // group is the synthetic aggregate. ACTIVITY_GROUP_ID is the group an activity
@@ -82,7 +77,7 @@ describe("ActivityComponent", () => {
     store = TestBed.inject(Store);
     systemTaskService = TestBed.inject(SystemTaskService);
 
-    jest.spyOn(systemTaskService, "getPagedActivities").mockReturnValue(of({ data: [], totalCount: 0 } as any));
+    vi.spyOn(systemTaskService, "getPagedActivities").mockReturnValue(of({ data: [], totalCount: 0 } as any));
 
     fixture.componentRef.setInput("widget", { name: "" } as any);
     fixture.componentRef.setInput("groupId", WIDGET_GROUP_ID);
@@ -90,7 +85,7 @@ describe("ActivityComponent", () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("should create", () => {
@@ -134,8 +129,8 @@ describe("ActivityComponent", () => {
 
   it("opens the preview dialog with the returned image", () => {
     const dialog = TestBed.inject(MatDialog);
-    const openSpy = jest.spyOn(dialog, "open").mockReturnValue({} as any);
-    jest.spyOn(systemTaskService, "getSystemTaskSourceFile").mockReturnValue(
+    const openSpy = vi.spyOn(dialog, "open").mockReturnValue({} as any);
+    vi.spyOn(systemTaskService, "getSystemTaskSourceFile").mockReturnValue(
       of({ name: "receipt.png", encodedImage: "data:image/png;base64,AAA" } as any)
     );
 
@@ -151,15 +146,19 @@ describe("ActivityComponent", () => {
 
   it("downloads under the name the server sent", () => {
     const blob = new Blob(["bytes"]);
-    jest.spyOn(systemTaskService, "downloadSystemTaskSourceFile").mockReturnValue(
+    vi.spyOn(systemTaskService, "downloadSystemTaskSourceFile").mockReturnValue(
       of({
         body: blob,
         headers: { get: () => 'attachment; filename="receipt.png"' },
       } as any)
     );
 
+    const downloads = captureDownloads();
+
     component.onDownloadButtonClick(1);
 
-    expect(downloadFile).toHaveBeenCalledWith(blob, "receipt.png");
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0].blob).toBe(blob);
+    expect(downloads[0].filename).toBe("receipt.png");
   });
 });

@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { CurrencyPipe } from "@angular/common";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
@@ -16,10 +17,13 @@ import { PieChartComponent } from "./pie-chart.component";
 describe("PieChartComponent", () => {
   let component: PieChartComponent;
   let fixture: ComponentFixture<PieChartComponent>;
-  let widgetService: jest.Mocked<WidgetService>;
+  // Typed loosely: the generated client overloads getPieChartData per `observe` mode, and a
+  // typed mock only accepts the last overload's HttpEvent return.
+  let widgetService: { getPieChartData: Mock };
 
   const mockWidget: Widget = {
     id: 1,
+    dashboardId: 1,
     name: "Test Pie Chart",
     widgetType: WidgetType.PieChart,
     configuration: {
@@ -37,7 +41,7 @@ describe("PieChartComponent", () => {
 
   beforeEach(async () => {
     const widgetServiceMock = {
-      getPieChartData: jest.fn(),
+      getPieChartData: vi.fn(),
     };
 
     await TestBed.configureTestingModule({
@@ -52,7 +56,7 @@ describe("PieChartComponent", () => {
       ],
     }).compileComponents();
 
-    widgetService = TestBed.inject(WidgetService) as jest.Mocked<WidgetService>;
+    widgetService = TestBed.inject(WidgetService) as unknown as { getPieChartData: Mock };
     widgetService.getPieChartData.mockReturnValue(of(mockPieChartData));
 
     fixture = TestBed.createComponent(PieChartComponent);
@@ -366,7 +370,7 @@ describe("PieChartComponent", () => {
           parsed: 100,
           dataset: { data: [100, 200, 200] },
         };
-        const result = labelCallback(mockContext as any);
+        const result = labelCallback.call({} as any, mockContext as any);
         expect(result).toBe("Category A: $100.00 (20.0%)");
       }
     });
@@ -381,7 +385,7 @@ describe("PieChartComponent", () => {
           parsed: 0,
           dataset: { data: [0, 0, 0] },
         };
-        const result = labelCallback(mockContext as any);
+        const result = labelCallback.call({} as any, mockContext as any);
         expect(result).toBe("Category A: $0.00 (0%)");
       }
     });
@@ -396,7 +400,7 @@ describe("PieChartComponent", () => {
           parsed: 100,
           dataset: { data: [100, 200] },
         };
-        const result = labelCallback(mockContext as any);
+        const result = labelCallback.call({} as any, mockContext as any);
         expect(result).toBe(": $100.00 (33.3%)");
       }
     });

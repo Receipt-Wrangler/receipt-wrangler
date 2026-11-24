@@ -1,3 +1,4 @@
+import type { Mocked } from "vitest";
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatDialogRef } from '@angular/material/dialog';
@@ -17,14 +18,14 @@ import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors"
 describe('ApiKeyFormDialogComponent', () => {
   let component: ApiKeyFormDialogComponent;
   let fixture: ComponentFixture<ApiKeyFormDialogComponent>;
-  let mockDialogRef: jest.Mocked<MatDialogRef<ApiKeyFormDialogComponent>>;
-  let mockApiKeyService: jest.Mocked<ApiKeyService>;
-  let mockSnackbarService: jest.Mocked<SnackbarService>;
+  let mockDialogRef: Mocked<MatDialogRef<ApiKeyFormDialogComponent>>;
+  let mockApiKeyService: Mocked<ApiKeyService>;
+  let mockSnackbarService: Mocked<SnackbarService>;
 
   beforeEach(async () => {
-    mockDialogRef = { close: jest.fn() } as unknown as jest.Mocked<MatDialogRef<ApiKeyFormDialogComponent>>;
-    mockApiKeyService = { createApiKey: jest.fn(), updateApiKey: jest.fn() } as unknown as jest.Mocked<ApiKeyService>;
-    mockSnackbarService = { success: jest.fn(), error: jest.fn() } as unknown as jest.Mocked<SnackbarService>;
+    mockDialogRef = { close: vi.fn() } as unknown as Mocked<MatDialogRef<ApiKeyFormDialogComponent>>;
+    mockApiKeyService = { createApiKey: vi.fn(), updateApiKey: vi.fn() } as unknown as Mocked<ApiKeyService>;
+    mockSnackbarService = { success: vi.fn(), error: vi.fn() } as unknown as Mocked<SnackbarService>;
 
     await TestBed.configureTestingModule({
       imports: [
@@ -159,7 +160,7 @@ describe('ApiKeyFormDialogComponent', () => {
   });
 
   it('should copy API key to clipboard', async () => {
-    const mockClipboard = { writeText: jest.fn() };
+    const mockClipboard = { writeText: vi.fn() };
     mockClipboard.writeText.mockReturnValue(Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: mockClipboard });
 

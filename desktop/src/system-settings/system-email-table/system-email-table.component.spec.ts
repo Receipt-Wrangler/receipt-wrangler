@@ -37,7 +37,7 @@ describe("SystemEmailsComponent", () => {
   });
 
   it("should pop confirmation dialog", () => {
-    const matDialogSpy = jest.spyOn(component.matDialog, "open").mockReturnValue(mockDialogRef({ afterClosed: of(undefined) }) as any);
+    const matDialogSpy = vi.spyOn(component.matDialog, "open").mockReturnValue(mockDialogRef({ afterClosed: of(undefined) }) as any);
     component.dataSource.set(new MatTableDataSource([
       {
         id: 1,

@@ -39,7 +39,7 @@ describe("OidcProviderTableComponent", () => {
 
     store = TestBed.inject(Store);
 
-    jest
+    vi
       .spyOn(TestBed.inject(OidcProviderService), "getPagedOidcProviders")
       .mockReturnValue(of({ data: [], totalCount: 0 }) as any);
 
@@ -47,7 +47,7 @@ describe("OidcProviderTableComponent", () => {
     component = fixture.componentInstance;
   });
 
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => vi.restoreAllMocks());
 
   it("hides the actions column when the user can neither edit nor delete", () => {
     store.dispatch(new SetPermissions([Permission.AppOidcProvidersRead], {}));

@@ -60,7 +60,7 @@ describe("DummyUserConversionDialogComponent", () => {
   });
 
   it("should call close when cancel button is clicked", () => {
-    const dialogRefSpy = jest.spyOn(component.matDialogRef, "close");
+    const dialogRefSpy = vi.spyOn(component.matDialogRef, "close");
     component.cancelButtonClicked();
 
     expect(dialogRefSpy).toHaveBeenCalledTimes(1);
@@ -69,17 +69,17 @@ describe("DummyUserConversionDialogComponent", () => {
   it("should call service and call update in state", () => {
     const usersService = TestBed.inject(UserService);
 
-    const usersSpy = jest.spyOn(usersService, "convertDummyUserById");
+    const usersSpy = vi.spyOn(usersService, "convertDummyUserById");
     usersSpy.mockReturnValue(of(undefined as any));
 
     const store = TestBed.inject(Store);
-    const storeSpy = jest.spyOn(store, "dispatch");
+    const storeSpy = vi.spyOn(store, "dispatch");
     storeSpy.mockReturnValue(of(undefined));
 
-    const dialogSpy = jest.spyOn(component.matDialogRef, "close");
+    const dialogSpy = vi.spyOn(component.matDialogRef, "close");
     dialogSpy.mockReturnValue(undefined);
 
-    jest.spyOn(TestBed.inject(SnackbarService), "success").mockReturnValue(
+    vi.spyOn(TestBed.inject(SnackbarService), "success").mockReturnValue(
       undefined
     );
 

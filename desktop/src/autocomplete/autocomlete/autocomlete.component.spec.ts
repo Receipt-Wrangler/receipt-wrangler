@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, } from "@angular/forms";
@@ -10,7 +11,7 @@ import { AutocomleteComponent } from "./autocomlete.component";
 describe("AutocomleteComponent", () => {
   let component: AutocomleteComponent;
   let fixture: ComponentFixture<AutocomleteComponent>;
-  jest.useFakeTimers();
+  vi.useFakeTimers();
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -255,29 +256,29 @@ describe("AutocomleteComponent", () => {
   // CDK overlay, neither of which this branch is about.
   describe("panel behavior after selecting in multiple mode", () => {
     function selectAnOption(): {
-      openPanel: jest.Mock;
-      closePanel: jest.Mock;
-      blur: jest.Mock;
+      openPanel: Mock;
+      closePanel: Mock;
+      blur: Mock;
     } {
-      const openPanel = jest.fn();
-      const closePanel = jest.fn();
-      const blur = jest.fn();
+      const openPanel = vi.fn();
+      const closePanel = vi.fn();
+      const blur = vi.fn();
 
       fixture.componentRef.setInput("multiple", true);
       fixture.componentRef.setInput("inputFormControl", new FormArray([]) as any);
       (component as any).matAutocompleteTrigger = () => ({ openPanel, closePanel });
       (component as any).inputMultiple = () => ({ nativeElement: { blur } });
 
-      // jest.useFakeTimers() is describe-scoped and none of the other
+      // vi.useFakeTimers() is describe-scoped and none of the other
       // optionSelected cases flush, so the queue is carrying their timers -
       // bound to components TestBed has since destroyed. Drop them, or
       // runAllTimers() fires those instead and throws NG0205.
-      jest.clearAllTimers();
+      vi.clearAllTimers();
 
       component.optionSelected({
         option: { id: "selected-option", value: "value 1" },
       } as MatAutocompleteSelectedEvent);
-      jest.runAllTimers();
+      vi.runAllTimers();
 
       return { openPanel, closePanel, blur };
     }

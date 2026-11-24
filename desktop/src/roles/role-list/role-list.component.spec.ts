@@ -1,3 +1,4 @@
+import type { Mock, MockInstance } from "vitest";
 import { CommonModule } from "@angular/common";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
@@ -75,17 +76,17 @@ async function setup(
 ): Promise<{
   component: RoleListComponent;
   fixture: ComponentFixture<RoleListComponent>;
-  navigateSpy: jest.SpyInstance;
+  navigateSpy: MockInstance;
   roleService: RoleService;
   snackbar: SnackbarService;
-  dialogRef: { componentInstance: any; afterClosed: jest.Mock };
+  dialogRef: { componentInstance: any; afterClosed: Mock };
 }> {
   const dialogRef = {
     ...mockDialogRef(),
-    afterClosed: jest.fn().mockReturnValue(of(confirmResult)),
+    afterClosed: vi.fn().mockReturnValue(of(confirmResult)),
   };
-  const matDialogMock = { open: jest.fn().mockReturnValue(dialogRef) };
-  const snackbarMock = { info: jest.fn(), success: jest.fn(), error: jest.fn() };
+  const matDialogMock = { open: vi.fn().mockReturnValue(dialogRef) };
+  const snackbarMock = { info: vi.fn(), success: vi.fn(), error: vi.fn() };
 
   TestBed.resetTestingModule();
   await TestBed.configureTestingModule({
@@ -109,10 +110,10 @@ async function setup(
     .compileComponents();
 
   const roleService = TestBed.inject(RoleService);
-  jest.spyOn(roleService, "getRoles").mockReturnValue(of(roles) as any);
-  jest.spyOn(roleService, "deleteRole").mockReturnValue(of({}) as any);
-  jest.spyOn(roleService, "setDefaultRole").mockReturnValue(of({}) as any);
-  jest
+  vi.spyOn(roleService, "getRoles").mockReturnValue(of(roles) as any);
+  vi.spyOn(roleService, "deleteRole").mockReturnValue(of({}) as any);
+  vi.spyOn(roleService, "setDefaultRole").mockReturnValue(of({}) as any);
+  vi
     .spyOn(TestBed.inject(PermissionService), "getPermissions")
     .mockReturnValue(
       permissions === "error"
@@ -121,7 +122,7 @@ async function setup(
     );
 
   const router = TestBed.inject(Router);
-  const navigateSpy = jest.spyOn(router, "navigate").mockResolvedValue(true);
+  const navigateSpy = vi.spyOn(router, "navigate").mockResolvedValue(true);
 
   const fixture = TestBed.createComponent(RoleListComponent);
   const component = fixture.componentInstance;
@@ -256,7 +257,7 @@ describe("RoleListComponent", () => {
 
   it("deletes a role with its scope after confirmation, then reloads", async () => {
     const { component, roleService } = await setup();
-    const reloadSpy = jest.spyOn(roleService, "getRoles");
+    const reloadSpy = vi.spyOn(roleService, "getRoles");
     const callsBefore = reloadSpy.mock.calls.length;
 
     component.deleteRole(listItem({ id: "5", scope: "group" }));
@@ -289,9 +290,9 @@ describe("RoleListComponent", () => {
 
   it("shows an error and does not reload when delete fails", async () => {
     const { component, roleService, snackbar } = await setup();
-    const reloadSpy = jest.spyOn(roleService, "getRoles");
+    const reloadSpy = vi.spyOn(roleService, "getRoles");
     const callsBefore = reloadSpy.mock.calls.length;
-    (roleService.deleteRole as jest.Mock).mockReturnValueOnce(
+    (roleService.deleteRole as Mock).mockReturnValueOnce(
       throwError(() => new Error("boom")) as any,
     );
 
@@ -320,7 +321,7 @@ describe("RoleListComponent", () => {
       { ...ROLES[0], id: 9, name: "Restricted", isDefault: false, isSystem: false },
     ];
     const { component, roleService, snackbar } = await setup(roles);
-    const reloadSpy = jest.spyOn(roleService, "getRoles");
+    const reloadSpy = vi.spyOn(roleService, "getRoles");
     const callsBefore = reloadSpy.mock.calls.length;
 
     component.defaultAppRoleControl.setValue(9);
@@ -343,9 +344,9 @@ describe("RoleListComponent", () => {
       { ...ROLES[0], id: 9, name: "Restricted", isDefault: false, isSystem: false },
     ];
     const { component, roleService, snackbar } = await setup(roles);
-    const reloadSpy = jest.spyOn(roleService, "getRoles");
+    const reloadSpy = vi.spyOn(roleService, "getRoles");
     const callsBefore = reloadSpy.mock.calls.length;
-    (roleService.setDefaultRole as jest.Mock).mockReturnValueOnce(
+    (roleService.setDefaultRole as Mock).mockReturnValueOnce(
       throwError(() => new Error("boom")) as any,
     );
 

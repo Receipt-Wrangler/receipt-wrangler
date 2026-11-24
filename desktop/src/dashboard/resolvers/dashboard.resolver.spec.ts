@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { TestBed } from "@angular/core/testing";
 import { ResolveFn } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
-import { Observable } from "rxjs";
+import { firstValueFrom, Observable } from "rxjs";
 import { SetDashboardsForGroup } from "src/store/dashboard.state.actions";
 import { Dashboard, DashboardService, Permission } from "../../open-api";
 import { AuthState } from "../../store";
@@ -40,16 +40,16 @@ describe("dashboardResolver", () => {
     store.dispatch(
       new SetPermissions([], { 1: [Permission.GroupDashboardsRead] })
     );
-    const dispatchSpy = jest.spyOn(store, "dispatch");
+    const dispatchSpy = vi.spyOn(store, "dispatch");
 
     executeResolver({ params: { groupId: "1" } } as any, {} as any);
 
     expect(dispatchSpy).toHaveBeenCalledWith(new SetDashboardsForGroup("1"));
   });
 
-  it("does not fetch dashboards without group.dashboards.read", (done) => {
+  it("does not fetch dashboards without group.dashboards.read", async () => {
     store.dispatch(new SetPermissions([], {}));
-    const dispatchSpy = jest.spyOn(store, "dispatch");
+    const dispatchSpy = vi.spyOn(store, "dispatch");
 
     const result = executeResolver(
       { params: { groupId: "1" } } as any,
@@ -57,9 +57,6 @@ describe("dashboardResolver", () => {
     ) as Observable<Dashboard[]>;
 
     expect(dispatchSpy).not.toHaveBeenCalledWith(new SetDashboardsForGroup("1"));
-    result.subscribe((dashboards) => {
-      expect(dashboards).toEqual([]);
-      done();
-    });
+    expect(await firstValueFrom(result)).toEqual([]);
   });
 });

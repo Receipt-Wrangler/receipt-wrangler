@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
@@ -105,7 +106,7 @@ describe("GroupReceiptSettingsComponent", () => {
         provideTestStore(),
         FormBuilder,
         GroupsService,
-        { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
         Store,
         SnackbarService,
         {
@@ -181,10 +182,10 @@ describe("GroupReceiptSettingsComponent", () => {
     const router = TestBed.inject(Router);
     const snackbarService = TestBed.inject(SnackbarService);
 
-    jest.spyOn(groupsService, "updateGroupReceiptSettings").mockReturnValue(of(testGroup.groupReceiptSettings as any));
-    jest.spyOn(store, "dispatch").mockReturnValue(of(undefined));
-    jest.spyOn(router, "navigate");
-    jest.spyOn(snackbarService, "success");
+    vi.spyOn(groupsService, "updateGroupReceiptSettings").mockReturnValue(of(testGroup.groupReceiptSettings as any));
+    vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
+    vi.spyOn(router, "navigate");
+    vi.spyOn(snackbarService, "success");
 
     component.form.patchValue(testGroup.groupReceiptSettings);
     component.submit();
@@ -295,8 +296,8 @@ describe("GroupReceiptSettingsComponent", () => {
     const groupsService = TestBed.inject(GroupsService);
     const store = TestBed.inject(Store);
 
-    jest.spyOn(groupsService, "updateGroupReceiptSettings").mockReturnValue(of(testGroup.groupReceiptSettings as any));
-    jest.spyOn(store, "dispatch").mockReturnValue(of(undefined));
+    vi.spyOn(groupsService, "updateGroupReceiptSettings").mockReturnValue(of(testGroup.groupReceiptSettings as any));
+    vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
 
     component.form.patchValue({
       quickScanCommentEnabled: true,
@@ -328,10 +329,10 @@ describe("GroupReceiptSettingsComponent", () => {
       const groupsService = TestBed.inject(GroupsService);
       const store = TestBed.inject(Store);
 
-      const updateSpy = jest
+      const updateSpy = vi
         .spyOn(groupsService, "updateGroupReceiptSettings")
         .mockReturnValue(of(testGroup.groupReceiptSettings as any));
-      jest.spyOn(store, "dispatch").mockReturnValue(of(undefined));
+      vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
 
       component.submit();
 
@@ -359,10 +360,10 @@ describe("GroupReceiptSettingsComponent", () => {
       const groupsService = TestBed.inject(GroupsService);
       const store = TestBed.inject(Store);
 
-      const updateSpy = jest
+      const updateSpy = vi
         .spyOn(groupsService, "updateGroupReceiptSettings")
         .mockReturnValue(of(testGroupWithDefaults.groupReceiptSettings as any));
-      jest.spyOn(store, "dispatch").mockReturnValue(of(undefined));
+      vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
 
       component.submit();
 
@@ -379,10 +380,10 @@ describe("GroupReceiptSettingsComponent", () => {
       const groupsService = TestBed.inject(GroupsService);
       const store = TestBed.inject(Store);
 
-      const updateSpy = jest
+      const updateSpy = vi
         .spyOn(groupsService, "updateGroupReceiptSettings")
         .mockReturnValue(of(testGroupWithDefaults.groupReceiptSettings as any));
-      jest.spyOn(store, "dispatch").mockReturnValue(of(undefined));
+      vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
 
       component.defaultCustomFieldsFormArray.clear();
       component.submit();
@@ -451,13 +452,13 @@ describe("GroupReceiptSettingsComponent", () => {
       component.form.get("receiptSummaryPosition")?.setValue(ReceiptSummaryPosition.Top);
 
       const groupsService = TestBed.inject(GroupsService);
-      jest.spyOn(groupsService, "updateGroupReceiptSettings")
+      vi.spyOn(groupsService, "updateGroupReceiptSettings")
         .mockReturnValue(of(testGroupWithSummary.groupReceiptSettings as any));
-      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+      vi.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
 
       component.submit();
 
-      const command = (groupsService.updateGroupReceiptSettings as jest.Mock).mock.calls[0][1];
+      const command = (groupsService.updateGroupReceiptSettings as Mock).mock.calls[0][1];
       expect(command.receiptSummaryPosition).toBe(ReceiptSummaryPosition.Top);
     });
 
@@ -486,13 +487,13 @@ describe("GroupReceiptSettingsComponent", () => {
       await configureTestBed(FormMode.edit, { group: testGroupWithSummary });
 
       const groupsService = TestBed.inject(GroupsService);
-      jest.spyOn(groupsService, "updateGroupReceiptSettings")
+      vi.spyOn(groupsService, "updateGroupReceiptSettings")
         .mockReturnValue(of(testGroupWithSummary.groupReceiptSettings as any));
-      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+      vi.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
 
       component.submit();
 
-      const command = (groupsService.updateGroupReceiptSettings as jest.Mock).mock.calls[0][1];
+      const command = (groupsService.updateGroupReceiptSettings as Mock).mock.calls[0][1];
       expect(command).not.toHaveProperty("receiptSummaryCustomFieldIds");
       // The keys this caller DOES own are still sent.
       expect(command.receiptSummaryEnabled).toBe(true);
@@ -510,13 +511,13 @@ describe("GroupReceiptSettingsComponent", () => {
       expect(component.summaryCustomFieldsFormArray.value).toEqual([currencyCustomField]);
 
       const groupsService = TestBed.inject(GroupsService);
-      jest.spyOn(groupsService, "updateGroupReceiptSettings")
+      vi.spyOn(groupsService, "updateGroupReceiptSettings")
         .mockReturnValue(of(testGroupWithSummary.groupReceiptSettings as any));
-      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+      vi.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
 
       component.submit();
 
-      const command = (groupsService.updateGroupReceiptSettings as jest.Mock).mock.calls[0][1];
+      const command = (groupsService.updateGroupReceiptSettings as Mock).mock.calls[0][1];
       expect(command.receiptSummaryCustomFieldIds).toEqual([3]);
       // The FormArray holds whole CustomField objects; only ids belong on the command.
       expect(command).not.toHaveProperty("receiptSummaryCustomFields");
@@ -542,13 +543,13 @@ describe("GroupReceiptSettingsComponent", () => {
       component.form.get("receiptSummaryStatuses.DECLINED")?.setValue(true);
 
       const groupsService = TestBed.inject(GroupsService);
-      jest.spyOn(groupsService, "updateGroupReceiptSettings")
+      vi.spyOn(groupsService, "updateGroupReceiptSettings")
         .mockReturnValue(of(testGroupWithSummary.groupReceiptSettings as any));
-      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+      vi.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
 
       component.submit();
 
-      const command = (groupsService.updateGroupReceiptSettings as jest.Mock).mock.calls[0][1];
+      const command = (groupsService.updateGroupReceiptSettings as Mock).mock.calls[0][1];
       expect(command.receiptSummaryStatuses.sort()).toEqual(["DECLINED", "RESOLVED"]);
     });
   });

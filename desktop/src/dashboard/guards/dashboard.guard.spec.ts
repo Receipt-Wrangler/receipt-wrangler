@@ -1,3 +1,4 @@
+import type { MockInstance } from "vitest";
 import { TestBed } from "@angular/core/testing";
 import { Router } from "@angular/router";
 import { RouterTestingModule } from "@angular/router/testing";
@@ -9,7 +10,7 @@ import { dashboardGuard } from "./dashboard.guard";
 
 describe("dashboardGuard", () => {
   let store: Store;
-  let navigateSpy: jest.SpyInstance;
+  let navigateSpy: MockInstance;
 
   const executeGuard = (dashboardId: string) =>
     TestBed.runInInjectionContext(() =>
@@ -41,14 +42,14 @@ describe("dashboardGuard", () => {
       ],
     });
     store = TestBed.inject(Store);
-    navigateSpy = jest
+    navigateSpy = vi
       .spyOn(TestBed.inject(Router), "navigate")
       .mockResolvedValue(true);
   });
 
   it("allows activation and selects the dashboard when it exists in the group", () => {
     seedDashboards([dashboard(5)]);
-    const dispatchSpy = jest.spyOn(store, "dispatch");
+    const dispatchSpy = vi.spyOn(store, "dispatch");
 
     expect(executeGuard("5")).toBe(true);
     expect(dispatchSpy).toHaveBeenCalledWith(new SetSelectedDashboardId("5"));

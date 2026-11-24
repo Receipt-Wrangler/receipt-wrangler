@@ -66,8 +66,10 @@ describe("NotificationComponent", () => {
         ],
       },
     });
-    component.notification.body =
-      "Hey check out the group: ${groupId:5.name.string}!";
+    fixture.componentRef.setInput("notification", {
+      ...component.notification(),
+      body: "Hey check out the group: ${groupId:5.name.string}!",
+    });
 
     component.ngOnInit();
 
@@ -76,10 +78,10 @@ describe("NotificationComponent", () => {
   });
 
   it("should delete notification", () => {
-    const serviceSpy = jest.spyOn(service, "deleteNotificationById").mockReturnValue(
+    const serviceSpy = vi.spyOn(service, "deleteNotificationById").mockReturnValue(
       of(undefined as any)
     );
-    const emitterSpy = jest.spyOn(component.notificationDeleted, "emit");
+    const emitterSpy = vi.spyOn(component.notificationDeleted, "emit");
 
     component.deleteNotification();
 

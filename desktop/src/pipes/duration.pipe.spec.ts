@@ -23,7 +23,7 @@ describe("DurationPipe", () => {
     it("should display minutes for same day", () => {
       // Mock current date
       const now = new Date(2024, 0, 1, 12, 30, 0);
-      jest.setSystemTime(now);
+      vi.setSystemTime(now);
 
       // 20 minutes ago
       const date = new Date(2024, 0, 1, 12, 10, 0);
@@ -37,7 +37,7 @@ describe("DurationPipe", () => {
     it("should display hours for same day", () => {
       // Mock current date
       const now = new Date(2024, 0, 1, 12, 0, 0);
-      jest.setSystemTime(now);
+      vi.setSystemTime(now);
 
       // 2 hours ago
       const date = new Date(2024, 0, 1, 10, 0, 0);
@@ -51,7 +51,7 @@ describe("DurationPipe", () => {
     it("should display days for different days", () => {
       // Mock current date
       const now = new Date(2024, 0, 5, 12, 0, 0);
-      jest.setSystemTime(now);
+      vi.setSystemTime(now);
 
       // 2 days ago
       const twoDaysAgo = new Date(2024, 0, 3, 12, 0, 0);
@@ -65,7 +65,7 @@ describe("DurationPipe", () => {
     it("should handle hours for different days when less than 24 hours", () => {
       // Mock current date
       const now = new Date(2024, 0, 2, 1, 0, 0);
-      jest.setSystemTime(now);
+      vi.setSystemTime(now);
 
       // 20 hours ago (previous day)
       const date = new Date(2024, 0, 1, 5, 0, 0);
@@ -75,7 +75,7 @@ describe("DurationPipe", () => {
     it("should return empty string for future dates", () => {
       // Mock current date
       const now = new Date(2024, 0, 1, 12, 0, 0);
-      jest.setSystemTime(now);
+      vi.setSystemTime(now);
 
       // Future date
       const futureDate = new Date(2024, 0, 2, 12, 0, 0);
@@ -83,7 +83,7 @@ describe("DurationPipe", () => {
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
   */
 });

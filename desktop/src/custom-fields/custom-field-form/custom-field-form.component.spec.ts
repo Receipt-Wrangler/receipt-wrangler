@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
@@ -39,20 +40,20 @@ describe("CustomFieldFormComponent", () => {
         {
           provide: MatDialogRef,
           useValue: {
-            close: jest.fn()
+            close: vi.fn()
           }
         },
         {
           provide: CustomFieldService,
           useValue: {
-            createCustomField: jest.fn().mockReturnValue(of({})),
-            updateCustomField: jest.fn().mockReturnValue(of({}))
+            createCustomField: vi.fn().mockReturnValue(of({})),
+            updateCustomField: vi.fn().mockReturnValue(of({}))
           }
         },
         {
           provide: SnackbarService,
           useValue: {
-            success: jest.fn()
+            success: vi.fn()
           }
         },
         provideHttpClient(withInterceptorsFromDi()),
@@ -303,7 +304,7 @@ describe("CustomFieldFormComponent", () => {
       (component.form.get("options") as any).at(2).patchValue({ value: "Option 3" });
       component.submit();
 
-      const command = (customFieldService.updateCustomField as jest.Mock).mock.calls[0][1];
+      const command = (customFieldService.updateCustomField as Mock).mock.calls[0][1];
       expect(command.options[2]).toEqual({ id: undefined, value: "Option 3", customFieldId: 7 });
     });
 

@@ -15,17 +15,17 @@ describe("QuickActionsDialogComponent", () => {
   let fixture: ComponentFixture<QuickActionsDialogComponent>;
 
   const mockDialogRef = {
-    close: jest.fn(),
+    close: vi.fn(),
   };
 
   const mockSnackBar = {
-    open: jest.fn(),
+    open: vi.fn(),
   };
 
   const mockSnackbarService = {
-    error: jest.fn(),
-    info: jest.fn(),
-    success: jest.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    success: vi.fn(),
   };
 
   beforeEach(async () => {
@@ -100,7 +100,7 @@ describe("QuickActionsDialogComponent", () => {
       quickAction: component.radioValues[0].value,
     });
 
-    jest.spyOn(component.itemsToAdd, "emit");
+    vi.spyOn(component.itemsToAdd, "emit");
 
     component.addSplits();
 
@@ -132,7 +132,7 @@ describe("QuickActionsDialogComponent", () => {
     component.localForm.addControl("1", new FormControl("10"));
     component.localForm.addControl("2", new FormControl("20"));
 
-    jest.spyOn(component.itemsToAdd, "emit");
+    vi.spyOn(component.itemsToAdd, "emit");
 
     component.addSplits();
 
@@ -339,7 +339,7 @@ describe("QuickActionsDialogComponent", () => {
         component.setPercentage(users[1].id.toString(), 35);
         component.setPercentage(users[2].id.toString(), 25);
 
-        jest.spyOn(component.itemsToAdd, "emit");
+        vi.spyOn(component.itemsToAdd, "emit");
 
         component.addSplits();
 
@@ -363,7 +363,7 @@ describe("QuickActionsDialogComponent", () => {
 
         component.setPercentage(users[0].id.toString(), 50);
 
-        jest.spyOn(component.itemsToAdd, "emit");
+        vi.spyOn(component.itemsToAdd, "emit");
 
         component.addSplits();
 
@@ -387,7 +387,7 @@ describe("QuickActionsDialogComponent", () => {
         component.setPercentage(users[0].id.toString(), 100);
         // Other users remain at 0%
 
-        jest.spyOn(component.itemsToAdd, "emit");
+        vi.spyOn(component.itemsToAdd, "emit");
 
         component.addSplits();
 
@@ -412,7 +412,7 @@ describe("QuickActionsDialogComponent", () => {
         percentageControl?.enable();
         percentageControl?.setValue(33.33);
 
-        jest.spyOn(component.itemsToAdd, "emit");
+        vi.spyOn(component.itemsToAdd, "emit");
 
         component.addSplits();
 
@@ -557,7 +557,7 @@ describe("QuickActionsDialogComponent", () => {
         component = fixture.componentInstance;
         fixture.componentRef.setInput("originalReceipt", { id: 1 } as any);
         fixture.detectChanges();
-        jest.spyOn(component.itemsToAdd, "emit");
+        vi.spyOn(component.itemsToAdd, "emit");
         component.localForm.patchValue({
           quickAction: component.radioValues[0].value,
         });
@@ -584,7 +584,7 @@ describe("QuickActionsDialogComponent", () => {
         percentageControl?.enable();
         percentageControl?.setValue(33.333);
 
-        jest.spyOn(component.itemsToAdd, "emit");
+        vi.spyOn(component.itemsToAdd, "emit");
 
         component.addSplits();
 

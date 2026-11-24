@@ -8,7 +8,7 @@ import { config } from "rxjs";
  * RxJS rethrows an unhandled error from its own `setTimeout`, so left alone it lands
  * in whichever later test first waits on a timer, and it reads
  * `config.onUnhandledError` only when that timer fires. Restoring the handler
- * before then, as a plain try/finally does, still leaks. So `fn` runs under Jest's
+ * before then, as a plain try/finally does, still leaks. So `fn` runs under Vitest's
  * fake timers and the pending timers are flushed while the collecting handler is
  * installed.
  *
@@ -18,14 +18,14 @@ export function swallowUnhandledRxjsErrors(fn: () => void): unknown[] {
   const errors: unknown[] = [];
   const previousHandler = config.onUnhandledError;
 
-  jest.useFakeTimers();
+  vi.useFakeTimers();
   config.onUnhandledError = (error) => errors.push(error);
   try {
     fn();
-    jest.runOnlyPendingTimers();
+    vi.runOnlyPendingTimers();
   } finally {
     config.onUnhandledError = previousHandler;
-    jest.useRealTimers();
+    vi.useRealTimers();
   }
 
   return errors;

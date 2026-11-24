@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
@@ -12,10 +13,11 @@ import { ReportWidgetComponent } from "./report-widget.component";
 describe("ReportWidgetComponent", () => {
   let fixture: ComponentFixture<ReportWidgetComponent>;
   let component: ReportWidgetComponent;
-  let runner: { renderTemplate: jest.Mock; downloadTemplateById: jest.Mock };
+  let runner: { renderTemplate: Mock; downloadTemplateById: Mock };
 
   const widget = (reportTemplateId?: number): Widget => ({
     id: 1,
+    dashboardId: 1,
     name: "My Report",
     widgetType: WidgetType.Report,
     configuration: reportTemplateId === undefined ? {} : { reportTemplateId },
@@ -30,7 +32,7 @@ describe("ReportWidgetComponent", () => {
   }
 
   beforeEach(async () => {
-    runner = { renderTemplate: jest.fn(), downloadTemplateById: jest.fn() };
+    runner = { renderTemplate: vi.fn(), downloadTemplateById: vi.fn() };
 
     await TestBed.configureTestingModule({
       imports: [ReportWidgetComponent],

@@ -24,7 +24,7 @@ describe("BulkDeleteResultDialogComponent", () => {
       providers: [
         provideRouter([]),
         provideStore([]),
-        { provide: MatDialogRef, useValue: { close: jest.fn() } },
+        { provide: MatDialogRef, useValue: { close: vi.fn() } },
         { provide: MAT_DIALOG_DATA, useValue: data },
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],

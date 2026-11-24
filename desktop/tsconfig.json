@@ -23,6 +23,12 @@
       "ES2022",
       "dom"
     ],
+    // Editors only: tsconfig.app.json and tsconfig.spec.json each set their own `types`.
+    // vitest/globals is not an @types package, so it is not picked up automatically.
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
     "paths": {}
   },
   "angularCompilerOptions": {

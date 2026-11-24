@@ -186,7 +186,7 @@ describe("TaskTableComponent", () => {
 
     it("opens the diff dialog with the parsed snapshots", () => {
       const dialog = TestBed.inject(MatDialog);
-      const open = jest.spyOn(dialog, "open").mockReturnValue(undefined as any);
+      const open = vi.spyOn(dialog, "open").mockReturnValue(undefined as any);
 
       component.openReceiptUpdateDialog({ before, after, version: 2 });
 

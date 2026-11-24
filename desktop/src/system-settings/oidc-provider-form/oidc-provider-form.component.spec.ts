@@ -48,7 +48,7 @@ describe("OidcProviderFormComponent", () => {
       providers: [
         provideNgxMask(),
         SnackbarService,
-        { provide: MatDialogRef, useValue: { close: jest.fn() } },
+        { provide: MatDialogRef, useValue: { close: vi.fn() } },
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),
       ],
@@ -102,7 +102,7 @@ describe("OidcProviderFormComponent", () => {
 
   it("omits a blank client secret from the payload so the stored one survives", () => {
     initEdit();
-    const updateSpy = jest
+    const updateSpy = vi
       .spyOn(oidcProviderService, "updateOidcProvider")
       .mockReturnValue(of(provider) as any);
 
@@ -119,7 +119,7 @@ describe("OidcProviderFormComponent", () => {
     initEdit();
     component.form.get("clientSecret")?.setValue("  a-new-secret  ");
 
-    const updateSpy = jest
+    const updateSpy = vi
       .spyOn(oidcProviderService, "updateOidcProvider")
       .mockReturnValue(of(provider) as any);
 
@@ -184,7 +184,7 @@ describe("OidcProviderFormComponent", () => {
     it("issues one request when submit runs again while the save is in flight", () => {
       initEdit();
       const pending = new Subject<OidcProviderView>();
-      const updateSpy = jest
+      const updateSpy = vi
         .spyOn(oidcProviderService, "updateOidcProvider")
         .mockReturnValue(pending as any);
 
@@ -200,7 +200,7 @@ describe("OidcProviderFormComponent", () => {
     it("accepts a new submit once the save has landed", () => {
       initEdit();
       const pending = new Subject<OidcProviderView>();
-      const updateSpy = jest
+      const updateSpy = vi
         .spyOn(oidcProviderService, "updateOidcProvider")
         .mockReturnValue(pending as any);
 
@@ -214,7 +214,7 @@ describe("OidcProviderFormComponent", () => {
 
     it("becomes submittable again after a failed save", () => {
       initEdit();
-      const updateSpy = jest
+      const updateSpy = vi
         .spyOn(oidcProviderService, "updateOidcProvider")
         .mockReturnValue(throwError(() => new Error("boom")) as any);
 
@@ -255,9 +255,9 @@ describe("OidcProviderFormComponent", () => {
 
     it("reports success", async () => {
       initEdit();
-      const writeText = jest.fn().mockResolvedValue(undefined);
+      const writeText = vi.fn().mockResolvedValue(undefined);
       setClipboard({ writeText });
-      const successSpy = jest
+      const successSpy = vi
         .spyOn(TestBed.inject(SnackbarService), "success")
         .mockImplementation(() => undefined as any);
 
@@ -269,8 +269,8 @@ describe("OidcProviderFormComponent", () => {
 
     it("reports a rejected write instead of leaving it unhandled", async () => {
       initEdit();
-      setClipboard({ writeText: jest.fn().mockRejectedValue(new Error("nope")) });
-      const errorSpy = jest
+      setClipboard({ writeText: vi.fn().mockRejectedValue(new Error("nope")) });
+      const errorSpy = vi
         .spyOn(TestBed.inject(SnackbarService), "error")
         .mockImplementation(() => undefined as any);
 
@@ -287,7 +287,7 @@ describe("OidcProviderFormComponent", () => {
       // synchronously and the button did nothing at all.
       initEdit();
       setClipboard(undefined);
-      const errorSpy = jest
+      const errorSpy = vi
         .spyOn(TestBed.inject(SnackbarService), "error")
         .mockImplementation(() => undefined as any);
 

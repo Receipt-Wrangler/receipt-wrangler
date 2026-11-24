@@ -88,8 +88,8 @@ describe("FilterFieldComponent", () => {
   // The server resolves WITHIN_CURRENT_MONTH in the app zone: at 9PM Sep 30 in
   // New York (Oct 1 UTC) the implied range is still September.
   it("shows the WITHIN_CURRENT_MONTH range from the app zone's today", () => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date("2026-10-01T01:00:00Z"));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T01:00:00Z"));
     try {
       TestBed.inject(Store).dispatch(new SetTimeZone("America/New_York"));
       render("date", FilterOperation.WithinCurrentMonth);
@@ -97,7 +97,7 @@ describe("FilterFieldComponent", () => {
       expect(component.startOfMonthFormControl.value).toEqual(new Date(2026, 8, 1));
       expect(component.endOfTodayFormControl.value).toEqual(new Date(2026, 8, 30, 23, 59, 59, 999));
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
 });

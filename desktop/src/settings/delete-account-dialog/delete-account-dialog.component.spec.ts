@@ -1,3 +1,4 @@
+import type { Mocked } from "vitest";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
@@ -14,11 +15,11 @@ import { provideNgxMask } from "ngx-mask";
 describe("DeleteAccountDialogComponent", () => {
   let component: DeleteAccountDialogComponent;
   let fixture: ComponentFixture<DeleteAccountDialogComponent>;
-  let dialogRefSpy: jest.Mocked<MatDialogRef<DeleteAccountDialogComponent>>;
+  let dialogRefSpy: Mocked<MatDialogRef<DeleteAccountDialogComponent>>;
 
   async function setUp(data?: DeleteAccountDialogData): Promise<void> {
     dialogRefSpy = {
-      close: jest.fn(),
+      close: vi.fn(),
     } as any;
 
     // app-button carries a routerLink, so the real buttons need a router.

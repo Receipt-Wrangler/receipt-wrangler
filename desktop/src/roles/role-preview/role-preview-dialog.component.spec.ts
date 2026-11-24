@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
@@ -44,10 +45,10 @@ describe("RolePreviewDialogComponent", () => {
 
   let fixture: ComponentFixture<RolePreviewDialogComponent>;
   let component: RolePreviewDialogComponent;
-  let getPermissionsMock: jest.Mock;
+  let getPermissionsMock: Mock;
 
   beforeEach(async () => {
-    getPermissionsMock = jest.fn().mockReturnValue(of(descriptors));
+    getPermissionsMock = vi.fn().mockReturnValue(of(descriptors));
     await TestBed.configureTestingModule({
       imports: [RolePreviewDialogComponent, NoopAnimationsModule],
       providers: [

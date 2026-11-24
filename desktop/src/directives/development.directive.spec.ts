@@ -38,14 +38,14 @@ describe('DevelopmentDirective', () => {
   });
 
   it('should remove view if is prod', () => {
-    jest.spyOn(environmentService, 'isProduction').mockReturnValue(true);
+    vi.spyOn(environmentService, 'isProduction').mockReturnValue(true);
     directive = TestBed.inject(DevelopmentDirective);
 
     expect(directive.hasView).toEqual(false);
   });
 
   it('should display view if is not prod', () => {
-    jest.spyOn(environmentService, 'isProduction').mockReturnValue(false);
+    vi.spyOn(environmentService, 'isProduction').mockReturnValue(false);
     directive = TestBed.inject(DevelopmentDirective);
 
     expect(directive.hasView).toEqual(true);
