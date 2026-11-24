@@ -64,6 +64,9 @@
                   "with": "src/environments/environment.development.ts"
                 }
               ]
+            },
+            "unit-test": {
+              "styles": []
             }
           },
           "defaultConfiguration": "production"
@@ -89,7 +92,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "buildTarget": "receipt-wrangler:build:production",
+            "buildTarget": "receipt-wrangler:build:production,unit-test",
             "tsConfig": "tsconfig.spec.json",
             "runnerConfig": "vitest.config.ts",
             "include": ["src/**/*.spec.ts"],

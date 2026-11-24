@@ -87,6 +87,9 @@ describe("GroupDashboardsComponent", () => {
     fixture.detectChanges();
   });
 
+  // The navigation tests run on fake timers; put the real ones back even if one fails.
+  afterEach(() => vi.useRealTimers());
+
   it("should create", () => {
     expect(component).toBeTruthy();
   });
@@ -149,7 +152,6 @@ describe("GroupDashboardsComponent", () => {
 
     vi.runOnlyPendingTimers();
     expect(navSpy).toHaveBeenCalledWith("/dashboard/group/1/7");
-    vi.useRealTimers();
   });
 
   it("navigates to the already-selected dashboard when data lands (warm/deep-link)", () => {
@@ -165,7 +167,6 @@ describe("GroupDashboardsComponent", () => {
 
     expect(navSpy).toHaveBeenCalledWith("/dashboard/group/1/5");
     expect(store.selectSnapshot(GroupState.selectedDashboardId)).toBe("5");
-    vi.useRealTimers();
   });
 
   it("does not navigate when the group has no dashboards and none is selected", () => {
@@ -177,7 +178,6 @@ describe("GroupDashboardsComponent", () => {
     vi.runOnlyPendingTimers();
 
     expect(navSpy).not.toHaveBeenCalled();
-    vi.useRealTimers();
   });
 
   it("should set selected dashboard id", () => {

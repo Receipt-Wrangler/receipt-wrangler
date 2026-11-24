@@ -96,29 +96,32 @@ describe("ReceiptFormComponent", () => {
 
   it("should init form correctly when there is no initial data", () => {
     vi.useFakeTimers();
-    // Midday UTC, so "today" in the default UTC app zone is Jan 1 whatever the
-    // test machine's own zone; the form holds it as that day's local midnight.
-    vi.setSystemTime(new Date(Date.UTC(2020, 0, 1, 12)));
-    const mockedDate = new Date(2020, 0, 1);
-    component.ngOnInit();
+    try {
+      // Midday UTC, so "today" in the default UTC app zone is Jan 1 whatever the
+      // test machine's own zone; the form holds it as that day's local midnight.
+      vi.setSystemTime(new Date(Date.UTC(2020, 0, 1, 12)));
+      const mockedDate = new Date(2020, 0, 1);
+      component.ngOnInit();
 
-    expect(component.form.value).toEqual({
-      name: "",
-      amount: "",
-      categories: [],
-      tags: [],
-      date: mockedDate,
-      paidByUserId: "",
-      // "" rather than the 0 this used to seed via Number(""): both read as
-      // blank in the picker, but Validators.required treats 0 as PRESENT, so
-      // the old sentinel left a group-less form valid.
-      groupId: "",
-      status: ReceiptStatus.Open,
-      customFields: [],
-      receiptItems: [],
-      syncAmountWithItems: false,
-    });
-    vi.useRealTimers();
+      expect(component.form.value).toEqual({
+        name: "",
+        amount: "",
+        categories: [],
+        tags: [],
+        date: mockedDate,
+        paidByUserId: "",
+        // "" rather than the 0 this used to seed via Number(""): both read as
+        // blank in the picker, but Validators.required treats 0 as PRESENT, so
+        // the old sentinel left a group-less form valid.
+        groupId: "",
+        status: ReceiptStatus.Open,
+        customFields: [],
+        receiptItems: [],
+        syncAmountWithItems: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("should patch magic fill values correctly", () => {

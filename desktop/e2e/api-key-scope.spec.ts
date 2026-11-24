@@ -3,7 +3,7 @@ import { stubTokenRefresh } from './helpers/auth';
 
 // An API key's scope (r / w / rw) is enforced on every request, so the owner
 // has to be able to pick it — on create AND on edit, since a key created before
-// the picker was offered can only be fixed by editing it. The Jest specs drive
+// the picker was offered can only be fixed by editing it. The unit specs drive
 // the form against a mocked ApiKeyService; this spec proves the chosen scope
 // goes out on the wire, is stored, and comes back into the table and the form.
 

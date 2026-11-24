@@ -114,9 +114,12 @@ describe("ReportReceiptsDialogComponent", () => {
   it("opens the full receipt page in a new tab", () => {
     const { component } = configure();
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
-    component.openFullReceipt(receipts[0]);
-    expect(openSpy).toHaveBeenCalledWith("/receipts/7/view", "_blank");
-    openSpy.mockRestore();
+    try {
+      component.openFullReceipt(receipts[0]);
+      expect(openSpy).toHaveBeenCalledWith("/receipts/7/view", "_blank");
+    } finally {
+      openSpy.mockRestore();
+    }
   });
 
   // Added At is an instant, so the subtitle says which zone its days are read in.

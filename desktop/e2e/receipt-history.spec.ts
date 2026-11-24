@@ -21,7 +21,7 @@ import {
 // One receipt goes through four recorded saves, each through the real API:
 // created, edited (name + amount), commented on, and bulk-resolved. The comment
 // and the bulk resolve are the two changes that recorded nothing before this
-// feature, so their entries prove the new recording reaches the wire. The Jest
+// feature, so their entries prove the new recording reaches the wire. The unit
 // specs build the history response by hand; this proves the drawer renders what
 // the real server computes.
 //

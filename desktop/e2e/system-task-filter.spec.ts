@@ -13,7 +13,7 @@ import {
 
 // The System Tasks table's filter, end to end.
 //
-// The Jest specs cover the chip labels, the state actions and the dialog
+// The unit specs cover the chip labels, the state actions and the dialog
 // against a mocked store, so what only an e2e can prove is the wire:
 //
 //   - the filter reaches the API and the SERVER narrows (totalCount included,

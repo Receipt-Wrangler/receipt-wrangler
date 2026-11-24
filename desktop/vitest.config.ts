@@ -10,6 +10,11 @@ export default defineConfig({
     isolate: true,
     // The builder silently picks happy-dom whenever it can resolve it; the suite targets jsdom.
     environment: "jsdom",
+    // Node 25+ ships its own localStorage global, which Vitest's jsdom environment leaves in place
+    // of jsdom's, so specs (and the NGXS storage plugin) would get Node's, unusable without a
+    // backing file. Turn Node's off in the test workers. Older Nodes have no such global, and
+    // Node 20 would reject the flag, so it is only passed when it is needed.
+    execArgv: "localStorage" in globalThis ? ["--no-experimental-webstorage"] : [],
     coverage: {
       // CI's coverage summary and Codecov steps read cobertura-coverage.xml from this folder.
       // angular.json has no option for it, and the builder's default is coverage/<project>.

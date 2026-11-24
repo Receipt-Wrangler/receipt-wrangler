@@ -21,7 +21,7 @@ test.describe.configure({ mode: 'serial' });
 /**
  * The receipts table's Comment column: each receipt's FIRST comment, sortable.
  *
- * The Jest specs build columns against a mocked store, so they prove nothing
+ * The unit specs build columns against a mocked store, so they prove nothing
  * about the wire. What only an e2e can show: the paged list actually carrying
  * `firstComment`, the earliest comment winning over a later one, and the
  * `first_comment` sort key round-tripping to the API instead of being rejected.

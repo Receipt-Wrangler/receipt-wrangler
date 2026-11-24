@@ -1676,7 +1676,7 @@ before and after).
 **Where the configuration lives.** The `test` target in `angular.json` holds the spec globs,
 `setupFiles` (`src/test-setup.ts`, the jsdom canvas stub), `providersFile` (`src/test-providers.ts`)
 and **every coverage option**. `vitest.config.ts` holds only what the builder cannot express:
-`isolate`, `environment` and the coverage `reportsDirectory`.
+`isolate`, `environment`, `execArgv` and the coverage `reportsDirectory`.
 
 Things that are different from Jest and will bite:
 
@@ -1688,7 +1688,8 @@ Things that are different from Jest and will bite:
   so `vi.mock("qrcode", …)` works (about, auth-form and login-qr specs). To fake app code, provide a
   double through TestBed. To fake a plain function, stub what it touches. `captureDownloads()`
   (`src/testing/download.testing.ts`) does this for `downloadFile`: it records each
-  `{ blob, filename }` off `URL.createObjectURL` and the anchor click.
+  `{ blob, filename }` off `URL.createObjectURL` and the anchor click. It only intercepts anchors
+  pointing at an object URL it made, so other link clicks in the same test still go through.
 - **Use the global `vi`; never `import { vi } from "vitest"`.** esbuild can rename an imported
   binding, and Vitest only hoists `vi.mock` called on something literally named `vi`. Types are
   imports: `import type { Mock, Mocked, MockInstance } from "vitest"`. `vi.fn` takes a single
@@ -1701,14 +1702,22 @@ Things that are different from Jest and will bite:
   a non-configurable `navigator.clipboard`, `localStorage` via the NGXS storage plugin. Measured with
   isolation off, 10 tests in `input.component.spec.ts` failed, depending on file order. Isolation
   roughly doubles the run (~190s vs ~90s on 4 cores). Fix the leaks before turning it off.
+  **`--debug` turns isolation off anyway**: the builder forces `isolate: false` and
+  `fileParallelism: false` so a single inspector session covers the run. Always pair `--debug` with
+  an `--include` naming one spec file, or leaks from other files can change its outcome.
 - **TestBed is initialized by the builder**, zoneless because `polyfills` is empty. It sets
   `errorOnUnknownElements` / `errorOnUnknownProperties` to **true**. Opt out per spec with
   `configureTestingModule({ errorOnUnknownElements: false, … })` only when you mean it.
   `src/test-providers.ts` adds an `ErrorHandler` that rethrows, as jest-preset-angular did. Without
   it, an error reported straight to `ErrorHandler` (NGXS's unhandled action errors) would only log.
-- **`buildTarget` is `build:production`, on purpose.** It keeps `environment.ts` (`isProd: true`),
-  which the specs were written against. It also keeps `namedChunks` off, and the coverage patterns
-  below rely on the `chunk-*.js` names. The builder still turns optimization and budgets off.
+- **`buildTarget` is `build:production,unit-test`, on purpose.** `production` keeps `environment.ts`
+  (`isProd: true`), which the specs were written against. It also keeps `namedChunks` off, and the
+  coverage patterns below rely on the `chunk-*.js` names. The builder still turns optimization and
+  budgets off. The `unit-test` build configuration only empties `styles`: jsdom never loads the
+  global stylesheets (the builder links them only into Vitest's browser mode), and compiling
+  Bootstrap's SCSS printed 300+ Sass deprecation warnings on every run. Component styles are
+  unaffected. The NG8102/NG8107/NG8114 template warnings that still print come from app templates,
+  and `ng build` shows them too.
 - **Coverage options go in `angular.json`, never in `vitest.config.ts`.** The builder adds the
   bundle patterns (`spec-*.js`, `chunk-*.js`) only to `coverageInclude`. An `include` in the Vitest
   config filters out every executed bundle and produces an empty report that fails the thresholds.
@@ -1722,8 +1731,17 @@ Things that are different from Jest and will bite:
   its test finished. That makes a leaked RxJS error a hard failure:
   `swallowUnhandledRxjsErrors` (`src/testing/rxjs-unhandled-errors.ts`) is how a spec drives a
   deliberately unhandled error.
-- **Node 25+ only:** Node's own `localStorage` global is not replaced by jsdom's there, so the NGXS
-  storage specs break locally. CI and Docker are on Node 24.
+- **Node 25+ has its own `localStorage` global**, and Vitest's jsdom environment leaves it in place
+  of jsdom's. Without a backing file it is unusable, which failed 20 tests (the header and
+  token-refresh specs) on Node 26. Node 26 is the current LTS and what `docker/dev/Dockerfile`
+  installs via NodeSource. `vitest.config.ts` passes `--no-experimental-webstorage` to the test
+  workers whenever Node defines that global, so the suite runs the same on Node 24 (CI) and 26.
+- **Editors show Vitest's globals everywhere.** The root `tsconfig.json` loads `vitest/globals` and
+  `node` types for editors, so `expect` / `vi` / `NodeJS` resolve in app and e2e code in the editor
+  even though `ng build` and Playwright don't provide them. An e2e spec must import `expect` from
+  `@playwright/test` itself. A solution-style root was tried and dropped: `tsserver` assigns files by
+  `include` patterns, and `tsconfig.app.json` lists only `src/main.ts`, so app files then landed in
+  the wrong project.
 
 ## E2E Testing
 

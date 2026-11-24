@@ -43,6 +43,9 @@ describe("TokenRefreshService", () => {
     router = TestBed.inject(Router);
   });
 
+  // Restore spies (Storage.prototype.clear especially) even when a test fails partway through.
+  afterEach(() => vi.restoreAllMocks());
+
   it("should be created", () => {
     expect(service).toBeTruthy();
   });
@@ -86,7 +89,6 @@ describe("TokenRefreshService", () => {
       expect(dispatchSpy).toHaveBeenCalledWith(new Logout());
       expect(clearSpy).toHaveBeenCalled();
       expect(navigateSpy).toHaveBeenCalledWith(["/auth/login"]);
-      clearSpy.mockRestore();
     });
 
     it("should navigate to /auth/login on refresh failure", async () => {
@@ -94,13 +96,12 @@ describe("TokenRefreshService", () => {
         throwError(() => new Error("fail"))
       );
       vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
-      const clearSpy = vi.spyOn(Storage.prototype, "clear");
+      vi.spyOn(Storage.prototype, "clear");
       const navigateSpy = vi.spyOn(router, "navigate").mockResolvedValue(true);
 
       await expect(firstValueFrom(service.refreshToken())).rejects.toThrow("fail");
 
       expect(navigateSpy).toHaveBeenCalledWith(["/auth/login"]);
-      clearSpy.mockRestore();
     });
 
     it("should serialize concurrent calls — only one HTTP request fires", () => {
@@ -164,7 +165,7 @@ describe("TokenRefreshService", () => {
       const spy = vi.spyOn(authService, "getNewRefreshToken");
       vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
       vi.spyOn(router, "navigate").mockResolvedValue(true);
-      const clearSpy = vi.spyOn(Storage.prototype, "clear");
+      vi.spyOn(Storage.prototype, "clear");
 
       // First call — fails
       spy.mockReturnValue(throwError(() => new Error("fail")));
@@ -175,8 +176,6 @@ describe("TokenRefreshService", () => {
       spy.mockReturnValue(of(mockClaims as any));
       service.refreshToken().subscribe();
       expect(spy).toHaveBeenCalledTimes(2);
-
-      clearSpy.mockRestore();
     });
 
     it("should propagate error to all concurrent subscribers on failure", () => {
@@ -186,7 +185,7 @@ describe("TokenRefreshService", () => {
       );
       vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
       vi.spyOn(router, "navigate").mockResolvedValue(true);
-      const clearSpy = vi.spyOn(Storage.prototype, "clear");
+      vi.spyOn(Storage.prototype, "clear");
 
       const errors: any[] = [];
       service.refreshToken().subscribe({ error: (e) => errors.push(e) });
@@ -198,8 +197,6 @@ describe("TokenRefreshService", () => {
       expect(errors.length).toBe(2);
       expect(errors[0]).toBe(error);
       expect(errors[1]).toBe(error);
-
-      clearSpy.mockRestore();
     });
 
     it("should dispatch Logout only once for concurrent failures", () => {
@@ -209,7 +206,7 @@ describe("TokenRefreshService", () => {
       );
       const dispatchSpy = vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
       vi.spyOn(router, "navigate").mockResolvedValue(true);
-      const clearSpy = vi.spyOn(Storage.prototype, "clear");
+      vi.spyOn(Storage.prototype, "clear");
 
       service.refreshToken().subscribe({ error: () => {} });
       service.refreshToken().subscribe({ error: () => {} });
@@ -220,8 +217,6 @@ describe("TokenRefreshService", () => {
         ([action]) => action instanceof Logout
       );
       expect(logoutCalls.length).toBe(1);
-
-      clearSpy.mockRestore();
     });
 
     it("should not dispatch SetAuthState on failure", () => {
@@ -230,7 +225,7 @@ describe("TokenRefreshService", () => {
       );
       const dispatchSpy = vi.spyOn(store, "dispatch").mockReturnValue(of(undefined));
       vi.spyOn(router, "navigate").mockResolvedValue(true);
-      const clearSpy = vi.spyOn(Storage.prototype, "clear");
+      vi.spyOn(Storage.prototype, "clear");
 
       service.refreshToken().subscribe({ error: () => {} });
 
@@ -238,8 +233,6 @@ describe("TokenRefreshService", () => {
         ([action]) => action instanceof SetAuthState
       );
       expect(setAuthCalls.length).toBe(0);
-
-      clearSpy.mockRestore();
     });
 
     it("should update auth state expiration date on success", async () => {
