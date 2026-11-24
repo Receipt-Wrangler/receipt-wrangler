@@ -7,7 +7,6 @@ import { FormGroup } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { MatChipsModule } from "@angular/material/chips";
 import { MatIconModule } from "@angular/material/icon";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { ButtonComponent } from "../../button/index";
@@ -35,7 +34,7 @@ describe("SystemTaskTableComponent", () => {
         MatChipsModule,
         MatIconModule,
         NgxsModule.forRoot([SystemTaskTableState, UserState]),
-        NoopAnimationsModule, SystemTaskTableComponent],
+        SystemTaskTableComponent],
       providers: [{
         provide: ActivatedRoute,
         useValue: {

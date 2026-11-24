@@ -5,7 +5,6 @@ import { ReactiveFormsModule } from "@angular/forms";
 import { MatAutocompleteModule } from "@angular/material/autocomplete";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { Router } from "@angular/router";
 import { of } from "rxjs";
 import { ApiModule, SearchResult, SearchService } from "../../open-api";
@@ -25,7 +24,7 @@ describe("SearchbarComponent", () => {
         ReactiveFormsModule,
         MatFormFieldModule,
         MatInputModule,
-        NoopAnimationsModule, SearchbarComponent],
+        SearchbarComponent],
     providers: [
         { provide: Router, useValue: { navigateByUrl: vi.fn().mockResolvedValue(true) } },
         provideHttpClient(withInterceptorsFromDi()),

@@ -3,7 +3,6 @@ import { CurrencyPipe } from "@angular/common";
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
 import { importProvidersFrom } from "@angular/core";
 import { DomSanitizer } from "@angular/platform-browser";
-import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
 import { provideRouter } from "@angular/router";
 import { provideCharts, withDefaultRegisterables } from "ng2-charts";
 import { provideNgxMask } from "ngx-mask";
@@ -96,7 +95,6 @@ const ngxsStorageKeys = [
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
-    provideAnimationsAsync(),
     provideHttpClient(withInterceptors([httpInterceptor])),
     provideRouter(appRoutes),
     provideNgxMask(),

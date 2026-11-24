@@ -4,7 +4,6 @@ import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialog } from "@angular/material/dialog";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
 import { NEVER, of, throwError } from "rxjs";
@@ -38,7 +37,6 @@ describe("ReceiptHistoryDrawerComponent", () => {
     await TestBed.configureTestingModule({
       imports: [
         ReceiptHistoryDrawerComponent,
-        NoopAnimationsModule,
         NgxsModule.forRoot([UserState, SystemSettingsState]),
       ],
       providers: [

@@ -3,7 +3,6 @@ import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder, FormGroup } from "@angular/forms";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
 import { ReportGenerateBarComponent } from "./report-generate-bar.component";
 
@@ -17,7 +16,7 @@ describe("ReportGenerateBarComponent", () => {
       // The real ButtonComponent renders the Save/Generate app-buttons as real <button>s
       // whose rendered/disabled state the DOM assertions below can inspect. The bar no
       // longer gates on permissions itself — the parent passes resolved booleans.
-      imports: [NoopAnimationsModule, ReportGenerateBarComponent],
+      imports: [ReportGenerateBarComponent],
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([]),

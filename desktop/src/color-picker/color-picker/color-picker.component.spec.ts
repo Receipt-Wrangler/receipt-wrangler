@@ -5,7 +5,6 @@ import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
 describe('ColorPickerComponent', () => {
   let component: ColorPickerComponent;
@@ -17,7 +16,6 @@ describe('ColorPickerComponent', () => {
         ReactiveFormsModule,
         MatFormFieldModule,
         MatInputModule,
-        NoopAnimationsModule,
         ColorPickerComponent,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],

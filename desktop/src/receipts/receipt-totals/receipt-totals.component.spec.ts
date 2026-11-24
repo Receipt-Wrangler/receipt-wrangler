@@ -1,7 +1,6 @@
 import { CurrencyPipe } from "@angular/common";
 import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { NgxsModule } from "@ngxs/store";
 import { Group, ReceiptStatus, ReceiptSummary, ReceiptSummaryPosition } from "../../open-api";
 import { SystemSettingsState } from "../../store/system-settings.state";
@@ -35,7 +34,6 @@ describe("ReceiptTotalsComponent", () => {
     await TestBed.configureTestingModule({
       imports: [
         ReceiptTotalsComponent,
-        NoopAnimationsModule,
         NgxsModule.forRoot([SystemSettingsState]),
       ],
       providers: [provideZonelessChangeDetection(), CurrencyPipe],
@@ -207,7 +205,6 @@ describe("ReceiptTotalsComponent position", () => {
     await TestBed.configureTestingModule({
       imports: [
         ReceiptTotalsComponent,
-        NoopAnimationsModule,
         NgxsModule.forRoot([SystemSettingsState]),
       ],
       providers: [provideZonelessChangeDetection(), CurrencyPipe],

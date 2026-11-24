@@ -80,7 +80,8 @@
     ></app-button>
     @if ((numFiltersApplied() ?? 0) > 0) {
       <app-button
-        @fadeInOut
+        animate.enter="rw-fade-enter"
+        animate.leave="rw-fade-leave"
         class="me-2"
         data-testid="receipts-filter-reset"
         icon="restart_alt"
@@ -212,7 +213,8 @@
 }
 @if (selectedReceiptIds().length) {
   <app-summary-card
-    @fadeInOut
+    animate.enter="rw-fade-enter"
+    animate.leave="rw-fade-leave"
     headerText="Selected Receipt summary"
     [receiptIds]="selectedReceiptIds()"
     [groupId]="selectedGroupId() ?? ''"

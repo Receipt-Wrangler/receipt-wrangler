@@ -2,7 +2,6 @@ import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
 import { AiType, OcrEngine, ReceiptProcessingSettings } from "../../open-api";
@@ -22,7 +21,6 @@ describe("ReceiptProcessingSettingsFormComponent", () => {
     await TestBed.configureTestingModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [NgxsModule.forRoot([ReceiptProcessingSettingsTaskTableState]),
-        NoopAnimationsModule,
         ReactiveFormsModule,
         ReceiptProcessingSettingsFormComponent],
     providers: [

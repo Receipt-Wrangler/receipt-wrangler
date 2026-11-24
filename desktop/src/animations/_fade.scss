@@ -1,0 +1,29 @@
+// The app's shared fade, for Angular's native enter/leave animations:
+//
+//   <div animate.enter="rw-fade-enter" animate.leave="rw-fade-leave">
+//
+// Angular only plays a leave animation on the root node of the view being removed (the element
+// directly inside an @if or @for block), so `animate.leave` anywhere deeper never runs.
+// Global, because the classes are added to elements in several components' templates.
+
+.rw-fade-enter {
+  animation: rw-fade-in 200ms linear;
+}
+
+// `forwards` holds opacity 0 until Angular removes the element, so a removal that lands a moment
+// after the animation ends cannot flash it back into view.
+.rw-fade-leave {
+  animation: rw-fade-out 200ms linear forwards;
+}
+
+@keyframes rw-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes rw-fade-out {
+  to {
+    opacity: 0;
+  }
+}

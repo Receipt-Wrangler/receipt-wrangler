@@ -1,7 +1,6 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute, Router } from "@angular/router";
 import { RouterTestingModule } from "@angular/router/testing";
 import { NgxsModule } from "@ngxs/store";
@@ -38,7 +37,6 @@ describe("OidcCallbackComponent", () => {
       imports: [
         ApiModule,
         NgxsModule.forRoot([AuthState, FeatureConfigState, GroupState, UserState]),
-        NoopAnimationsModule,
         RouterTestingModule,
         OidcCallbackComponent,
       ],

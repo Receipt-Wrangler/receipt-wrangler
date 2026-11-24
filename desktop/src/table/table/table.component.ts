@@ -1,4 +1,3 @@
-import { animate, state, style, transition, trigger } from "@angular/animations";
 import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { SelectionModel } from "@angular/cdk/collections";
 import { Component, OnChanges, SimpleChanges, input, output, viewChild } from "@angular/core";
@@ -15,13 +14,6 @@ import { RowExpandablePipe } from "./row-expandable.pipe";
   selector: "app-table",
   templateUrl: "./table.component.html",
   styleUrls: ["./table.component.scss"],
-  animations: [
-    trigger("detailExpand", [
-      state("collapsed,void", style({ height: "0px", minHeight: "0" })),
-      state("expanded", style({ height: "*" })),
-      transition("expanded <=> collapsed", animate("225ms cubic-bezier(0.4, 0.0, 0.2, 1)")),
-    ]),
-  ],
   imports: [MatTable, MatSort, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCheckbox, MatCellDef, MatCell, MatSortHeader, NgTemplateOutlet, ButtonComponent, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatPaginator, RowExpandablePipe]
 })
 export class TableComponent implements OnChanges {

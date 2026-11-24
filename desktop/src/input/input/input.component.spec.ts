@@ -9,7 +9,6 @@ import { MatIconModule } from "@angular/material/icon";
 import { MatInputModule } from "@angular/material/input";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { By } from "@angular/platform-browser";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { NgxsModule, Store } from "@ngxs/store";
 import { NgxMaskDirective, provideNgxMask } from "ngx-mask";
 import { PasswordGeneratorService } from "../../services/password-generator.service";
@@ -37,7 +36,6 @@ describe("InputComponent", () => {
         MatIconModule,
         MatInputModule,
         MatTooltipModule,
-        NoopAnimationsModule,
         ReactiveFormsModule,
         NgxMaskDirective,
         NgxsModule.forRoot([SystemSettingsState]),

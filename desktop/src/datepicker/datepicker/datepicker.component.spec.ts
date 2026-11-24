@@ -6,7 +6,6 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { DatepickerComponent } from './datepicker.component';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 
 describe('DatepickerComponent', () => {
   let component: DatepickerComponent;
@@ -20,7 +19,6 @@ describe('DatepickerComponent', () => {
         MatFormFieldModule,
         MatInputModule,
         MatNativeDateModule,
-        NoopAnimationsModule,
         ReactiveFormsModule,
         DatepickerComponent,
       ],

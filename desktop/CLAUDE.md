@@ -350,6 +350,24 @@ process.exit(bad.length ? 1 : 0);
   (`emailUploadTasks`, `panelTasks`). The email host used to index all its child tasks and showed
   an empty panel whenever an `HTML_TO_PDF` child came first; the processing-settings host had the
   same lookup, latent only because every child type the backend writes there gets a panel.
+- **Animations are CSS, driven by Angular's native `animate.enter` / `animate.leave`.**
+  `@angular/animations` is gone (Angular deprecated it, and Material 21 no longer needs it), so there
+  are no `trigger()`s and no `provideAnimationsAsync()`. Fade with the global classes in
+  `src/animations/_fade.scss`: `animate.enter="rw-fade-enter"` and `animate.leave="rw-fade-leave"`.
+  - **Leave only plays on the root node of the view being removed**: the element directly inside the
+    `@if` / `@for` block. On anything deeper it never runs, and a component destroyed by navigation
+    plays none. That is why `system-settings-form`'s alert and `oidc-callback`'s spinner carry
+    `animate.enter` only. The old trigger engine behaved the same way, so these were never fading out.
+  - **Use keyframes (`animation`), not `transition`, for an enter class.** The element is inserted
+    with the class already on it, so a transition has no earlier style to start from without
+    `@starting-style`.
+  - **A state change that is not an enter or leave is a class plus a CSS `transition`.** `app-table`'s
+    expandable row is the example: `--expanded` switches `grid-template-rows` between `0fr` and `1fr`,
+    which animates to the content's own height where `height: auto` cannot.
+- **Chart.js plugins are passed per chart, never `Chart.register`ed.** `app-pie-chart-ui` takes a
+  `plugins` input and hands it to `baseChart`. The dashboard pie's slice percentages are a local
+  plugin (`dashboard/pie-chart/slice-percentage-labels.plugin.ts`), not `chartjs-plugin-datalabels`.
+  A registered plugin runs on every chart in the app.
 
 ### Use Established Patterns (do not invent one-offs)
 New UI MUST reuse the application's established patterns and shared components rather than
@@ -1710,6 +1728,10 @@ Things that are different from Jest and will bite:
   `configureTestingModule({ errorOnUnknownElements: false, … })` only when you mean it.
   `src/test-providers.ts` adds an `ErrorHandler` that rethrows, as jest-preset-angular did. Without
   it, an error reported straight to `ErrorHandler` (NGXS's unhandled action errors) would only log.
+  It also provides `ANIMATION_MODULE_TYPE: "NoopAnimations"`, which turns off Material's and the CDK
+  overlays' animations in every spec, so **no spec imports `NoopAnimationsModule`** (the package is
+  gone). The app's own `animate.enter` / `animate.leave` need nothing: jsdom has no
+  `getAnimations`, so Angular skips them and a leaving element is removed at once.
 - **`buildTarget` is `build:production,unit-test`, on purpose.** `production` keeps `environment.ts`
   (`isProd: true`), which the specs were written against. It also keeps `namedChunks` off, and the
   coverage patterns below rely on the `chunk-*.js` names. The builder still turns optimization and

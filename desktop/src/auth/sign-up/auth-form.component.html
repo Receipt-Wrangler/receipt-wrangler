@@ -1,10 +1,10 @@
 @if (isLoading()) {
-  <div class="loading-container" @fadeInOut>
+  <div class="loading-container" animate.enter="rw-fade-enter" animate.leave="rw-fade-leave">
     <img src="assets/branding/loading.gif" class="loading-gif">
     <div class="loading-text">Loading...</div>
   </div>
 } @else {
-  <div class="auth-container" @fadeIn>
+  <div class="auth-container" animate.enter="rw-fade-enter">
     <div class="auth-card">
       <!-- Logo and Welcome -->
       <div class="logo-section">

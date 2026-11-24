@@ -5,7 +5,6 @@ import { MatCardModule } from "@angular/material/card";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatSort } from "@angular/material/sort";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute, Router, provideRouter } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
@@ -30,7 +29,6 @@ describe("GroupFormComponent", () => {
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState]),
-        NoopAnimationsModule,
         ReactiveFormsModule,
         GroupFormComponent, GroupMemberFormComponent],
     providers: [

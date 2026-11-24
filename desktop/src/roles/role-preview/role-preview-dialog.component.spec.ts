@@ -1,7 +1,6 @@
 import type { Mock } from "vitest";
 import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { MAT_DIALOG_DATA } from "@angular/material/dialog";
 import { of, throwError } from "rxjs";
 import {
@@ -50,7 +49,7 @@ describe("RolePreviewDialogComponent", () => {
   beforeEach(async () => {
     getPermissionsMock = vi.fn().mockReturnValue(of(descriptors));
     await TestBed.configureTestingModule({
-      imports: [RolePreviewDialogComponent, NoopAnimationsModule],
+      imports: [RolePreviewDialogComponent],
       providers: [
         provideZonelessChangeDetection(),
         {
