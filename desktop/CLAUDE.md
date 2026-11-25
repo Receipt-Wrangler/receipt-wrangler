@@ -177,7 +177,17 @@ do not undo them without re-checking `npm audit`:
 - **`overrides` block in `package.json`** forces patched versions of transitive deps that a dependency
   otherwise pins inside vulnerable ranges. When `npm audit` flags a new transitive advisory that
   upstream hasn't bumped yet, add/raise the floor here rather than waiting on an upstream release.
-  - `@babel/core`, `esbuild`, `undici` — floors under the Angular toolchain.
+  - `@babel/core`, `esbuild`, `undici` — floors under the Angular toolchain. `undici` is still
+    needed: `jsdom` declares `^7.25.0` and `node-gyp` `^6.25.0`, neither of which excludes the
+    advisories fixed in 7.30.1.
+  - `glob` (`^14.0.2`) and `minimatch` (`^11.0.1`) — **cross-major**, under `@angular/cli` →
+    `pacote@21.5.1` (exact pin) → `@npmcli/package-json`, `cacache`, `ignore-walk`, `@tufjs/models`.
+    Those declare `glob@^13` / `minimatch@^10`, and *every* 13.x / 10.x release is inside the
+    advisory ranges, so no in-range floor exists; `npm audit` only offers Angular 22. Safe because
+    those four call only `glob()`, `minimatch()` and `new Minimatch(...)` + `.match()` / `.negate` /
+    `.globParts` — minimatch 11 removed `makeRe`, `AST` and the `debug` option, none of which they
+    touch. Re-check those call sites before raising either floor another major; drop both once the
+    CLI line ships a `pacote` whose tree is on glob 14 / minimatch 11.
   - `ts-morph` (`^28`) — `@ngxs/storage-plugin@21` peer-pins `ts-morph@21.0.1`, whose
     `@ts-morph/common@0.22` pulls `fast-glob` → `micromatch` → `braces`. The plugin never imports
     ts-morph (its tarball has no schematics), so the override is runtime-inert; NGXS 22 relaxes the
@@ -242,7 +252,7 @@ lockfile is written by the same npm that later runs `npm ci` on it.
 python3 - <<'EOF'
 import json, re
 NAMESPACES = ('@angular/', '@angular-devkit/', '@ngtools/')   # the peer-coupled family
-OVERRIDES  = ('@babel/core', 'esbuild',
+OVERRIDES  = ('@babel/core', 'esbuild', 'glob', 'minimatch',
               'ts-morph', 'undici')                            # keep in sync with package.json
 STALE      = ()                                                # e.g. ('handlebars', 'shell-quote')
 pat = re.compile(
