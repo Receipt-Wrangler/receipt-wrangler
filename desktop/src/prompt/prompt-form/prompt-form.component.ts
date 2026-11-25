@@ -25,7 +25,7 @@ import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 export class PromptFormComponent extends BaseFormComponent implements OnInit {
   public originalPrompt?: Prompt;
 
-  public promptVariables = ["categories", "tags", "currentYear", "ocrText"];
+  public promptVariables = ["categories", "tags", "currentYear", "ocrText", "customFields"];
 
   constructor(
     private activatedRoute: ActivatedRoute,
