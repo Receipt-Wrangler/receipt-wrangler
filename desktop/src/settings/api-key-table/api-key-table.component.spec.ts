@@ -3,7 +3,6 @@ import { HttpTestingController, provideHttpClientTesting } from "@angular/common
 import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialogModule } from "@angular/material/dialog";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { ApiKeyScope, ApiKeyView, Permission } from "../../open-api";
@@ -26,7 +25,6 @@ describe("ApiKeyTableComponent", () => {
       imports: [
         NgxsModule.forRoot([AuthState, ApiKeyTableState]),
         MatDialogModule,
-        NoopAnimationsModule,
         ApiKeyTableComponent,
       ],
       providers: [

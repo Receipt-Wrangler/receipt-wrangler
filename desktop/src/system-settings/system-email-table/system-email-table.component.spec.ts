@@ -1,7 +1,6 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import {ComponentFixture, TestBed} from "@angular/core/testing";
 import {MatTableDataSource} from "@angular/material/table";
-import {NoopAnimationsModule} from "@angular/platform-browser/animations";
 import {ActivatedRoute} from "@angular/router";
 import {NgxsModule} from "@ngxs/store";
 import {of} from "rxjs";
@@ -20,7 +19,7 @@ describe("SystemEmailsComponent", () => {
     await TestBed.configureTestingModule({
     imports: [
         NgxsModule.forRoot([SystemEmailTableState]),
-        NoopAnimationsModule, SystemEmailTableComponent],
+        SystemEmailTableComponent],
     providers: [{
             provide: ActivatedRoute,
             useValue: {}

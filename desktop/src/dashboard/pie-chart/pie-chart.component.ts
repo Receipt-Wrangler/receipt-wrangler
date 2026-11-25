@@ -1,7 +1,6 @@
 import { CommonModule, CurrencyPipe } from "@angular/common";
 import { Component, OnInit, OnChanges, SimpleChanges, input, signal } from "@angular/core";
-import { Chart, ChartConfiguration, ChartData } from "chart.js";
-import ChartDataLabels from "chartjs-plugin-datalabels";
+import { ChartConfiguration, ChartData, Plugin } from "chart.js";
 import { take, tap } from "rxjs";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import { ChartGrouping, PieChartData, PieChartDataCommand, Widget, WidgetService } from "../../open-api";
@@ -9,9 +8,7 @@ import { RECEIPT_DATE_FILTER_KEYS } from "../../constants/receipt-filter-fields.
 import { toDateWireFilter } from "../../utils/date-wire-filter";
 import { CardComponent } from "../../shared-ui/card/card.component";
 import { PieChartUiComponent } from "../../shared-ui/pie-chart/pie-chart.component";
-
-// Register the datalabels plugin
-Chart.register(ChartDataLabels);
+import { getSlicePercentage, slicePercentageLabelsPlugin } from "./slice-percentage-labels.plugin";
 
 @Component({
   selector: "app-pie-chart",
@@ -50,6 +47,8 @@ export class PieChartComponent implements OnInit, OnChanges {
 
   public pieChartOptions: ChartConfiguration<"pie">["options"];
 
+  public readonly chartPlugins: Plugin<"pie">[] = [slicePercentageLabelsPlugin];
+
   public isLoading = signal(true);
   public hasData = signal(false);
 
@@ -70,24 +69,10 @@ export class PieChartComponent implements OnInit, OnChanges {
             label: (context) => {
               const label = context.label || "";
               const value = context.parsed || 0;
-              const total = context.dataset.data.reduce((a: number, b: number) => a + Math.abs(b), 0);
-              const percentage = total > 0 ? ((Math.abs(value) / total) * 100).toFixed(1) : "0";
+              const percentage = getSlicePercentage(value, context.dataset.data);
               const formattedValue = this.customCurrencyPipe.transform(value);
               return `${label}: ${formattedValue} (${percentage}%)`;
             },
-          },
-        },
-        datalabels: {
-          color: "#fff",
-          font: {
-            weight: "bold",
-            size: 12,
-          },
-          formatter: (value: number, context: any) => {
-            const total = context.dataset.data.reduce((a: number, b: number) => a + Math.abs(b), 0);
-            const percentage = total > 0 ? ((Math.abs(value) / total) * 100).toFixed(1) : "0";
-            // Only show label if percentage is > 5% to avoid cluttering small slices
-            return parseFloat(percentage) > 5 ? `${percentage}%` : "";
           },
         },
       },

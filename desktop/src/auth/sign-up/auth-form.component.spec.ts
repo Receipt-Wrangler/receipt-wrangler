@@ -6,7 +6,6 @@ import {
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgxsModule, Store } from '@ngxs/store';
 import { of } from 'rxjs';
@@ -40,7 +39,6 @@ describe('AuthForm', () => {
     imports: [FeatureDirective,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, FeatureConfigState, GroupState]),
-        NoopAnimationsModule,
         ReactiveFormsModule,
         ApiModule,
         LoginQrComponent,

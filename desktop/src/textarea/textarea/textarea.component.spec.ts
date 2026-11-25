@@ -5,7 +5,6 @@ import { MatAutocompleteModule } from "@angular/material/autocomplete";
 import { MatFormField, MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { By } from "@angular/platform-browser";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { TextareaComponent } from "./textarea.component";
 
 describe("TextareaComponent", () => {
@@ -18,7 +17,6 @@ describe("TextareaComponent", () => {
         MatFormFieldModule,
         MatInputModule,
         ReactiveFormsModule,
-        NoopAnimationsModule,
         MatAutocompleteModule,
         TextareaComponent
       ],

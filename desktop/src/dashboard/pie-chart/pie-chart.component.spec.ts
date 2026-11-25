@@ -13,6 +13,7 @@ import { SystemSettingsState } from "../../store/system-settings.state";
 
 import { PieChartUiComponent } from "../../shared-ui/pie-chart/pie-chart.component";
 import { PieChartComponent } from "./pie-chart.component";
+import { slicePercentageLabelsPlugin } from "./slice-percentage-labels.plugin";
 
 describe("PieChartComponent", () => {
   let component: PieChartComponent;
@@ -352,10 +353,6 @@ describe("PieChartComponent", () => {
         component.pieChartOptions?.plugins?.tooltip?.callbacks?.label
       ).toBeDefined();
     });
-
-    it("should have datalabels configuration", () => {
-      expect(component.pieChartOptions?.plugins?.datalabels).toBeDefined();
-    });
   });
 
   describe("tooltip callback", () => {
@@ -406,53 +403,6 @@ describe("PieChartComponent", () => {
     });
   });
 
-  describe("datalabels formatter", () => {
-    it("should format percentage correctly for large slices", () => {
-      const formatter =
-        component.pieChartOptions?.plugins?.datalabels?.formatter;
-      expect(formatter).toBeDefined();
-
-      if (formatter) {
-        const mockContext = {
-          dataset: { data: [100, 100] },
-        };
-        const result = (formatter as Function)(50, mockContext);
-        expect(result).toBe("25.0%");
-      }
-    });
-
-    it("should return empty string for small slices (< 5%)", () => {
-      const formatter =
-        component.pieChartOptions?.plugins?.datalabels?.formatter;
-
-      if (formatter) {
-        const mockContext = {
-          dataset: { data: [100, 900] },
-        };
-        // 100 out of 1000 = 10%
-        const result = (formatter as Function)(4, mockContext);
-        // 4 out of 1000 = 0.4% which is < 5%
-        const smallResult = (formatter as Function)(4, {
-          dataset: { data: [4, 996] },
-        });
-        expect(smallResult).toBe("");
-      }
-    });
-
-    it("should handle zero total in formatter", () => {
-      const formatter =
-        component.pieChartOptions?.plugins?.datalabels?.formatter;
-
-      if (formatter) {
-        const mockContext = {
-          dataset: { data: [0, 0] },
-        };
-        const result = (formatter as Function)(0, mockContext);
-        expect(result).toBe("");
-      }
-    });
-  });
-
   describe("template rendering", () => {
     it("should display widget name in header", () => {
       fixture.detectChanges();
@@ -483,6 +433,14 @@ describe("PieChartComponent", () => {
         By.css("app-pie-chart-ui")
       );
       expect(pieChartUi).toBeTruthy();
+    });
+
+    it("gives the chart its slice percentage labels", () => {
+      fixture.detectChanges();
+
+      const pieChartUi = fixture.debugElement.query(By.directive(PieChartUiComponent))
+        .componentInstance as PieChartUiComponent;
+      expect(pieChartUi.plugins()).toEqual([slicePercentageLabelsPlugin]);
     });
   });
 

@@ -6,7 +6,6 @@ import { MatMenuModule, MatMenuTrigger } from "@angular/material/menu";
 import { MatSidenavModule } from "@angular/material/sidenav";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { By } from "@angular/platform-browser";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { Router } from "@angular/router";
 import { RouterTestingModule } from "@angular/router/testing";
 import { NgxsModule, Store } from "@ngxs/store";
@@ -49,7 +48,6 @@ describe("SidebarComponent", () => {
         MatMenuModule,
         MatSnackBarModule,
         MatSidenavModule,
-        NoopAnimationsModule,
         RouterTestingModule,
         ApiModule, SidebarComponent],
     providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi())]

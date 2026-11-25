@@ -1,7 +1,6 @@
 import { ScrollingModule } from "@angular/cdk/scrolling";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatListModule } from "@angular/material/list";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { RouterModule } from "@angular/router";
 import { DashboardListComponent } from "./dashboard-list.component";
 
@@ -13,7 +12,6 @@ describe("DashboardListComponent", () => {
     await TestBed.configureTestingModule({
       imports: [
         ScrollingModule,
-        NoopAnimationsModule,
         MatListModule,
         RouterModule.forRoot([]),
         DashboardListComponent

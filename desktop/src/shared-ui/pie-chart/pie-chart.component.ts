@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component, ViewEncapsulation, input } from "@angular/core";
-import { ChartConfiguration, ChartData } from "chart.js";
+import { ChartConfiguration, ChartData, Plugin } from "chart.js";
 import { BaseChartDirective } from "ng2-charts";
 
 @Component({
@@ -21,6 +21,9 @@ export class PieChartUiComponent {
     responsive: true,
     maintainAspectRatio: false,
 });
+
+  /** Plugins for this chart only, rather than registered with Chart.js for every chart. */
+  public readonly plugins = input<Plugin<"pie">[]>([]);
 
   public readonly height = input<string>("300px");
 

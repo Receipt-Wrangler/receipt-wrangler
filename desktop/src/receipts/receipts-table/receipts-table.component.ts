@@ -8,7 +8,6 @@ import { MatTableDataSource } from "@angular/material/table";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { catchError, EMPTY, filter, map, Subject, switchMap, take, tap } from "rxjs";
-import { fadeInOut } from "src/animations";
 import { ReceiptFilterService } from "src/services/receipt-filter.service";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { ResetReceiptFilter, SetColumnConfig, SetPage, SetPageSize, SetQuickDateField, SetReceiptFilterData, SetReceiptFilterField, SetSummaryConfigGroupId, } from "src/store/receipt-table.actions";
@@ -94,7 +93,6 @@ function receiptNoun(count: number): string {
   selector: "app-receipts-table",
   templateUrl: "./receipts-table.component.html",
   styleUrls: ["./receipts-table.component.scss"],
-  animations: [fadeInOut],
   encapsulation: ViewEncapsulation.None,
   host: DEFAULT_HOST_CLASS,
   // The chip labels are built in TS rather than the template, so the formatting

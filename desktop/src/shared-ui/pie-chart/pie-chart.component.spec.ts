@@ -271,6 +271,23 @@ describe("PieChartUiComponent", () => {
     });
   });
 
+  describe("plugins input", () => {
+    it("should have no plugins by default", () => {
+      expect(component.plugins()).toEqual([]);
+    });
+
+    it("should pass its plugins to the chart", () => {
+      const plugin = { id: "test-plugin" };
+      fixture.componentRef.setInput("plugins", [plugin]);
+      fixture.detectChanges();
+
+      const chart = fixture.debugElement
+        .query(By.directive(BaseChartDirective))
+        .injector.get(BaseChartDirective);
+      expect(chart.plugins).toEqual([plugin]);
+    });
+  });
+
   describe("state transitions", () => {
     it("should transition from loading to showing data", () => {
       fixture.componentRef.setInput('isLoading', true);

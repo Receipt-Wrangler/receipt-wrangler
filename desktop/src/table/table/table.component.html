@@ -73,11 +73,13 @@
     >
       <div
         class="expanded-row-content"
-        [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
-        <ng-template
-          [ngTemplateOutlet]="expandedRowTemplate()"
-          [ngTemplateOutletContext]="{ element: element }"
-        ></ng-template>
+        [class.expanded-row-content--expanded]="element == expandedElement">
+        <div class="expanded-row-content__inner">
+          <ng-template
+            [ngTemplateOutlet]="expandedRowTemplate()"
+            [ngTemplateOutletContext]="{ element: element }"
+          ></ng-template>
+        </div>
       </div>
     </td>
   </ng-container>

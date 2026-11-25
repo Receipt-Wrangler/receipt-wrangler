@@ -6,7 +6,6 @@ import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTableDataSource } from "@angular/material/table";
 import { By } from "@angular/platform-browser";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
@@ -57,7 +56,6 @@ describe("CustomFieldTableComponent", () => {
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, CustomFieldTableState]),
-        NoopAnimationsModule,
         CustomFieldTableComponent,
       ],
       providers: [

@@ -1,7 +1,6 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
 import { PromptTableState } from "../../store/prompt-table.state";
@@ -16,7 +15,7 @@ describe("PromptTableComponent", () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [NgxsModule.forRoot([PromptTableState]), NoopAnimationsModule, PromptTableComponent],
+    imports: [NgxsModule.forRoot([PromptTableState]), PromptTableComponent],
     providers: [{
             provide: ActivatedRoute,
             useValue: {

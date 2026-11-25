@@ -350,6 +350,24 @@ process.exit(bad.length ? 1 : 0);
   (`emailUploadTasks`, `panelTasks`). The email host used to index all its child tasks and showed
   an empty panel whenever an `HTML_TO_PDF` child came first; the processing-settings host had the
   same lookup, latent only because every child type the backend writes there gets a panel.
+- **Animations are CSS, driven by Angular's native `animate.enter` / `animate.leave`.**
+  `@angular/animations` is gone (Angular deprecated it, and Material 21 no longer needs it), so there
+  are no `trigger()`s and no `provideAnimationsAsync()`. Fade with the global classes in
+  `src/animations/_fade.scss`: `animate.enter="rw-fade-enter"` and `animate.leave="rw-fade-leave"`.
+  - **Leave only plays on the root node of the view being removed**: the element directly inside the
+    `@if` / `@for` block. On anything deeper it never runs, and a component destroyed by navigation
+    plays none. That is why `system-settings-form`'s alert and `oidc-callback`'s spinner carry
+    `animate.enter` only. The old trigger engine behaved the same way, so these were never fading out.
+  - **Use keyframes (`animation`), not `transition`, for an enter class.** The element is inserted
+    with the class already on it, so a transition has no earlier style to start from without
+    `@starting-style`.
+  - **A state change that is not an enter or leave is a class plus a CSS `transition`.** `app-table`'s
+    expandable row is the example: `--expanded` switches `grid-template-rows` between `0fr` and `1fr`,
+    which animates to the content's own height where `height: auto` cannot.
+- **Chart.js plugins are passed per chart, never `Chart.register`ed.** `app-pie-chart-ui` takes a
+  `plugins` input and hands it to `baseChart`. The dashboard pie's slice percentages are a local
+  plugin (`dashboard/pie-chart/slice-percentage-labels.plugin.ts`), not `chartjs-plugin-datalabels`.
+  A registered plugin runs on every chart in the app.
 
 ### Use Established Patterns (do not invent one-offs)
 New UI MUST reuse the application's established patterns and shared components rather than
@@ -1710,6 +1728,10 @@ Things that are different from Jest and will bite:
   `configureTestingModule({ errorOnUnknownElements: false, … })` only when you mean it.
   `src/test-providers.ts` adds an `ErrorHandler` that rethrows, as jest-preset-angular did. Without
   it, an error reported straight to `ErrorHandler` (NGXS's unhandled action errors) would only log.
+  It also provides `ANIMATION_MODULE_TYPE: "NoopAnimations"`, which turns off Material's and the CDK
+  overlays' animations in every spec, so **no spec imports `NoopAnimationsModule`** (the package is
+  gone). The app's own `animate.enter` / `animate.leave` need nothing: jsdom has no
+  `getAnimations`, so Angular skips them and a leaving element is removed at once.
 - **`buildTarget` is `build:production,unit-test`, on purpose.** `production` keeps `environment.ts`
   (`isProd: true`), which the specs were written against. It also keeps `namedChunks` off, and the
   coverage patterns below rely on the `chunk-*.js` names. The builder still turns optimization and
@@ -1848,6 +1870,37 @@ allows it.
 - Forms use a custom `<app-input>` wrapper over `<mat-form-field>`. `page.getByLabel('Username')` resolves through the `<mat-label>` association.
 - Submit buttons use `<app-button>` rendering `<button>` with visible text — `page.getByRole('button', { name: '...' })` works directly.
 - Error feedback is often a Material snackbar (not inline `<mat-error>`). When asserting errors, locate the snackbar container or its text, not the form.
+- **After picking a `mat-select` option, wait for its listbox to be gone before the next click.**
+  The closed panel plays a ~100ms exit animation, and its transparent backdrop covers the whole page
+  until the overlay detaches. A click in that window lands on the backdrop and does nothing: reopening
+  the same select then never opens it, and the old panel's options are found and then detached, which
+  reads as a 60s "element was detached from the DOM" timeout under load. A swallowed Save click is
+  worse, because an assertion that the form did not save then passes for the wrong reason. The open
+  listbox shares the field's label, so wait on
+  `expect(page.getByRole('listbox', { name: label, exact: true })).toHaveCount(0)`, as
+  `pickOption` in `quick-scan-config.spec.ts` does.
+- **After picking in a multiple-mode `app-autocomlete`, wait for the picker's zero-delay timer before
+  pressing Tab or Escape.** The picker acts on that timer (see "The chip picker's close-on-select
+  preference"). A key pressed before the timer fires dismisses nothing, and a re-opened panel is left
+  covering the dialog. Wait for what the timer produces. On the click, Material focuses the input
+  and sets `aria-expanded` to `"false"`, so neither signal below can pass early:
+  - **Preference off (the default):** the panel re-opens. Wait for
+    `expect(input).toHaveAttribute('aria-expanded', 'true')`. That attribute is set by the change
+    detection pass that ends with the `afterNextRender` callback in which `MatAutocompleteTrigger`
+    starts listening for Tab, so a Tab sent after it closes the panel.
+  - **Preference on:** the timer blurs the input instead, so wait for `expect(input).not.toBeFocused()`.
+  - **A spec running as a shared account (`e2e-admin`, `e2e-user`) does not control that
+    preference**, so accept either outcome. `receipt-summary.spec.ts` polls for
+    `aria-expanded === 'true' || document.activeElement !== input`.
+  - **The pick must leave at least one option.** The picker filters out what is already selected, and
+    Material only reports the panel open while it has options. If the pick removes the last one, the
+    re-open shows nothing, so `aria-expanded` stays `"false"` and the input keeps focus. Seed another
+    option so there is something to wait for.
+  - **Not `toHaveValue('')`.** Material writes the picker's `displayWith` result into the input on
+    the click itself, and the default `displayWith` returns `''`. So the input is empty before the
+    timer runs, whether or not anything was typed.
+  - **Not the listbox becoming visible either.** The re-open attaches the panel before that change
+    detection pass, so for a moment the panel is on screen but a Tab is still ignored.
 - **`getByLabel` matches substrings.** On any password field carrying the generate button, plain
   `getByLabel('Password')` resolves *two* elements — the input and the button, whose accessible name
   is "Generate password" — and fails on strict mode. Use `getByLabel('Password', { exact: true })`

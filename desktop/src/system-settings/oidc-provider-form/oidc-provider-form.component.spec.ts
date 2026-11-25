@@ -4,7 +4,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { RouterTestingModule } from "@angular/router/testing";
 import { NgxsModule } from "@ngxs/store";
 import { of, Subject, throwError } from "rxjs";
@@ -40,7 +39,6 @@ describe("OidcProviderFormComponent", () => {
         ApiModule,
         MatSnackBarModule,
         NgxsModule.forRoot([]),
-        NoopAnimationsModule,
         ReactiveFormsModule,
         RouterTestingModule,
         OidcProviderFormComponent,

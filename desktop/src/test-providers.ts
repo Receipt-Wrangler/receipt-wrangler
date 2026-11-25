@@ -1,4 +1,4 @@
-import { ErrorHandler, Provider } from "@angular/core";
+import { ANIMATION_MODULE_TYPE, ErrorHandler, Provider } from "@angular/core";
 
 // Providers added to every spec's TestBed environment (angular.json `providersFile`).
 //
@@ -16,6 +16,10 @@ const providers: Provider[] = [
       },
     },
   },
+  // Material and the CDK overlays skip their animations, so dialogs, menus and backdrops open and
+  // close without waiting on animation events jsdom never fires. (The app's own `animate.enter` /
+  // `animate.leave` need nothing here: Angular skips them under jsdom, which has no getAnimations.)
+  { provide: ANIMATION_MODULE_TYPE, useValue: "NoopAnimations" },
 ];
 
 export default providers;

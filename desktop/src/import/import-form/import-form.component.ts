@@ -5,7 +5,6 @@ import { DomSanitizer, SafeHtml } from "@angular/platform-browser";
 import { Store } from "@ngxs/store";
 import { prettyPrintJson } from "pretty-print-json";
 import { switchMap, take, tap } from "rxjs";
-import { fadeInOut } from "../../animations";
 import { BaseFormComponent } from "../../form";
 import { ReceiptFileUploadCommand } from "../../interfaces";
 import { FormOption } from "../../interfaces/form-option.interface";
@@ -25,7 +24,6 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
     selector: "app-import-form",
     templateUrl: "./import-form.component.html",
     styleUrl: "./import-form.component.scss",
-    animations: [fadeInOut],
     imports: [DialogComponent, ReactiveFormsModule, UploadImageComponent, SelectComponent, DialogFooterComponent, ButtonComponent, DeleteButtonComponent, FormGetPipe]
 })
 export class ImportFormComponent extends BaseFormComponent implements OnInit {

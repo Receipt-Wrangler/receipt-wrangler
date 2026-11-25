@@ -1,4 +1,4 @@
-import { Component, input } from "@angular/core";
+import { ApplicationRef, Component, input } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { firstValueFrom } from "rxjs";
@@ -21,6 +21,9 @@ describe("setDialogInputs", () => {
 
     setDialogInputs(dialogRef, { headerText: "Delete tag", count: 3 });
     await firstValueFrom(dialogRef.afterOpened());
+    // With animations off (src/test-providers.ts) the dialog reports itself open before the
+    // zoneless scheduler has rendered it, so let the app settle before reading the DOM.
+    await TestBed.inject(ApplicationRef).whenStable();
 
     expect(dialogRef.componentInstance.headerText()).toEqual("Delete tag");
     expect(dialogRef.componentInstance.count()).toEqual(3);

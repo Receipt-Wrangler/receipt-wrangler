@@ -4,7 +4,6 @@ import { ComponentFixture, TestBed, } from "@angular/core/testing";
 import { FormArray, FormControl, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
@@ -28,7 +27,6 @@ describe("QuickScanDialogComponent", () => {
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, GroupState, LayoutState]),
-        NoopAnimationsModule,
         ReactiveFormsModule,
         QuickScanDialogComponent],
     providers: [

@@ -6,7 +6,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { of } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { CustomFieldOption, CustomFieldService, CustomFieldType } from "../../open-api";
@@ -29,7 +28,6 @@ describe("CustomFieldFormComponent", () => {
       imports: [
         MatDialogModule,
         MatSnackBarModule,
-        NoopAnimationsModule,
         ReactiveFormsModule,
         CustomFieldFormComponent
       ],

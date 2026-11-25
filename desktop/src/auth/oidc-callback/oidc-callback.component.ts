@@ -4,7 +4,6 @@ import { Store } from "@ngxs/store";
 import { catchError, of, switchMap, tap } from "rxjs";
 import { UserService } from "src/open-api";
 import { setAppData } from "src/utils";
-import { fadeInOut } from "../../animations";
 import { GroupState } from "../../store";
 
 /**
@@ -24,7 +23,6 @@ import { GroupState } from "../../store";
   selector: "app-oidc-callback",
   templateUrl: "./oidc-callback.component.html",
   styleUrls: ["./oidc-callback.component.scss"],
-  animations: [fadeInOut],
 })
 export class OidcCallbackComponent implements OnInit {
   constructor(

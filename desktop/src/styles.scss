@@ -2,6 +2,7 @@
 @use "sass:map";
 @use "@angular/material" as mat;
 @use "./variables.scss" as variables;
+@use "./animations/fade";
 @use "material-icons/iconfont/filled.css";
 @use "material-icons/iconfont/outlined.css";
 @use "@fontsource/raleway";

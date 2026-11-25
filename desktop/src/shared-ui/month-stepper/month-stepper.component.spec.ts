@@ -1,6 +1,5 @@
 import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
 import { FilterMonth } from "../../utils/receipt-date-filter";
 import { MonthStepperComponent } from "./month-stepper.component";
@@ -24,7 +23,7 @@ describe("MonthStepperComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MonthStepperComponent, NoopAnimationsModule],
+      imports: [MonthStepperComponent],
       // app-button binds [routerLink], so it needs a router context.
       providers: [provideZonelessChangeDetection(), provideRouter([])],
     }).compileComponents();

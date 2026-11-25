@@ -4,7 +4,6 @@ import { FormArray, FormBuilder, FormGroup, ValidatorFn, Validators, ReactiveFor
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { startWith, switchMap, take, tap } from "rxjs";
-import { fadeInOut } from "../../animations/index";
 import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
 import { BaseFormComponent } from "../../form";
 import { FormOption } from "../../interfaces/form-option.interface";
@@ -50,7 +49,6 @@ interface QueueData extends FormOption {
   templateUrl: "./system-settings-form.component.html",
   styleUrl: "./system-settings-form.component.scss",
   providers: [InputReadonlyPipe],
-  animations: [fadeInOut],
   imports: [FormHeaderComponent, AlertComponent, AuditDetailSectionComponent, ReactiveFormsModule, FormSectionComponent, CheckboxComponent, AutocomleteComponent, InputComponent, NgTemplateOutlet, SelectComponent, FormButtonBarComponent, SubmitButtonComponent, EditButtonComponent, CardComponent, ButtonComponent, CustomCurrencyPipe, FormGetPipe, InputReadonlyPipe, TaskQueueFormControlPipe]
 })
 export class SystemSettingsFormComponent extends BaseFormComponent implements OnInit, AfterViewInit {

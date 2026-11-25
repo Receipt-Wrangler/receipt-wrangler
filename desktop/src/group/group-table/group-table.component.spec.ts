@@ -6,7 +6,6 @@ import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTableDataSource } from "@angular/material/table";
 import { By } from "@angular/platform-browser";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
@@ -36,7 +35,6 @@ describe("GroupTableComponent", () => {
         MatSnackBarModule,
         AppDatePipe,
         NgxsModule.forRoot([AuthState, GroupState, GroupTableState, SystemSettingsState]),
-        NoopAnimationsModule,
         GroupTableComponent,
       ],
       providers: [

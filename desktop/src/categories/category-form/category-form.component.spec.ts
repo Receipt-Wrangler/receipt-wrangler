@@ -4,7 +4,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef, } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { of } from "rxjs";
 import { DuplicateValidator } from "src/validators/duplicate-validator";
 import { ApiModule, CategoryService, CategoryView } from "../../open-api";
@@ -25,7 +24,7 @@ describe("CategoryForm", () => {
         MatDialogModule,
         MatSnackBarModule,
         ReactiveFormsModule,
-        NoopAnimationsModule, CategoryForm],
+        CategoryForm],
     providers: [
         provideRouter([]),
         provideNgxMask(),

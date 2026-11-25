@@ -7,7 +7,6 @@ import { BehaviorSubject, catchError, EMPTY, from, switchMap, tap } from "rxjs";
 import { AppData, AuthService, OidcProviderSummary } from "src/open-api";
 import { SnackbarService } from "src/services";
 import { setAppData } from "src/utils";
-import { fadeIn, fadeInOut } from "../../animations";
 import { FeatureConfigState, GroupState } from "../../store";
 import { UserValidators } from "../../validators";
 import { InputComponent } from "../../input/input/input.component";
@@ -23,7 +22,6 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
     styleUrls: ["./auth-form.component.scss"],
     encapsulation: ViewEncapsulation.None,
     providers: [UserValidators],
-    animations: [fadeInOut, fadeIn],
     imports: [ReactiveFormsModule, InputComponent, ButtonComponent, FeatureDirective, RouterLink, LoginQrComponent, AsyncPipe, FormGetPipe]
 })
 export class AuthForm implements OnInit {

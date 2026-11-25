@@ -1,9 +1,9 @@
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { CommonModule } from '@angular/common';
 import { Component, signal, TemplateRef, viewChild } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
+import { provideRouter } from '@angular/router';
 
 import { TableComponent } from './table.component';
 import { MatTableDataSource } from '@angular/material/table';
@@ -30,16 +30,31 @@ class ColumnContextHostComponent {
   displayedColumns = signal<string[]>([]);
 }
 
+/** Two rows with the built-in expand column and a detail template. */
+@Component({
+  template: `
+    <ng-template #detail let-element="element">Detail for {{ element.id }}</ng-template>
+    <app-table
+      [displayedColumns]="['expand']"
+      [dataSource]="dataSource"
+      [expandedRowTemplate]="detail"
+    ></app-table>
+  `,
+  imports: [TableComponent],
+})
+class ExpandableHostComponent {
+  dataSource = new MatTableDataSource<any>([{ id: 1 }, { id: 2 }]);
+}
+
 describe('TableComponent', () => {
   let component: TableComponent;
   let fixture: ComponentFixture<TableComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CommonModule, MatTableModule, MatSortModule, TableComponent, ColumnContextHostComponent],
-      // The expandedDetail row carries an animation trigger, so rendering the
-      // table (rather than only its class) needs an animations provider.
-      providers: [provideNoopAnimations()],
+      imports: [CommonModule, MatTableModule, MatSortModule, TableComponent, ColumnContextHostComponent, ExpandableHostComponent],
+      // The expander is a real app-button, which carries a routerLink.
+      providers: [provideRouter([])],
     }).compileComponents();
 
     fixture = TestBed.createComponent(TableComponent);
@@ -177,6 +192,30 @@ describe('TableComponent', () => {
 
   // The selection holds row objects, so a selected row the table no longer shows
   // must not survive into the next bulk action.
+  // The open/closed state is a class that the stylesheet animates, so this is what
+  // decides whether a row's detail is shown.
+  it("expands the clicked row's detail and collapses it on a second click", () => {
+    const hostFixture = TestBed.createComponent(ExpandableHostComponent);
+    hostFixture.detectChanges();
+    const host = hostFixture.nativeElement as HTMLElement;
+    const details = () => Array.from(host.querySelectorAll('.expanded-row-content'));
+    const expanded = () =>
+      details().map((detail) => detail.classList.contains('expanded-row-content--expanded'));
+    const clickExpander = (row: number) => {
+      host.querySelectorAll<HTMLButtonElement>('td.mat-column-expand button')[row].click();
+      hostFixture.detectChanges();
+    };
+
+    expect(expanded()).toEqual([false, false]);
+
+    clickExpander(1);
+    expect(expanded()).toEqual([false, true]);
+    expect(details()[1].textContent).toContain('Detail for 2');
+
+    clickExpander(1);
+    expect(expanded()).toEqual([false, false]);
+  });
+
   describe('selection across data changes', () => {
     const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
 

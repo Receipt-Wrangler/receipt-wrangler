@@ -4,7 +4,6 @@ import { CUSTOM_ELEMENTS_SCHEMA, DestroyRef } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
-import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { SYSTEM_RAN_BY_OPTION_ID } from "src/constants";
@@ -47,7 +46,6 @@ describe("SystemTaskFilterComponent", () => {
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
         MatDialogModule,
-        NoopAnimationsModule,
         ReactiveFormsModule,
         SystemTaskFilterComponent,
       ],

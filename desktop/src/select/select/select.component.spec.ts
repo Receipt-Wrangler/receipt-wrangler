@@ -2,7 +2,6 @@ import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from '@angular
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { BadgeComponent } from '../../shared-ui/badge/badge.component';
 import { OptionDisplayPipe } from '../pipes/option-display.pipe';
 import { ReadonlyValuePipe } from '../pipes/readonly-value.pipe';
@@ -19,7 +18,7 @@ describe('SelectComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MatSelectModule, ReactiveFormsModule, NoopAnimationsModule, BadgeComponent, SelectComponent, OptionDisplayPipe, ReadonlyValuePipe],
+      imports: [MatSelectModule, ReactiveFormsModule, BadgeComponent, SelectComponent, OptionDisplayPipe, ReadonlyValuePipe],
       providers: [provideZonelessChangeDetection()],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();
